@@ -1,0 +1,516 @@
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:mobile_scanner/mobile_scanner.dart';
+
+import '../../../../core/api/api_client.dart';
+import '../../../../core/api/repositories.dart';
+import '../../../../core/models/models.dart';
+import '../../../../core/theme/app_theme.dart';
+import '../../../../core/widgets/domain_widgets.dart';
+
+enum ScanMode { scanIn, scanOut, scanReturn }
+
+extension on ScanMode {
+  String get title => switch (this) {
+        ScanMode.scanIn => 'นำเข้าคลัง',
+        ScanMode.scanOut => 'เบิกออก',
+        ScanMode.scanReturn => 'ส่งคืน',
+      };
+
+  /// สถานะห่อที่ mode นี้รับได้
+  String get requiredStatus => switch (this) {
+        ScanMode.scanIn => 'PACKED',
+        ScanMode.scanOut => 'STERILE',
+        ScanMode.scanReturn => 'ISSUED',
+      };
+}
+
+/// รายการที่สแกนแล้ว + ผล lookup
+class _ScannedItem {
+  final String id;
+  String? name;
+  String? status;
+  int? daysLeft;
+  bool isExpired = false;
+  bool loading = true;
+  String? blockReason; // null = ผ่าน
+  String? serverError; // error จากตอนยืนยัน
+
+  _ScannedItem(this.id);
+  bool get eligible => !loading && blockReason == null;
+}
+
+class ScanPage extends ConsumerStatefulWidget {
+  const ScanPage({super.key});
+
+  @override
+  ConsumerState<ScanPage> createState() => _ScanPageState();
+}
+
+class _ScanPageState extends ConsumerState<ScanPage> {
+  ScanMode _mode = ScanMode.scanOut;
+  final List<_ScannedItem> _items = [];
+  bool _torchOn = false;
+  bool _submitting = false;
+
+  Department? _department;
+  SterilizationBatch? _batch;
+  final _receiverCtrl = TextEditingController();
+
+  late final MobileScannerController _cam = MobileScannerController();
+
+  @override
+  void dispose() {
+    _cam.dispose();
+    _receiverCtrl.dispose();
+    super.dispose();
+  }
+
+  void _onDetect(BarcodeCapture capture) {
+    for (final b in capture.barcodes) {
+      final raw = b.rawValue?.trim();
+      if (raw == null || raw.isEmpty) continue;
+      if (_items.any((i) => i.id == raw)) continue;
+
+      final item = _ScannedItem(raw);
+      setState(() => _items.insert(0, item));
+      HapticFeedback.mediumImpact();
+      _lookup(item);
+    }
+  }
+
+  Future<void> _lookup(_ScannedItem item) async {
+    try {
+      final r = await ref.read(scanRepositoryProvider).lookup(item.id);
+      item
+        ..name = r.package.templateName
+        ..status = r.package.status
+        ..daysLeft = r.daysLeft
+        ..isExpired = r.isExpired
+        ..loading = false
+        ..blockReason = _blockReason(r);
+    } catch (e) {
+      item
+        ..loading = false
+        ..blockReason = apiErrorMessage(e);
+    }
+    if (mounted) setState(() {});
+  }
+
+  /// กติกาบล็อกฝั่ง client (server ตรวจซ้ำอีกชั้น)
+  String? _blockReason(LookupResult r) {
+    if (_mode == ScanMode.scanOut && r.isExpired) {
+      return 'ห้ามใช้ — ห่อหมดอายุแล้ว';
+    }
+    final st = r.package.status;
+    if (st != _mode.requiredStatus) {
+      final label = packageStatusStyle(st).label;
+      return 'สถานะปัจจุบัน: $label — ${_mode.title}ไม่ได้';
+    }
+    return null;
+  }
+
+  bool get _readyToSubmit {
+    if (_submitting) return false;
+    if (_items.where((i) => i.eligible).isEmpty) return false;
+    return switch (_mode) {
+      ScanMode.scanIn => _batch != null,
+      ScanMode.scanOut || ScanMode.scanReturn => _department != null,
+    };
+  }
+
+  Future<void> _confirm() async {
+    final eligible = _items.where((i) => i.eligible).toList();
+    if (eligible.isEmpty) return;
+    setState(() => _submitting = true);
+
+    try {
+      final ids = eligible.map((i) => i.id).toList();
+      final repo = ref.read(scanRepositoryProvider);
+      final results = switch (_mode) {
+        ScanMode.scanIn => await repo.scanIn(ids, _batch!.id),
+        ScanMode.scanOut => await repo.scanOut(ids, _department!.id,
+            receiverName: _receiverCtrl.text.trim()),
+        ScanMode.scanReturn => await repo.scanReturn(ids, _department!.id),
+      };
+
+      final byId = {for (final r in results) r.packageId: r};
+      final okCount = results.where((r) => r.success).length;
+      final failCount = results.length - okCount;
+
+      setState(() {
+        // ลบตัวที่สำเร็จออก คงตัวที่พลาดไว้พร้อมเหตุผล
+        _items.removeWhere((i) => byId[i.id]?.success == true);
+        for (final i in _items) {
+          final r = byId[i.id];
+          if (r != null && !r.success) i.serverError = r.error;
+        }
+        _submitting = false;
+      });
+
+      ref.invalidate(packagesProvider);
+      ref.invalidate(dashboardProvider);
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(failCount == 0
+            ? 'บันทึก${_mode.title}สำเร็จ $okCount ห่อ'
+            : 'สำเร็จ $okCount ห่อ · ไม่ผ่าน $failCount ห่อ (ดูเหตุผลในรายการ)'),
+        backgroundColor:
+            failCount == 0 ? SterelisColors.success : SterelisColors.warning,
+      ));
+    } catch (e) {
+      setState(() => _submitting = false);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(apiErrorMessage(e)),
+        backgroundColor: SterelisColors.danger,
+      ));
+    }
+  }
+
+  void _switchMode(ScanMode m) {
+    setState(() {
+      _mode = m;
+      _items.clear();
+      _department = null;
+      _batch = null;
+      _receiverCtrl.clear();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('สแกน QR'),
+        actions: [
+          IconButton(
+            icon: Icon(_torchOn
+                ? Icons.flashlight_off_outlined
+                : Icons.flashlight_on_outlined),
+            onPressed: () {
+              setState(() => _torchOn = !_torchOn);
+              _cam.toggleTorch();
+            },
+          ),
+        ],
+      ),
+      body: Column(children: [
+        Container(
+          color: SterelisColors.white,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          child: SegmentedButton<ScanMode>(
+            segments: ScanMode.values
+                .map((m) => ButtonSegment(value: m, label: Text(m.title)))
+                .toList(),
+            selected: {_mode},
+            onSelectionChanged: (s) => _switchMode(s.first),
+            style: ButtonStyle(
+              backgroundColor: WidgetStateProperty.resolveWith((states) =>
+                  states.contains(WidgetState.selected)
+                      ? SterelisColors.blue500
+                      : null),
+              foregroundColor: WidgetStateProperty.resolveWith((states) =>
+                  states.contains(WidgetState.selected)
+                      ? Colors.white
+                      : SterelisColors.textMuted),
+            ),
+          ),
+        ),
+        _TargetSelector(
+          mode: _mode,
+          department: _department,
+          batch: _batch,
+          receiverCtrl: _receiverCtrl,
+          onDepartment: (d) => setState(() => _department = d),
+          onBatch: (b) => setState(() => _batch = b),
+        ),
+        Expanded(
+          flex: 4,
+          child: Container(
+            color: SterelisColors.ink900,
+            child: MobileScanner(controller: _cam, onDetect: _onDetect),
+          ),
+        ),
+        Expanded(
+          flex: 4,
+          child: _ScannedPanel(
+            items: _items,
+            mode: _mode,
+            submitting: _submitting,
+            canSubmit: _readyToSubmit,
+            onConfirm: _confirm,
+            onClear: () => setState(_items.clear),
+            onRemove: (item) => setState(() => _items.remove(item)),
+          ),
+        ),
+      ]),
+    );
+  }
+}
+
+/// แถบเลือกปลายทาง: แผนก (out/return) หรือรอบนึ่ง (in) + ชื่อผู้รับ (out)
+class _TargetSelector extends ConsumerWidget {
+  const _TargetSelector({
+    required this.mode,
+    required this.department,
+    required this.batch,
+    required this.receiverCtrl,
+    required this.onDepartment,
+    required this.onBatch,
+  });
+
+  final ScanMode mode;
+  final Department? department;
+  final SterilizationBatch? batch;
+  final TextEditingController receiverCtrl;
+  final ValueChanged<Department?> onDepartment;
+  final ValueChanged<SterilizationBatch?> onBatch;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    if (mode == ScanMode.scanIn) {
+      final batches = ref.watch(batchesProvider('PASSED'));
+      return Container(
+        color: SterelisColors.white,
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+        child: batches.when(
+          loading: () => const LinearProgressIndicator(minHeight: 2),
+          error: (e, _) => Text('โหลดรอบนึ่งไม่ได้: ${apiErrorMessage(e)}',
+              style:
+                  const TextStyle(color: SterelisColors.danger, fontSize: 12)),
+          data: (list) => DropdownButtonFormField<SterilizationBatch>(
+            initialValue: batch,
+            isExpanded: true,
+            decoration: const InputDecoration(
+              labelText: 'รอบนึ่ง (เฉพาะรอบที่ผ่านการตรวจ)',
+              prefixIcon: Icon(Icons.local_fire_department_outlined),
+            ),
+            items: list
+                .map((b) => DropdownMenuItem(
+                      value: b,
+                      child: Text(
+                        'รอบ ${b.roundNo ?? '-'} · ${b.sterilizerName ?? b.id}',
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ))
+                .toList(),
+            onChanged: onBatch,
+          ),
+        ),
+      );
+    }
+
+    final departments = ref.watch(departmentsProvider);
+    return Container(
+      color: SterelisColors.white,
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+      child: departments.when(
+        loading: () => const LinearProgressIndicator(minHeight: 2),
+        error: (e, _) => Text('โหลดแผนกไม่ได้: ${apiErrorMessage(e)}',
+            style: const TextStyle(color: SterelisColors.danger, fontSize: 12)),
+        data: (list) => Column(children: [
+          DropdownButtonFormField<Department>(
+            initialValue: department,
+            isExpanded: true,
+            decoration: InputDecoration(
+              labelText: mode == ScanMode.scanOut
+                  ? 'แผนกปลายทาง (บังคับ)'
+                  : 'แผนกที่ส่งของคืน (บังคับ)',
+              prefixIcon: const Icon(Icons.apartment_outlined),
+            ),
+            items: list
+                .map((d) =>
+                    DropdownMenuItem(value: d, child: Text(d.name)))
+                .toList(),
+            onChanged: onDepartment,
+          ),
+          if (mode == ScanMode.scanOut) ...[
+            const SizedBox(height: 8),
+            TextField(
+              controller: receiverCtrl,
+              decoration: const InputDecoration(
+                labelText: 'ชื่อผู้รับ (ไม่บังคับ)',
+                prefixIcon: Icon(Icons.person_outline),
+                isDense: true,
+              ),
+            ),
+          ],
+        ]),
+      ),
+    );
+  }
+}
+
+class _ScannedPanel extends StatelessWidget {
+  const _ScannedPanel({
+    required this.items,
+    required this.mode,
+    required this.submitting,
+    required this.canSubmit,
+    required this.onConfirm,
+    required this.onClear,
+    required this.onRemove,
+  });
+
+  final List<_ScannedItem> items;
+  final ScanMode mode;
+  final bool submitting;
+  final bool canSubmit;
+  final VoidCallback onConfirm, onClear;
+  final ValueChanged<_ScannedItem> onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    final okCount = items.where((i) => i.eligible).length;
+
+    return Column(children: [
+      Padding(
+        padding: const EdgeInsets.fromLTRB(16, 10, 16, 4),
+        child: Row(children: [
+          Text('สแกนแล้ว ${items.length} ห่อ',
+              style: const TextStyle(
+                  fontWeight: FontWeight.w700,
+                  color: SterelisColors.textStrong)),
+          if (okCount != items.length) ...[
+            const SizedBox(width: 6),
+            Text('(ผ่าน $okCount)',
+                style: const TextStyle(
+                    fontSize: 12, color: SterelisColors.textMuted)),
+          ],
+          const Spacer(),
+          if (items.isNotEmpty)
+            TextButton(onPressed: onClear, child: const Text('ล้าง')),
+        ]),
+      ),
+      Expanded(
+        child: items.isEmpty
+            ? const Center(
+                child: Text('ชี้กล้องไปที่ QR code ของห่อ',
+                    style: TextStyle(color: SterelisColors.textFaint)))
+            : ListView.separated(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                itemCount: items.length,
+                separatorBuilder: (_, __) => const SizedBox(height: 6),
+                itemBuilder: (_, i) =>
+                    _ScannedTile(item: items[i], onRemove: onRemove),
+              ),
+      ),
+      Padding(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+        child: FilledButton.icon(
+          onPressed: canSubmit ? onConfirm : null,
+          icon: submitting
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(
+                      strokeWidth: 2, color: Colors.white))
+              : const Icon(Icons.save_outlined),
+          label: Text(submitting
+              ? 'กำลังบันทึก...'
+              : 'ยืนยัน${mode.title}${okCount == 0 ? '' : ' ($okCount)'}'),
+          style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(50)),
+        ),
+      ),
+    ]);
+  }
+}
+
+class _ScannedTile extends StatelessWidget {
+  const _ScannedTile({required this.item, required this.onRemove});
+  final _ScannedItem item;
+  final ValueChanged<_ScannedItem> onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    // ของหมดอายุ (เบิกออก) → การ์ดแดง "ห้ามใช้" เด่นชัดตาม design system
+    if (item.isExpired && item.blockReason != null) {
+      return Dismissible(
+        key: ValueKey(item.id),
+        direction: DismissDirection.endToStart,
+        onDismissed: (_) => onRemove(item),
+        child: BlockedCard(
+          title: 'ห้ามใช้ — หมดอายุแล้ว',
+          detail: '${item.id}${item.name != null ? ' · ${item.name}' : ''}',
+        ),
+      );
+    }
+
+    final blocked = item.blockReason != null || item.serverError != null;
+    return Dismissible(
+      key: ValueKey(item.id),
+      direction: DismissDirection.endToStart,
+      onDismissed: (_) => onRemove(item),
+      background: Container(
+        alignment: Alignment.centerRight,
+        padding: const EdgeInsets.only(right: 16),
+        decoration: BoxDecoration(
+          color: SterelisColors.dangerBg,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: const Icon(Icons.delete_outline, color: SterelisColors.danger),
+      ),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: SterelisColors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+              color: blocked
+                  ? const Color(0xFFF4BFC1)
+                  : SterelisColors.border),
+        ),
+        child: Row(children: [
+          if (item.loading)
+            const SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(strokeWidth: 2))
+          else
+            Icon(
+              blocked ? Icons.error_outline : Icons.check_circle,
+              color:
+                  blocked ? SterelisColors.danger : SterelisColors.success,
+              size: 20,
+            ),
+          const SizedBox(width: 10),
+          Expanded(
+            child:
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(item.id,
+                  style: const TextStyle(
+                      fontFamily: 'monospace',
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w600)),
+              if (item.name != null && item.name!.isNotEmpty)
+                Text(item.name!,
+                    style: const TextStyle(
+                        fontSize: 12, color: SterelisColors.textMuted)),
+              if (item.blockReason != null)
+                Text(item.blockReason!,
+                    style: const TextStyle(
+                        fontSize: 12,
+                        color: SterelisColors.danger,
+                        fontWeight: FontWeight.w600))
+              else if (item.serverError != null)
+                Text(item.serverError!,
+                    style: const TextStyle(
+                        fontSize: 12,
+                        color: SterelisColors.danger,
+                        fontWeight: FontWeight.w600)),
+            ]),
+          ),
+          if (!item.loading &&
+              item.daysLeft != null &&
+              item.blockReason == null)
+            Text('เหลือ ${item.daysLeft} วัน',
+                style: const TextStyle(
+                    fontSize: 11, color: SterelisColors.textMuted)),
+        ]),
+      ),
+    );
+  }
+}

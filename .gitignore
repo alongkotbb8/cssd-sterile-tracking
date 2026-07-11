@@ -1,0 +1,36 @@
+# --- Root ---
+.DS_Store
+*.log
+
+# --- Node / NestJS (apps/api) ---
+node_modules/
+dist/
+.env
+!.env.example
+npm-debug.log*
+
+# --- Prisma ---
+apps/api/prisma/migrations/dev.db
+
+# --- Flutter (apps/mobile) ---
+apps/mobile/.dart_tool/
+apps/mobile/.flutter-plugins
+apps/mobile/.flutter-plugins-dependencies
+apps/mobile/.packages
+apps/mobile/.pub-cache/
+apps/mobile/.pub/
+apps/mobile/build/
+apps/mobile/android/local.properties
+apps/mobile/android/key.properties
+apps/mobile/android/**/*.keystore
+apps/mobile/android/**/*.jks
+apps/mobile/ios/Flutter/.last_build_id
+apps/mobile/ios/Pods/
+apps/mobile/macos/Pods/
+apps/mobile/.idea/
+apps/mobile/*.iml
+
+# IDE
+.idea/
+.vscode/
+*.iml

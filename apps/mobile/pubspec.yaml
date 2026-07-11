@@ -1,0 +1,73 @@
+name: cssd_mobile
+description: ระบบตามรอยอุปกรณ์หัตถการปลอดเชื้อ — CSSD Sterile Tracking
+
+publish_to: 'none'
+version: 0.1.0+1
+
+environment:
+  sdk: '>=3.3.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # Navigation
+  go_router: ^13.2.0
+
+  # State management
+  flutter_riverpod: ^2.5.1
+  riverpod_annotation: ^2.3.5
+
+  # HTTP
+  dio: ^5.4.3
+  retrofit: ^4.1.0
+
+  # QR / Camera
+  mobile_scanner: ^5.1.1
+
+  # Offline storage (SQLite)
+  drift: ^2.18.0
+  drift_flutter: ^0.2.0
+
+  # Bluetooth printer
+  flutter_blue_plus: ^1.32.12
+
+  # USB serial (FlashLabel A318 via USB-OTG)
+  usb_serial: ^0.5.0
+
+  # Local notifications (expiry alerts)
+  flutter_local_notifications: ^17.2.2
+
+  # Charts (dashboard donut)
+  fl_chart: ^0.68.0
+
+  # Shared preferences / secure storage
+  flutter_secure_storage: ^9.2.2
+  shared_preferences: ^2.2.3
+
+  # i18n
+  flutter_localizations:
+    sdk: flutter
+  intl: ^0.20.2
+
+  # Utilities
+  freezed_annotation: ^2.4.1
+  json_annotation: ^4.9.0
+  path_provider: ^2.1.3
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+  build_runner: ^2.4.9
+  riverpod_generator: ^2.3.11
+  freezed: ^2.5.2
+  json_serializable: ^6.8.0
+  retrofit_generator: ^8.1.0
+  drift_dev: ^2.18.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/images/
+    - assets/icons/

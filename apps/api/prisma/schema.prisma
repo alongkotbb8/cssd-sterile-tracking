@@ -1,0 +1,227 @@
+// Prisma schema — CSSD Sterile Instrument Tracking
+// State machine: PACKED → STERILE → ISSUED → RETURNED → (reprocess) → PACKED
+//                                  ↘ EXPIRED | DISCARDED (any state)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Enums ───────────────────────────────────────────────────────────────────
+
+enum WrapType {
+  SEAL  // 180-day shelf life
+  CLOTH // 7-day shelf life
+}
+
+enum PackageStatus {
+  PACKED             // Created, label printed, awaiting sterilisation
+  STERILE            // Sterilisation passed, in sterile store
+  ISSUED             // Scanned out to destination department
+  RETURNED           // Returned from department, awaiting reprocess
+  DISCARDED          // Written off (damaged / end-of-life)
+  // NOTE: EXPIRED is derived at query time (expiry_date < now), not stored
+}
+
+enum MovementType {
+  IN     // Scan into sterile store (PACKED → STERILE)
+  OUT    // Issue to department (STERILE → ISSUED)
+  RETURN // Return from department (ISSUED → RETURNED)
+}
+
+enum BatchStatus {
+  PENDING // Sterilisation in progress
+  PASSED  // CI + BI indicators passed
+  FAILED  // Indicators failed → trigger recall
+}
+
+enum UserRole {
+  CSSD       // Floor staff: create packages, scan in/out
+  SUPERVISOR // View dashboard, reports, approve recall
+  ADMIN      // Master data, user management, settings
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+}
+
+// ─── Master Data ─────────────────────────────────────────────────────────────
+
+model Department {
+  id        String   @id @default(cuid())
+  code      String   @unique @db.VarChar(20)  // e.g. "DENT", "ER", "OB", "WOUND"
+  name      String   @db.VarChar(100)
+  type      String?  @db.VarChar(50)          // e.g. "clinic", "ward", "er"
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  movements Movement[]
+
+  @@map("departments")
+}
+
+model SetTemplate {
+  id              String   @id @default(cuid())
+  code            String   @unique @db.VarChar(30)  // used in running-number prefix
+  name            String   @db.VarChar(100)
+  itemList        Json     // string[] — list of instrument names in the set
+  defaultWrapType WrapType @default(SEAL)
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  packages Package[]
+
+  @@map("set_templates")
+}
+
+model Sterilizer {
+  id        String   @id @default(cuid())
+  code      String   @unique @db.VarChar(20)  // e.g. "AUTO-1", "PLASMA-1"
+  name      String   @db.VarChar(100)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  batches SterilizationBatch[]
+
+  @@map("sterilizers")
+}
+
+// ─── Core Tables ─────────────────────────────────────────────────────────────
+
+model SterilizationBatch {
+  id          String      @id @default(cuid())
+  sterilizerId String
+  sterilizer  Sterilizer  @relation(fields: [sterilizerId], references: [id])
+  roundNo     Int                                         // round number for the day
+  runDate     DateTime    @db.Date                        // date of sterilisation run
+  startedAt   DateTime                                    // actual start time
+  finishedAt  DateTime?                                   // null while in progress
+  ciResult    Boolean?                                    // chemical indicator
+  biResult    Boolean?                                    // biological indicator (may arrive later)
+  status      BatchStatus @default(PENDING)
+  notes       String?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  packages Package[]
+
+  // batch code: AUTO-1/2026-06-30/003
+  @@unique([sterilizerId, runDate, roundNo])
+  @@map("sterilization_batches")
+}
+
+model Package {
+  // Running number format: {SET_CODE}-{YYYYMMDD}-{SEQ4}  e.g. DELIV-20260630-0007
+  // Generated server-side only — never on device
+  id            String        @id                    // = running number (human-readable)
+  setTemplateId String
+  setTemplate   SetTemplate   @relation(fields: [setTemplateId], references: [id])
+  wrapType      WrapType
+  batchId       String?
+  batch         SterilizationBatch? @relation(fields: [batchId], references: [id])
+  sterilizeDate DateTime?     @db.Date               // null until STERILE
+  expiryDate    DateTime?     @db.Date               // server-computed: sterilizeDate + shelf_life
+  status        PackageStatus @default(PACKED)
+  printedAt     DateTime?                             // when label was last printed
+  reprintCount  Int           @default(0)
+  notes         String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  createdById   String
+  createdBy     User          @relation("PackageCreator", fields: [createdById], references: [id])
+
+  movements Movement[]
+
+  @@index([status])
+  @@index([expiryDate])
+  @@index([batchId])
+  @@map("packages")
+}
+
+// Running number sequence (one row per set_template per day)
+model RunningNumberSequence {
+  setTemplateId String
+  date          String   @db.VarChar(10)   // YYYYMMDD
+  lastSeq       Int      @default(0)
+
+  @@id([setTemplateId, date])
+  @@map("running_number_sequences")
+}
+
+model Movement {
+  id           String       @id @default(cuid())
+  packageId    String
+  package      Package      @relation(fields: [packageId], references: [id])
+  type         MovementType
+  departmentId String?                               // required for OUT and RETURN
+  department   Department?  @relation(fields: [departmentId], references: [id])
+  receiverName String?      @db.VarChar(100)         // optional; only on OUT
+  performedById String
+  performedBy  User         @relation("MovementPerformer", fields: [performedById], references: [id])
+  createdAt    DateTime     @default(now())
+
+  @@index([packageId])
+  @@index([departmentId])
+  @@index([createdAt])
+  @@map("movements")
+}
+
+// ─── Users & Security ────────────────────────────────────────────────────────
+
+model User {
+  id           String     @id @default(cuid())
+  employeeCode String     @unique @db.VarChar(20)
+  name         String     @db.VarChar(100)
+  email        String?    @unique @db.VarChar(200)
+  passwordHash String
+  role         UserRole   @default(CSSD)
+  status       UserStatus @default(ACTIVE)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  createdPackages   Package[]  @relation("PackageCreator")
+  performedMovements Movement[] @relation("MovementPerformer")
+  auditLogs         AuditLog[]
+
+  @@map("users")
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  action    String   @db.VarChar(60)   // e.g. "PACKAGE_CREATE", "SCAN_OUT", "RECALL_BATCH"
+  targetId  String?  @db.VarChar(100)  // package id / batch id / user id etc.
+  metadata  Json?                       // extra context (dept, batch, old/new status)
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([createdAt])
+  @@index([action])
+  @@map("audit_logs")
+}
+
+// ─── Offline Sync (number pool) ──────────────────────────────────────────────
+
+// When a mobile device goes offline it reserves a block of IDs from this table.
+// On reconnect it confirms which IDs were actually used.
+model NumberPoolReservation {
+  id            String    @id @default(cuid())
+  setTemplateId String
+  date          String    @db.VarChar(10)  // YYYYMMDD
+  fromSeq       Int
+  toSeq         Int
+  deviceId      String    @db.VarChar(100)
+  userId        String
+  reservedAt    DateTime  @default(now())
+  confirmedAt   DateTime?
+
+  @@map("number_pool_reservations")
+}
