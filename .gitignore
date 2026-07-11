@@ -24,6 +24,10 @@ apps/mobile/android/local.properties
 apps/mobile/android/key.properties
 apps/mobile/android/**/*.keystore
 apps/mobile/android/**/*.jks
+apps/mobile/android/keystore/
+apps/mobile/android/build/
+apps/mobile/android/.gradle/
+**/PASSWORD*
 apps/mobile/ios/Flutter/.last_build_id
 apps/mobile/ios/Pods/
 apps/mobile/macos/Pods/

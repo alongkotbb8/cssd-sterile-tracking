@@ -1,11 +1,11 @@
 {
-    "name": "cssd_mobile",
-    "short_name": "cssd_mobile",
+    "name": "Sterelis — CSSD Sterile Tracking",
+    "short_name": "Sterelis",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#F5F8FC",
+    "theme_color": "#2F6BED",
+    "description": "ระบบตามรอยอุปกรณ์หัตถการปลอดเชื้อ (CSSD)",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

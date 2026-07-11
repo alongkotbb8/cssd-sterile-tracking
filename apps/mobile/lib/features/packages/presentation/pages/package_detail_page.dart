@@ -62,6 +62,8 @@ class PackageDetailPage extends ConsumerWidget {
               ],
               _HeaderCard(pkg: pkg),
               const SizedBox(height: 12),
+              PackageQrCard(packageId: pkg.id),
+              const SizedBox(height: 12),
               _LifecycleCard(status: pkg.status),
               const SizedBox(height: 12),
               _InfoCard(pkg: pkg),

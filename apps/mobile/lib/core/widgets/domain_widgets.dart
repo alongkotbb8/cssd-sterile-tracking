@@ -1,7 +1,67 @@
 import 'package:flutter/material.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 
 import '../models/models.dart';
 import '../theme/app_theme.dart';
+
+/// การ์ด QR code ของห่อ — เก็บเฉพาะ package_id ตามกฎโดเมน (ห้ามยัดข้อมูลอื่นลง QR)
+class PackageQrCard extends StatelessWidget {
+  const PackageQrCard({super.key, required this.packageId, this.size = 180});
+  final String packageId;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: SterelisColors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: SterelisColors.border),
+      ),
+      child: Column(children: [
+        const Align(
+          alignment: Alignment.centerLeft,
+          child: Text('QR สำหรับสแกน',
+              style: TextStyle(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 14,
+                  color: SterelisColors.textStrong)),
+        ),
+        const SizedBox(height: 16),
+        Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: SterelisColors.border),
+          ),
+          child: QrImageView(
+            data: packageId,
+            version: QrVersions.auto,
+            size: size,
+            gapless: false,
+            eyeStyle: const QrEyeStyle(
+              eyeShape: QrEyeShape.square,
+              color: SterelisColors.ink900,
+            ),
+            dataModuleStyle: const QrDataModuleStyle(
+              dataModuleShape: QrDataModuleShape.square,
+              color: SterelisColors.ink900,
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        Text(packageId,
+            style: const TextStyle(
+                fontFamily: 'monospace',
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: SterelisColors.textMuted)),
+      ]),
+    );
+  }
+}
 
 /// สี/ป้ายของสถานะห่อ — ผูกกับ state machine ใน design system
 ({Color fg, Color bg, String label}) packageStatusStyle(String status) {

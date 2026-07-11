@@ -8,9 +8,9 @@ import '../../../../core/printer/printer_adapter.dart';
 import '../../../../core/printer/printer_provider.dart';
 import '../../../../core/theme/app_theme.dart';
 
-/// เปิด sheet สร้างห่อ — เมื่อสร้างสำเร็จ แสดง dialog เลขรัน + ปุ่มพิมพ์ label
+/// เปิด sheet สร้างห่อ (สร้างได้ทีละหลายห่อ) — เมื่อสำเร็จแสดง dialog สรุป + ปุ่มพิมพ์ทั้งหมด
 Future<void> showCreatePackageSheet(BuildContext context, WidgetRef ref) async {
-  final pkg = await showModalBottomSheet<PackageModel>(
+  final created = await showModalBottomSheet<List<PackageModel>>(
     context: context,
     isScrollControlled: true,
     backgroundColor: SterelisColors.surface,
@@ -19,7 +19,7 @@ Future<void> showCreatePackageSheet(BuildContext context, WidgetRef ref) async {
     ),
     builder: (_) => const _CreatePackageSheet(),
   );
-  if (pkg == null || !context.mounted) return;
+  if (created == null || created.isEmpty || !context.mounted) return;
 
   final shouldPrint = await showDialog<bool>(
     context: context,
@@ -35,25 +35,42 @@ Future<void> showCreatePackageSheet(BuildContext context, WidgetRef ref) async {
               const Icon(Icons.check, color: SterelisColors.success, size: 22),
         ),
         const SizedBox(width: 10),
-        const Text('สร้างห่อสำเร็จ', style: TextStyle(fontSize: 18)),
-      ]),
-      content: Column(mainAxisSize: MainAxisSize.min, children: [
-        Text(pkg.templateName,
-            style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
-        const SizedBox(height: 6),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-          decoration: BoxDecoration(
-            color: SterelisColors.surface2,
-            borderRadius: BorderRadius.circular(10),
+        Expanded(
+          child: Text(
+            created.length == 1
+                ? 'สร้างห่อสำเร็จ'
+                : 'สร้าง ${created.length} ห่อสำเร็จ',
+            style: const TextStyle(fontSize: 18),
           ),
-          child: Text(pkg.id,
-              style: const TextStyle(
-                  fontFamily: 'monospace',
-                  fontWeight: FontWeight.w700,
-                  fontSize: 15)),
         ),
       ]),
+      content: ConstrainedBox(
+        constraints: const BoxConstraints(maxHeight: 260),
+        child: SingleChildScrollView(
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            Text(created.first.templateName,
+                style:
+                    const TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+            const SizedBox(height: 10),
+            ...created.map((p) => Container(
+                  width: double.infinity,
+                  margin: const EdgeInsets.only(bottom: 6),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: SterelisColors.surface2,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(p.id,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                          fontFamily: 'monospace',
+                          fontWeight: FontWeight.w700,
+                          fontSize: 14)),
+                )),
+          ]),
+        ),
+      ),
       actions: [
         TextButton(
           onPressed: () => Navigator.of(dctx).pop(false),
@@ -62,38 +79,52 @@ Future<void> showCreatePackageSheet(BuildContext context, WidgetRef ref) async {
         FilledButton.icon(
           onPressed: () => Navigator.of(dctx).pop(true),
           icon: const Icon(Icons.print_outlined, size: 18),
-          label: const Text('พิมพ์ label'),
+          label: Text(created.length == 1
+              ? 'พิมพ์ label'
+              : 'พิมพ์ทั้งหมด (${created.length})'),
         ),
       ],
     ),
   );
 
   if (shouldPrint == true && context.mounted) {
-    await printPackageLabel(context, ref, pkg);
+    await printPackageLabels(context, ref, created);
   }
 }
 
-/// พิมพ์ label ของห่อผ่าน adapter ที่เลือกไว้ (ใช้ซ้ำได้จากหน้ารายละเอียด)
+/// พิมพ์ label ของห่อเดียว (ใช้จากหน้ารายละเอียด)
 Future<void> printPackageLabel(
-    BuildContext context, WidgetRef ref, PackageModel pkg) async {
+        BuildContext context, WidgetRef ref, PackageModel pkg) =>
+    printPackageLabels(context, ref, [pkg]);
+
+/// พิมพ์ label หลายห่อ — เชื่อมต่อเครื่องพิมพ์ครั้งเดียว แล้วส่งทีละใบ
+Future<void> printPackageLabels(
+    BuildContext context, WidgetRef ref, List<PackageModel> pkgs) async {
+  if (pkgs.isEmpty) return;
   final messenger = ScaffoldMessenger.of(context);
   final printer = ref.read(printerAdapterProvider);
-  // ห่อที่ยังไม่นึ่งจะยังไม่มีวันหมดอายุจริง (backend คำนวณตอนสแกนเข้าคลัง)
-  // ใช้วันโดยประมาณ = แพ็กวันนี้ + อายุตามชนิดห่อ
-  final sterilize = pkg.sterilizeDate ?? DateTime.now();
-  final expiry =
-      pkg.expiryDate ?? sterilize.add(Duration(days: pkg.shelfLifeDays));
   try {
     if (!printer.isConnected) await printer.connect();
-    await printer.printLabel(LabelData(
-      packageId: pkg.id,
-      setName: pkg.templateName,
-      wrapType: pkg.wrapType == 'SEAL' ? 'ห่อซีล' : 'ห่อผ้า',
-      sterilizeDate: sterilize,
-      expiryDate: expiry,
-    ));
+    var ok = 0;
+    for (final pkg in pkgs) {
+      // ห่อที่ยังไม่นึ่งยังไม่มีวันหมดอายุจริง (backend คำนวณตอนสแกนเข้าคลัง)
+      // ใช้วันโดยประมาณ = แพ็กวันนี้ + อายุตามชนิดห่อ
+      final sterilize = pkg.sterilizeDate ?? DateTime.now();
+      final expiry =
+          pkg.expiryDate ?? sterilize.add(Duration(days: pkg.shelfLifeDays));
+      await printer.printLabel(LabelData(
+        packageId: pkg.id,
+        setName: pkg.templateName,
+        wrapType: pkg.wrapType == 'SEAL' ? 'ห่อซีล' : 'ห่อผ้า',
+        sterilizeDate: sterilize,
+        expiryDate: expiry,
+      ));
+      ok++;
+    }
     messenger.showSnackBar(SnackBar(
-      content: Text('ส่งพิมพ์ไปยัง ${printer.displayName} แล้ว'),
+      content: Text(pkgs.length == 1
+          ? 'ส่งพิมพ์ไปยัง ${printer.displayName} แล้ว'
+          : 'ส่งพิมพ์ $ok label ไปยัง ${printer.displayName} แล้ว'),
       backgroundColor: SterelisColors.success,
     ));
   } on PrinterException catch (e) {
@@ -117,8 +148,10 @@ class _CreatePackageSheet extends ConsumerStatefulWidget {
 class _CreatePackageSheetState extends ConsumerState<_CreatePackageSheet> {
   SetTemplate? _template;
   String _wrapType = 'SEAL';
+  int _quantity = 1;
   final _notesCtrl = TextEditingController();
   bool _saving = false;
+  int _savedCount = 0;
 
   @override
   void dispose() {
@@ -129,19 +162,36 @@ class _CreatePackageSheetState extends ConsumerState<_CreatePackageSheet> {
   Future<void> _submit() async {
     final template = _template;
     if (template == null) return;
-    setState(() => _saving = true);
+    setState(() {
+      _saving = true;
+      _savedCount = 0;
+    });
+    final repo = ref.read(packageRepositoryProvider);
+    final notes = _notesCtrl.text.trim();
+    final created = <PackageModel>[];
     try {
-      final pkg = await ref.read(packageRepositoryProvider).create(
-            setTemplateId: template.id,
-            wrapType: _wrapType,
-            notes: _notesCtrl.text.trim(),
-          );
+      // สร้างทีละห่อ backend ออกเลขรันเรียงกัน (กันเลขซ้ำฝั่ง server)
+      for (var i = 0; i < _quantity; i++) {
+        final pkg = await repo.create(
+          setTemplateId: template.id,
+          wrapType: _wrapType,
+          notes: notes,
+        );
+        created.add(pkg);
+        if (mounted) setState(() => _savedCount = created.length);
+      }
       ref.invalidate(packagesProvider);
       if (!mounted) return;
-      Navigator.of(context).pop(pkg);
+      Navigator.of(context).pop(created);
     } catch (e) {
       if (!mounted) return;
       setState(() => _saving = false);
+      // ถ้าสร้างได้บางส่วนก่อน error → ปิด sheet คืนเท่าที่สำเร็จ ไม่ให้ห่อหาย
+      if (created.isNotEmpty) {
+        ref.invalidate(packagesProvider);
+        Navigator.of(context).pop(created);
+        return;
+      }
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
             content: Text(apiErrorMessage(e)),
@@ -192,7 +242,7 @@ class _CreatePackageSheetState extends ConsumerState<_CreatePackageSheet> {
             error: (e, _) => Text(apiErrorMessage(e),
                 style: const TextStyle(color: SterelisColors.danger)),
             data: (list) => ConstrainedBox(
-              constraints: const BoxConstraints(maxHeight: 260),
+              constraints: const BoxConstraints(maxHeight: 220),
               child: SingleChildScrollView(
                 child: Wrap(
                   spacing: 8,
@@ -251,8 +301,40 @@ class _CreatePackageSheetState extends ConsumerState<_CreatePackageSheet> {
             ),
           ),
           const SizedBox(height: 18),
+          // จำนวนห่อที่จะสร้างพร้อมกัน
+          Row(children: [
+            const Text('จำนวน',
+                style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+            const Spacer(),
+            _QtyButton(
+              icon: Icons.remove,
+              onTap: _quantity > 1 && !_saving
+                  ? () => setState(() => _quantity--)
+                  : null,
+            ),
+            SizedBox(
+              width: 52,
+              child: Text('$_quantity',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w800,
+                      color: SterelisColors.textStrong)),
+            ),
+            _QtyButton(
+              icon: Icons.add,
+              onTap: _quantity < 50 && !_saving
+                  ? () => setState(() => _quantity++)
+                  : null,
+            ),
+          ]),
+          const SizedBox(height: 6),
+          const Text('สร้างได้สูงสุด 50 ห่อต่อครั้ง',
+              style: TextStyle(fontSize: 12, color: SterelisColors.textFaint)),
+          const SizedBox(height: 18),
           TextField(
             controller: _notesCtrl,
+            enabled: !_saving,
             decoration: const InputDecoration(labelText: 'หมายเหตุ (ไม่บังคับ)'),
           ),
           const SizedBox(height: 20),
@@ -265,11 +347,42 @@ class _CreatePackageSheetState extends ConsumerState<_CreatePackageSheet> {
                     child: CircularProgressIndicator(
                         strokeWidth: 2, color: Colors.white))
                 : const Icon(Icons.qr_code_2),
-            label: const Text('บันทึก + ออกเลขรัน'),
+            label: Text(_saving
+                ? 'กำลังสร้าง $_savedCount/$_quantity...'
+                : _quantity == 1
+                    ? 'บันทึก + ออกเลขรัน'
+                    : 'บันทึก $_quantity ห่อ + ออกเลขรัน'),
             style:
                 FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _QtyButton extends StatelessWidget {
+  const _QtyButton({required this.icon, required this.onTap});
+  final IconData icon;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final enabled = onTap != null;
+    return Material(
+      color: enabled ? SterelisColors.blue50 : SterelisColors.surface2,
+      shape: const CircleBorder(),
+      child: InkWell(
+        customBorder: const CircleBorder(),
+        onTap: onTap,
+        child: SizedBox(
+          width: 44,
+          height: 44,
+          child: Icon(icon,
+              color: enabled
+                  ? SterelisColors.blue600
+                  : SterelisColors.textFaint),
+        ),
       ),
     );
   }

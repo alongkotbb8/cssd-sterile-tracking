@@ -24,6 +24,7 @@ dependencies:
 
   # QR / Camera
   mobile_scanner: ^5.1.1
+  qr_flutter: ^4.1.0
 
   # Offline storage (SQLite)
   drift: ^2.18.0
@@ -31,9 +32,6 @@ dependencies:
 
   # Bluetooth printer
   flutter_blue_plus: ^1.32.12
-
-  # USB serial (FlashLabel A318 via USB-OTG)
-  usb_serial: ^0.5.0
 
   # Local notifications (expiry alerts)
   flutter_local_notifications: ^17.2.2
