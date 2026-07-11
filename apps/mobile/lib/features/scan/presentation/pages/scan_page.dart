@@ -123,6 +123,46 @@ class _ScanPageState extends ConsumerState<ScanPage> {
   Future<void> _confirm() async {
     final eligible = _items.where((i) => i.eligible).toList();
     if (eligible.isEmpty) return;
+
+    // pop-up ยืนยันก่อนบันทึกจริง
+    final destination = switch (_mode) {
+      ScanMode.scanIn =>
+        'รอบ ${_batch?.roundNo ?? '-'} · ${_batch?.sterilizerName ?? ''}',
+      ScanMode.scanOut => 'แผนก ${_department?.name ?? ''}'
+          '${_receiverCtrl.text.trim().isNotEmpty ? ' · ผู้รับ ${_receiverCtrl.text.trim()}' : ''}',
+      ScanMode.scanReturn => 'แผนก ${_department?.name ?? ''}',
+    };
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text('ยืนยัน${_mode.title}'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('${_mode.title} ${eligible.length} ห่อ',
+                style: const TextStyle(
+                    fontWeight: FontWeight.w700, fontSize: 16)),
+            const SizedBox(height: 6),
+            Text(destination,
+                style: const TextStyle(
+                    fontSize: 13.5, color: SterelisColors.textMuted)),
+          ],
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.of(dctx).pop(false),
+              child: const Text('ยกเลิก')),
+          FilledButton(
+            onPressed: () => Navigator.of(dctx).pop(true),
+            child: const Text('ยืนยัน'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
     setState(() => _submitting = true);
 
     try {
@@ -281,24 +321,51 @@ class _TargetSelector extends ConsumerWidget {
           error: (e, _) => Text('โหลดรอบนึ่งไม่ได้: ${apiErrorMessage(e)}',
               style:
                   const TextStyle(color: SterelisColors.danger, fontSize: 12)),
-          data: (list) => DropdownButtonFormField<SterilizationBatch>(
-            initialValue: batch,
-            isExpanded: true,
-            decoration: const InputDecoration(
-              labelText: 'รอบนึ่ง (เฉพาะรอบที่ผ่านการตรวจ)',
-              prefixIcon: Icon(Icons.local_fire_department_outlined),
-            ),
-            items: list
-                .map((b) => DropdownMenuItem(
-                      value: b,
-                      child: Text(
-                        'รอบ ${b.roundNo ?? '-'} · ${b.sterilizerName ?? b.id}',
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ))
-                .toList(),
-            onChanged: onBatch,
-          ),
+          data: (list) => Column(children: [
+            Row(children: [
+              Expanded(
+                child: DropdownButtonFormField<SterilizationBatch>(
+                  initialValue:
+                      list.any((b) => b.id == batch?.id) ? batch : null,
+                  isExpanded: true,
+                  decoration: InputDecoration(
+                    labelText: list.isEmpty
+                        ? 'ยังไม่มีรอบนึ่ง — กด "รอบใหม่"'
+                        : 'รอบนึ่ง (เฉพาะรอบที่ผ่านการตรวจ)',
+                    prefixIcon:
+                        const Icon(Icons.local_fire_department_outlined),
+                    isDense: true,
+                  ),
+                  items: list
+                      .map((b) => DropdownMenuItem(
+                            value: b,
+                            child: Text(
+                              'รอบ ${b.roundNo ?? '-'} · ${b.sterilizerName ?? b.id}',
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ))
+                      .toList(),
+                  onChanged: onBatch,
+                ),
+              ),
+              const SizedBox(width: 8),
+              FilledButton.tonalIcon(
+                onPressed: () async {
+                  final created = await showCreateBatchSheet(context, ref);
+                  if (created != null) {
+                    ref.invalidate(batchesProvider('PASSED'));
+                    onBatch(created);
+                  }
+                },
+                icon: const Icon(Icons.add, size: 18),
+                label: const Text('รอบใหม่'),
+                style: FilledButton.styleFrom(
+                    minimumSize: const Size(0, 48),
+                    backgroundColor: SterelisColors.blue50,
+                    foregroundColor: SterelisColors.blue600),
+              ),
+            ]),
+          ]),
         ),
       );
     }
@@ -416,6 +483,165 @@ class _ScannedPanel extends StatelessWidget {
         ),
       ),
     ]);
+  }
+}
+
+/// เปิด sheet เปิดรอบนึ่งใหม่ (บันทึกผล CI/BI ผ่านให้เลย) — คืน batch ที่พร้อมใช้
+Future<SterilizationBatch?> showCreateBatchSheet(
+    BuildContext context, WidgetRef ref) {
+  return showModalBottomSheet<SterilizationBatch>(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: SterelisColors.surface,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+    ),
+    builder: (_) => const _CreateBatchSheet(),
+  );
+}
+
+class _CreateBatchSheet extends ConsumerStatefulWidget {
+  const _CreateBatchSheet();
+
+  @override
+  ConsumerState<_CreateBatchSheet> createState() => _CreateBatchSheetState();
+}
+
+class _CreateBatchSheetState extends ConsumerState<_CreateBatchSheet> {
+  Sterilizer? _sterilizer;
+  int _roundNo = 1;
+  bool _biPassed = true;
+  bool _saving = false;
+
+  Future<void> _submit() async {
+    final st = _sterilizer;
+    if (st == null) return;
+    setState(() => _saving = true);
+    try {
+      final batch = await ref.read(batchRepositoryProvider).createPassed(
+            sterilizerId: st.id,
+            roundNo: _roundNo,
+            biResult: _biPassed,
+          );
+      if (!mounted) return;
+      Navigator.of(context).pop(batch);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _saving = false);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(apiErrorMessage(e)),
+        backgroundColor: SterelisColors.danger,
+      ));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final sterilizers = ref.watch(sterilizersProvider);
+    final bottom = MediaQuery.of(context).viewInsets.bottom;
+
+    return Padding(
+      padding: EdgeInsets.fromLTRB(20, 16, 20, 20 + bottom),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Center(
+            child: Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                  color: SterelisColors.border,
+                  borderRadius: BorderRadius.circular(2)),
+            ),
+          ),
+          const SizedBox(height: 16),
+          const Text('เปิดรอบนึ่งใหม่',
+              style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800,
+                  color: SterelisColors.textStrong)),
+          const SizedBox(height: 4),
+          const Text('บันทึกเป็นรอบที่ผ่านการตรวจ CI/BI แล้ว พร้อมนำเข้าคลัง',
+              style: TextStyle(fontSize: 13, color: SterelisColors.textMuted)),
+          const SizedBox(height: 18),
+          const Text('เครื่องนึ่ง',
+              style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+          const SizedBox(height: 8),
+          sterilizers.when(
+            loading: () => const Padding(
+              padding: EdgeInsets.all(16),
+              child: Center(child: CircularProgressIndicator()),
+            ),
+            error: (e, _) => Text(apiErrorMessage(e),
+                style: const TextStyle(color: SterelisColors.danger)),
+            data: (list) => DropdownButtonFormField<Sterilizer>(
+              initialValue: _sterilizer,
+              isExpanded: true,
+              decoration: const InputDecoration(
+                prefixIcon: Icon(Icons.local_fire_department_outlined),
+              ),
+              items: list
+                  .map((s) =>
+                      DropdownMenuItem(value: s, child: Text(s.name)))
+                  .toList(),
+              onChanged: _saving ? null : (s) => setState(() => _sterilizer = s),
+            ),
+          ),
+          const SizedBox(height: 18),
+          Row(children: [
+            const Text('รอบที่',
+                style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+            const Spacer(),
+            IconButton.filledTonal(
+              onPressed: _roundNo > 1 && !_saving
+                  ? () => setState(() => _roundNo--)
+                  : null,
+              icon: const Icon(Icons.remove),
+            ),
+            SizedBox(
+              width: 52,
+              child: Text('$_roundNo',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w800,
+                      color: SterelisColors.textStrong)),
+            ),
+            IconButton.filledTonal(
+              onPressed:
+                  _saving ? null : () => setState(() => _roundNo++),
+              icon: const Icon(Icons.add),
+            ),
+          ]),
+          const SizedBox(height: 8),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('ผลตรวจ BI ผ่าน',
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+            subtitle: const Text('CI ถือว่าผ่านโดยอัตโนมัติ',
+                style: TextStyle(fontSize: 12, color: SterelisColors.textMuted)),
+            value: _biPassed,
+            activeThumbColor: SterelisColors.success,
+            onChanged: _saving ? null : (v) => setState(() => _biPassed = v),
+          ),
+          const SizedBox(height: 12),
+          FilledButton.icon(
+            onPressed: _sterilizer == null || _saving ? null : _submit,
+            icon: _saving
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                        strokeWidth: 2, color: Colors.white))
+                : const Icon(Icons.check),
+            label: const Text('เปิดรอบ + บันทึกผลผ่าน'),
+            style:
+                FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
+          ),
+        ],
+      ),
+    );
   }
 }
 

@@ -20,6 +20,16 @@ final templatesProvider = FutureProvider.autoDispose<List<SetTemplate>>((ref) as
       .toList();
 });
 
+final sterilizersProvider =
+    FutureProvider.autoDispose<List<Sterilizer>>((ref) async {
+  final res = await ref
+      .watch(dioProvider)
+      .get<List<dynamic>>('/master-data/sterilizers');
+  return res.data!
+      .map((e) => Sterilizer.fromJson(e as Map<String, dynamic>))
+      .toList();
+});
+
 /// ---------- Dashboard ----------
 
 final dashboardProvider = FutureProvider.autoDispose<DashboardData>((ref) async {
@@ -147,3 +157,35 @@ final batchesProvider = FutureProvider.autoDispose.family<List<SterilizationBatc
       .map((e) => SterilizationBatch.fromJson(e as Map<String, dynamic>))
       .toList();
 });
+
+final batchRepositoryProvider =
+    Provider<BatchRepository>((ref) => BatchRepository(ref));
+
+class BatchRepository {
+  BatchRepository(this._ref);
+  final Ref _ref;
+
+  /// เปิดรอบนึ่งใหม่ + บันทึกผล CI/BI ผ่าน (batch พร้อมใช้นำเข้าคลังทันที)
+  Future<SterilizationBatch> createPassed({
+    required String sterilizerId,
+    required int roundNo,
+    bool biResult = true,
+  }) async {
+    final dio = _ref.read(dioProvider);
+    final created = await dio.post<Map<String, dynamic>>(
+      '/batches',
+      data: {
+        'sterilizerId': sterilizerId,
+        'roundNo': roundNo,
+        'startedAt': DateTime.now().toUtc().toIso8601String(),
+      },
+    );
+    final id = created.data!['id'] as String;
+    // บันทึกผลตรวจ CI (+BI) ผ่าน → backend เปลี่ยนสถานะเป็น PASSED
+    final result = await dio.post<Map<String, dynamic>>(
+      '/batches/$id/result',
+      data: {'ciResult': true, 'biResult': biResult},
+    );
+    return SterilizationBatch.fromJson(result.data!);
+  }
+}

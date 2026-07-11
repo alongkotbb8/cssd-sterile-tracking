@@ -63,6 +63,20 @@ class SetTemplate {
       );
 }
 
+class Sterilizer {
+  final String id;
+  final String code;
+  final String name;
+
+  const Sterilizer({required this.id, required this.code, required this.name});
+
+  factory Sterilizer.fromJson(Map<String, dynamic> j) => Sterilizer(
+        id: j['id'] as String,
+        code: (j['code'] ?? '') as String,
+        name: j['name'] as String,
+      );
+}
+
 class Movement {
   final String type; // IN | OUT | RETURN
   final DateTime? createdAt;
@@ -193,6 +207,14 @@ class SterilizationBatch {
         sterilizerName:
             (j['sterilizer'] as Map<String, dynamic>?)?['name'] as String?,
       );
+
+  // เทียบด้วย id เพื่อให้ dropdown จับคู่ค่าที่เลือกกับ list ที่ refetch มาได้ถูก
+  @override
+  bool operator ==(Object other) =>
+      other is SterilizationBatch && other.id == id;
+
+  @override
+  int get hashCode => id.hashCode;
 }
 
 class DashboardSlice {

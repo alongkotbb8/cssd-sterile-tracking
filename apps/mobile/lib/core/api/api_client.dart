@@ -35,12 +35,23 @@ class ServerUrlNotifier extends Notifier<String> {
   }
 }
 
+// Render free tier "หลับ" หลังไม่มีคนใช้ ~15 นาที ตื่นใช้เวลาได้ถึง ~50-60 วินาที
+// ตั้ง timeout ต่อครั้งให้พอสมควร แล้วให้ interceptor retry อัตโนมัติแทนการ
+// ให้ผู้ใช้กด "ลองใหม่" เอง
+const _kWakeRetryDelays = [
+  Duration(seconds: 3),
+  Duration(seconds: 6),
+  Duration(seconds: 10),
+  Duration(seconds: 15),
+  Duration(seconds: 15),
+];
+
 final dioProvider = Provider<Dio>((ref) {
   final baseUrl = ref.watch(serverUrlProvider);
   final dio = Dio(BaseOptions(
     baseUrl: '$baseUrl/api/v1',
-    connectTimeout: const Duration(seconds: 8),
-    receiveTimeout: const Duration(seconds: 15),
+    connectTimeout: const Duration(seconds: 20),
+    receiveTimeout: const Duration(seconds: 20),
   ));
 
   dio.interceptors.add(InterceptorsWrapper(
@@ -53,13 +64,46 @@ final dioProvider = Provider<Dio>((ref) {
       }
       handler.next(options);
     },
-    onError: (e, handler) {
+    onError: (e, handler) async {
       // token หมดอายุ/ไม่ถูกต้อง → บังคับออกจากระบบ (ยกเว้นตอน login เอง)
       if (e.response?.statusCode == 401 &&
           !e.requestOptions.path.contains('/auth/login')) {
         ref.read(authControllerProvider.notifier).logout();
+        handler.next(e);
+        return;
       }
-      handler.next(e);
+
+      // เรียกจากลูป retry ชั้นนอกอยู่แล้ว (ดู flag ด้านล่าง) ไม่ต้อง retry ซ้อน
+      if (e.requestOptions.extra['_wakeRetrying'] == true) {
+        handler.next(e);
+        return;
+      }
+
+      var currentError = e;
+      for (var attempt = 0; attempt < _kWakeRetryDelays.length; attempt++) {
+        // retry อัตโนมัติเฉพาะตอน server ยังไม่ตอบ (กำลังตื่นจาก sleep)
+        // - GET: retry ได้เสมอ (idempotent)
+        // - POST/PATCH/DELETE: retry เฉพาะ connectTimeout/connectionError
+        //   (ยังไม่เชื่อมต่อ ไม่มีทางที่ server ได้รับข้อมูลไปประมวลผลแล้ว)
+        final canRetry = currentError.type ==
+                DioExceptionType.connectionTimeout ||
+            currentError.type == DioExceptionType.connectionError ||
+            (currentError.type == DioExceptionType.receiveTimeout &&
+                currentError.requestOptions.method.toUpperCase() == 'GET');
+        if (!canRetry) break;
+
+        await Future.delayed(_kWakeRetryDelays[attempt]);
+        try {
+          final opts = currentError.requestOptions;
+          opts.extra['_wakeRetrying'] = true;
+          final res = await dio.fetch(opts);
+          handler.resolve(res);
+          return;
+        } on DioException catch (retryErr) {
+          currentError = retryErr;
+        }
+      }
+      handler.next(currentError);
     },
   ));
 
