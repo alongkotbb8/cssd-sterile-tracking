@@ -38,6 +38,36 @@ final dashboardProvider = FutureProvider.autoDispose<DashboardData>((ref) async 
   return DashboardData.fromJson(res.data!);
 });
 
+/// รายงานช่วงวันที่ (from/to เป็น yyyy-MM-dd) — record เทียบค่าได้ ใช้เป็น family key
+typedef ReportRange = ({String from, String to});
+
+final weeklyReportProvider =
+    FutureProvider.autoDispose.family<WeeklyReport, ReportRange>(
+        (ref, range) async {
+  final res = await ref.watch(dioProvider).get<Map<String, dynamic>>(
+    '/reports/weekly',
+    queryParameters: {'from': range.from, 'to': range.to},
+  );
+  return WeeklyReport.fromJson(res.data!);
+});
+
+final reportRepositoryProvider =
+    Provider<ReportRepository>((ref) => ReportRepository(ref));
+
+class ReportRepository {
+  ReportRepository(this._ref);
+  final Ref _ref;
+
+  /// ล้างประวัติเก่ากว่า [before] (ADMIN เท่านั้น) — คืนจำนวนที่ลบ
+  Future<Map<String, dynamic>> cleanup(DateTime before) async {
+    final res = await _ref.read(dioProvider).post<Map<String, dynamic>>(
+      '/reports/cleanup',
+      data: {'before': before.toUtc().toIso8601String()},
+    );
+    return res.data!;
+  }
+}
+
 /// ---------- Packages ----------
 
 /// filter = null → ทั้งหมด, มิฉะนั้นส่ง status ไปกรองที่ server (เรียง FEFO จาก server)

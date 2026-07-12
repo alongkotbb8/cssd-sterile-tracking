@@ -39,6 +39,10 @@ dependencies:
   # Charts (dashboard donut)
   fl_chart: ^0.68.0
 
+  # Report PDF printing
+  pdf: ^3.11.1
+  printing: ^5.13.2
+
   # Shared preferences / secure storage
   flutter_secure_storage: ^9.2.2
   shared_preferences: ^2.2.3

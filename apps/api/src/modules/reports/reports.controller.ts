@@ -1,11 +1,16 @@
-import { Controller, Get, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { ApiBearerAuth, ApiTags, ApiOperation, ApiQuery } from '@nestjs/swagger';
+import { UserRole } from '@prisma/client';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { Roles } from '../../common/decorators/roles.decorator';
+import { RolesGuard } from '../../common/guards/roles.guard';
+import { CleanupDto } from './dto/cleanup.dto';
 import { ReportsService } from './reports.service';
 
 @ApiTags('reports')
 @ApiBearerAuth()
-@UseGuards(AuthGuard('jwt'))
+@UseGuards(AuthGuard('jwt'), RolesGuard)
 @Controller('reports')
 export class ReportsController {
   constructor(private svc: ReportsService) {}
@@ -32,5 +37,15 @@ export class ReportsController {
   @ApiQuery({ name: 'departmentId', required: false })
   unreturned(@Query('departmentId') dept?: string) {
     return this.svc.unreturned(dept);
+  }
+
+  @Post('cleanup')
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({
+    summary:
+      'ล้างประวัติเก่าหลังพิมพ์รายงานเก็บเข้าแฟ้ม (ไม่แตะสต๊อกคลังปัจจุบัน) — ADMIN เท่านั้น',
+  })
+  cleanup(@Body() dto: CleanupDto, @CurrentUser() user: { id: string }) {
+    return this.svc.cleanup(dto.before, user.id);
   }
 }

@@ -2,7 +2,10 @@
 /// (เขียนมือ ไม่ใช้ codegen เพื่อให้อ่าน/แก้ง่าย)
 library;
 
-DateTime? _date(dynamic v) => v == null ? null : DateTime.tryParse(v as String);
+// server ส่งเวลาเป็น UTC (ISO + Z) — แปลงเป็นเวลาท้องถิ่นก่อนเสมอ
+// ไม่งั้นหน้าจอจะแสดงเวลาเพี้ยนไป 7 ชั่วโมง (UTC vs เวลาไทย)
+DateTime? _date(dynamic v) =>
+    v == null ? null : DateTime.tryParse(v as String)?.toLocal();
 
 class AppUser {
   final String id;
@@ -215,6 +218,70 @@ class SterilizationBatch {
 
   @override
   int get hashCode => id.hashCode;
+}
+
+/// แถวรายการเคลื่อนไหวในรายงาน (จาก /reports/weekly)
+class ReportMovement {
+  final String type; // IN | OUT | RETURN
+  final DateTime? createdAt;
+  final String packageId;
+  final String templateName;
+  final String? departmentName;
+  final String? receiverName;
+  final String? performedByName;
+
+  const ReportMovement({
+    required this.type,
+    required this.packageId,
+    required this.templateName,
+    this.createdAt,
+    this.departmentName,
+    this.receiverName,
+    this.performedByName,
+  });
+
+  factory ReportMovement.fromJson(Map<String, dynamic> j) {
+    final pkg = j['package'] as Map<String, dynamic>?;
+    return ReportMovement(
+      type: j['type'] as String,
+      createdAt: _date(j['createdAt']),
+      packageId: (j['packageId'] ?? pkg?['id'] ?? '') as String,
+      templateName:
+          ((pkg?['setTemplate'] as Map<String, dynamic>?)?['name'] ?? '')
+              as String,
+      departmentName:
+          (j['department'] as Map<String, dynamic>?)?['name'] as String?,
+      receiverName: j['receiverName'] as String?,
+      performedByName:
+          (j['performedBy'] as Map<String, dynamic>?)?['name'] as String?,
+    );
+  }
+}
+
+class WeeklyReport {
+  final List<ReportMovement> movements;
+  final int inCount;
+  final int outCount;
+  final int returnCount;
+
+  const WeeklyReport({
+    required this.movements,
+    required this.inCount,
+    required this.outCount,
+    required this.returnCount,
+  });
+
+  factory WeeklyReport.fromJson(Map<String, dynamic> j) {
+    final summary = (j['summary'] ?? const {}) as Map<String, dynamic>;
+    return WeeklyReport(
+      movements: ((j['movements'] as List?) ?? const [])
+          .map((e) => ReportMovement.fromJson(e as Map<String, dynamic>))
+          .toList(),
+      inCount: (summary['IN'] ?? 0) as int,
+      outCount: (summary['OUT'] ?? 0) as int,
+      returnCount: (summary['RETURN'] ?? 0) as int,
+    );
+  }
 }
 
 class DashboardSlice {

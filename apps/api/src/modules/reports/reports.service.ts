@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { PackageStatus } from '@prisma/client';
+import { AuditService } from '../../common/audit/audit.service';
 import { PrismaService } from '../../common/prisma/prisma.service';
 
 function parseDateOrThrow(value: string | undefined, name: string): Date {
@@ -12,7 +13,10 @@ function parseDateOrThrow(value: string | undefined, name: string): Date {
 
 @Injectable()
 export class ReportsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private audit: AuditService,
+  ) {}
 
   /** FR-6: Dashboard data */
   async dashboard() {
@@ -123,5 +127,61 @@ export class ReportsService {
         },
       },
     });
+  }
+
+  /**
+   * ล้างข้อมูลประวัติเก่าหลังพิมพ์รายงานเก็บเข้าแฟ้มแล้ว (ADMIN เท่านั้น)
+   *
+   * ลบ:  movement เก่ากว่า `before`, ห่อสถานะ DISCARDED ที่จบชีวิตก่อน `before`
+   *      (พร้อม movement ที่เหลือของห่อเหล่านั้น), audit log เก่ากว่า `before`
+   * ไม่แตะ: ห่อทุกสถานะที่ยังอยู่ในวงจร (PACKED/STERILE/ISSUED/RETURNED)
+   *         — สต๊อกคลังปัจจุบันคงอยู่ครบ
+   */
+  async cleanup(beforeStr: string, userId: string) {
+    const before = parseDateOrThrow(beforeStr, 'before');
+    if (before >= new Date()) {
+      throw new BadRequestException('วันที่ตัดข้อมูลต้องเป็นอดีตเท่านั้น');
+    }
+
+    const result = await this.prisma.$transaction(async (tx) => {
+      const discarded = await tx.package.findMany({
+        where: { status: PackageStatus.DISCARDED, updatedAt: { lt: before } },
+        select: { id: true },
+      });
+      const discardedIds = discarded.map((p) => p.id);
+
+      const movements = await tx.movement.deleteMany({
+        where: {
+          OR: [
+            { createdAt: { lt: before } },
+            ...(discardedIds.length
+              ? [{ packageId: { in: discardedIds } }]
+              : []),
+          ],
+        },
+      });
+
+      const packages = discardedIds.length
+        ? await tx.package.deleteMany({ where: { id: { in: discardedIds } } })
+        : { count: 0 };
+
+      const audits = await tx.auditLog.deleteMany({
+        where: { createdAt: { lt: before } },
+      });
+
+      return {
+        deletedMovements: movements.count,
+        deletedPackages: packages.count,
+        deletedAuditLogs: audits.count,
+      };
+    });
+
+    // บันทึกการล้างข้อมูลไว้เป็นหลักฐาน (audit ใหม่ เกิดหลัง cutoff เสมอ)
+    await this.audit.log(userId, 'DATA_CLEANUP', undefined, {
+      before: before.toISOString(),
+      ...result,
+    });
+
+    return { before: before.toISOString(), ...result };
   }
 }

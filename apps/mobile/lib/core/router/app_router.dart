@@ -6,6 +6,7 @@ import '../../features/auth/presentation/pages/login_page.dart';
 import '../../features/dashboard/presentation/pages/dashboard_page.dart';
 import '../../features/packages/presentation/pages/package_detail_page.dart';
 import '../../features/packages/presentation/pages/packages_page.dart';
+import '../../features/reports/presentation/pages/report_page.dart';
 import '../../features/scan/presentation/pages/scan_page.dart';
 import '../../features/settings/presentation/pages/settings_page.dart';
 import '../auth/auth_controller.dart';
@@ -53,6 +54,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/packages/:id',
         builder: (c, s) => PackageDetailPage(id: s.pathParameters['id']!),
       ),
+      GoRoute(path: '/reports', builder: (c, s) => const ReportPage()),
     ],
   );
 });

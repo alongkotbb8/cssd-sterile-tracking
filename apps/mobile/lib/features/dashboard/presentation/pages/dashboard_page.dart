@@ -1,6 +1,7 @@
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../../core/api/api_client.dart';
 import '../../../../core/api/repositories.dart';
@@ -40,6 +41,13 @@ class DashboardPage extends ConsumerWidget {
                       fontWeight: FontWeight.w400)),
           ],
         ),
+        actions: [
+          IconButton(
+            tooltip: 'รายงานสรุป / พิมพ์',
+            icon: const Icon(Icons.summarize_outlined),
+            onPressed: () => context.push('/reports'),
+          ),
+        ],
       ),
       body: RefreshIndicator(
         onRefresh: () => ref.refresh(dashboardProvider.future),
