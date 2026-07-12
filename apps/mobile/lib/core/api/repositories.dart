@@ -20,6 +20,33 @@ final templatesProvider = FutureProvider.autoDispose<List<SetTemplate>>((ref) as
       .toList();
 });
 
+final templateRepositoryProvider =
+    Provider<TemplateRepository>((ref) => TemplateRepository(ref));
+
+class TemplateRepository {
+  TemplateRepository(this._ref);
+  final Ref _ref;
+
+  /// สร้างชุดอุปกรณ์ใหม่ (SUPERVISOR/ADMIN เท่านั้น)
+  Future<SetTemplate> create({
+    required String code,
+    required String name,
+    required List<String> itemList,
+    String defaultWrapType = 'SEAL',
+  }) async {
+    final res = await _ref.read(dioProvider).post<Map<String, dynamic>>(
+      '/master-data/templates',
+      data: {
+        'code': code,
+        'name': name,
+        'itemList': itemList,
+        'defaultWrapType': defaultWrapType,
+      },
+    );
+    return SetTemplate.fromJson(res.data!);
+  }
+}
+
 final sterilizersProvider =
     FutureProvider.autoDispose<List<Sterilizer>>((ref) async {
   final res = await ref

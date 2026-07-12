@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/api/api_client.dart';
 import '../../../../core/api/repositories.dart';
+import '../../../../core/auth/auth_controller.dart';
 import '../../../../core/models/models.dart';
 import '../../../../core/printer/printer_adapter.dart';
 import '../../../../core/printer/printer_provider.dart';
@@ -200,10 +201,22 @@ class _CreatePackageSheetState extends ConsumerState<_CreatePackageSheet> {
     }
   }
 
+  Future<void> _createTemplate() async {
+    final created = await showCreateTemplateSheet(context, ref);
+    if (created != null && mounted) {
+      setState(() {
+        _template = created;
+        _wrapType = created.defaultWrapType;
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final templates = ref.watch(templatesProvider);
     final bottom = MediaQuery.of(context).viewInsets.bottom;
+    final role = ref.watch(authControllerProvider).user?.role;
+    final canCreateTemplate = role == 'SUPERVISOR' || role == 'ADMIN';
 
     return Padding(
       padding: EdgeInsets.fromLTRB(20, 16, 20, 20 + bottom),
@@ -247,33 +260,48 @@ class _CreatePackageSheetState extends ConsumerState<_CreatePackageSheet> {
                 child: Wrap(
                   spacing: 8,
                   runSpacing: 8,
-                  children: list.map((t) {
-                    final sel = _template?.id == t.id;
-                    return ChoiceChip(
-                      label: Text(t.name),
-                      selected: sel,
-                      showCheckmark: false,
-                      onSelected: (_) => setState(() {
-                        _template = t;
-                        _wrapType = t.defaultWrapType;
-                      }),
-                      backgroundColor: SterelisColors.white,
-                      selectedColor: SterelisColors.blue50,
-                      labelStyle: TextStyle(
-                        color:
-                            sel ? SterelisColors.blue600 : SterelisColors.text,
-                        fontWeight: sel ? FontWeight.w700 : FontWeight.w500,
+                  children: [
+                    ...list.map((t) {
+                      final sel = _template?.id == t.id;
+                      return ChoiceChip(
+                        label: Text(t.name),
+                        selected: sel,
+                        showCheckmark: false,
+                        onSelected: (_) => setState(() {
+                          _template = t;
+                          _wrapType = t.defaultWrapType;
+                        }),
+                        backgroundColor: SterelisColors.white,
+                        selectedColor: SterelisColors.blue50,
+                        labelStyle: TextStyle(
+                          color: sel
+                              ? SterelisColors.blue600
+                              : SterelisColors.text,
+                          fontWeight: sel ? FontWeight.w700 : FontWeight.w500,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          side: BorderSide(
+                              color: sel
+                                  ? SterelisColors.blue500
+                                  : SterelisColors.border,
+                              width: sel ? 1.5 : 1),
+                        ),
+                      );
+                    }),
+                    if (canCreateTemplate)
+                      ActionChip(
+                        avatar: const Icon(Icons.add,
+                            size: 16, color: SterelisColors.blue600),
+                        label: const Text('ชุดใหม่'),
+                        onPressed: _saving ? null : _createTemplate,
+                        backgroundColor: SterelisColors.blue50,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          side: const BorderSide(color: SterelisColors.blue500),
+                        ),
                       ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        side: BorderSide(
-                            color: sel
-                                ? SterelisColors.blue500
-                                : SterelisColors.border,
-                            width: sel ? 1.5 : 1),
-                      ),
-                    );
-                  }).toList(),
+                  ],
                 ),
               ),
             ),
@@ -354,6 +382,216 @@ class _CreatePackageSheetState extends ConsumerState<_CreatePackageSheet> {
                     : 'บันทึก $_quantity ห่อ + ออกเลขรัน'),
             style:
                 FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// เปิด sheet สร้างชุดอุปกรณ์ใหม่ (SUPERVISOR/ADMIN) — คืนค่า SetTemplate ที่สร้างสำเร็จ
+Future<SetTemplate?> showCreateTemplateSheet(
+    BuildContext context, WidgetRef ref) {
+  return showModalBottomSheet<SetTemplate>(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: SterelisColors.surface,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+    ),
+    builder: (_) => const _CreateTemplateSheet(),
+  );
+}
+
+class _CreateTemplateSheet extends ConsumerStatefulWidget {
+  const _CreateTemplateSheet();
+
+  @override
+  ConsumerState<_CreateTemplateSheet> createState() =>
+      _CreateTemplateSheetState();
+}
+
+class _CreateTemplateSheetState extends ConsumerState<_CreateTemplateSheet> {
+  final _codeCtrl = TextEditingController();
+  final _nameCtrl = TextEditingController();
+  final _itemCtrls = <TextEditingController>[TextEditingController()];
+  String _wrapType = 'SEAL';
+  bool _saving = false;
+  String? _error;
+
+  @override
+  void dispose() {
+    _codeCtrl.dispose();
+    _nameCtrl.dispose();
+    for (final c in _itemCtrls) {
+      c.dispose();
+    }
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    final code = _codeCtrl.text.trim();
+    final name = _nameCtrl.text.trim();
+    final items = _itemCtrls
+        .map((c) => c.text.trim())
+        .where((s) => s.isNotEmpty)
+        .toList();
+    if (code.isEmpty || name.isEmpty || items.isEmpty) {
+      setState(() => _error = 'กรอกรหัส ชื่อชุด และรายการอุปกรณ์อย่างน้อย 1 รายการ');
+      return;
+    }
+    setState(() {
+      _saving = true;
+      _error = null;
+    });
+    try {
+      final created = await ref.read(templateRepositoryProvider).create(
+            code: code,
+            name: name,
+            itemList: items,
+            defaultWrapType: _wrapType,
+          );
+      ref.invalidate(templatesProvider);
+      if (!mounted) return;
+      Navigator.of(context).pop(created);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _saving = false;
+        _error = apiErrorMessage(e);
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bottom = MediaQuery.of(context).viewInsets.bottom;
+    return Padding(
+      padding: EdgeInsets.fromLTRB(20, 16, 20, 20 + bottom),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Center(
+            child: Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: SterelisColors.border,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          const Text('สร้างชุดอุปกรณ์ใหม่',
+              style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800,
+                  color: SterelisColors.textStrong)),
+          const SizedBox(height: 4),
+          const Text('ระบุว่าในอุปกรณ์ 1 ชุดมีอะไรบ้าง',
+              style: TextStyle(fontSize: 13, color: SterelisColors.textMuted)),
+          const SizedBox(height: 18),
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxHeight: 420),
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  TextField(
+                    controller: _codeCtrl,
+                    enabled: !_saving,
+                    textCapitalization: TextCapitalization.characters,
+                    decoration: const InputDecoration(
+                      labelText: 'รหัสชุด (ใช้ขึ้นต้นเลขรัน)',
+                      hintText: 'เช่น DELIV',
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  TextField(
+                    controller: _nameCtrl,
+                    enabled: !_saving,
+                    decoration: const InputDecoration(
+                      labelText: 'ชื่อชุดอุปกรณ์',
+                      hintText: 'เช่น ชุดทำคลอด',
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+                  const Text('ชนิดห่อเริ่มต้น',
+                      style:
+                          TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                  const SizedBox(height: 8),
+                  SegmentedButton<String>(
+                    segments: const [
+                      ButtonSegment(
+                          value: 'SEAL', label: Text('ห่อซีล · 180 วัน')),
+                      ButtonSegment(
+                          value: 'CLOTH', label: Text('ห่อผ้า · 7 วัน')),
+                    ],
+                    selected: {_wrapType},
+                    onSelectionChanged: _saving
+                        ? null
+                        : (s) => setState(() => _wrapType = s.first),
+                  ),
+                  const SizedBox(height: 18),
+                  const Text('รายการอุปกรณ์ในชุด',
+                      style:
+                          TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                  const SizedBox(height: 8),
+                  for (var i = 0; i < _itemCtrls.length; i++)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Row(children: [
+                        Expanded(
+                          child: TextField(
+                            controller: _itemCtrls[i],
+                            enabled: !_saving,
+                            decoration: InputDecoration(
+                              labelText: 'อุปกรณ์ชิ้นที่ ${i + 1}',
+                            ),
+                          ),
+                        ),
+                        if (_itemCtrls.length > 1)
+                          IconButton(
+                            icon: const Icon(Icons.remove_circle_outline,
+                                color: SterelisColors.danger),
+                            onPressed: _saving
+                                ? null
+                                : () => setState(() {
+                                      _itemCtrls.removeAt(i).dispose();
+                                    }),
+                          ),
+                      ]),
+                    ),
+                  TextButton.icon(
+                    onPressed: _saving
+                        ? null
+                        : () => setState(
+                            () => _itemCtrls.add(TextEditingController())),
+                    icon: const Icon(Icons.add),
+                    label: const Text('เพิ่มรายการอุปกรณ์'),
+                  ),
+                  if (_error != null) ...[
+                    const SizedBox(height: 8),
+                    Text(_error!,
+                        style: const TextStyle(color: SterelisColors.danger)),
+                  ],
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          FilledButton.icon(
+            onPressed: _saving ? null : _submit,
+            icon: _saving
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                        strokeWidth: 2, color: Colors.white))
+                : const Icon(Icons.save_outlined),
+            label: Text(_saving ? 'กำลังบันทึก...' : 'บันทึกชุดอุปกรณ์'),
+            style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
           ),
         ],
       ),
