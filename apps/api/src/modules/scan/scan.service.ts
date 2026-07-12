@@ -54,15 +54,22 @@ export class ScanService {
         expiryDate.setUTCDate(expiryDate.getUTCDate() + shelfLife);
 
         const updated = await this.prisma.$transaction(async (tx) => {
-          const p = await tx.package.update({
-            where: { id },
+          // status ใน where เป็น compare-and-swap อะตอมมิก กันสแกนซ้ำพร้อมกันจาก 2 เครื่อง
+          const { count } = await tx.package.updateMany({
+            where: { id, status: PackageStatus.PACKED },
             data: { status: PackageStatus.STERILE, batchId, sterilizeDate, expiryDate },
           });
+          if (count === 0) return null;
           await tx.movement.create({
             data: { packageId: id, type: MovementType.IN, performedById: userId },
           });
-          return p;
+          return tx.package.findUniqueOrThrow({ where: { id } });
         });
+
+        if (!updated) {
+          results.push({ packageId: id, success: false, error: 'ห่อนี้ถูกสแกนไปพร้อมกันจากที่อื่นแล้ว' });
+          continue;
+        }
 
         await this.audit.log(userId, 'SCAN_IN', id, { batchId, expiryDate });
         results.push({ packageId: id, success: true, package: updated as unknown as Record<string, unknown> });
@@ -99,8 +106,13 @@ export class ScanService {
           results.push({ packageId: id, success: false, error: `สถานะปัจจุบัน: ${pkg.status}` }); continue;
         }
 
-        await this.prisma.$transaction(async (tx) => {
-          await tx.package.update({ where: { id }, data: { status: PackageStatus.ISSUED } });
+        const done = await this.prisma.$transaction(async (tx) => {
+          // status ใน where เป็น compare-and-swap อะตอมมิก กันสแกนซ้ำพร้อมกันจาก 2 เครื่อง
+          const { count } = await tx.package.updateMany({
+            where: { id, status: PackageStatus.STERILE },
+            data: { status: PackageStatus.ISSUED },
+          });
+          if (count === 0) return false;
           await tx.movement.create({
             data: {
               packageId: id,
@@ -110,7 +122,13 @@ export class ScanService {
               performedById: userId,
             },
           });
+          return true;
         });
+
+        if (!done) {
+          results.push({ packageId: id, success: false, error: 'ห่อนี้ถูกสแกนไปพร้อมกันจากที่อื่นแล้ว' });
+          continue;
+        }
 
         await this.audit.log(userId, 'SCAN_OUT', id, { departmentId, receiverName });
         results.push({ packageId: id, success: true });
@@ -135,12 +153,23 @@ export class ScanService {
           results.push({ packageId: id, success: false, error: `สถานะปัจจุบัน: ${pkg.status}` }); continue;
         }
 
-        await this.prisma.$transaction(async (tx) => {
-          await tx.package.update({ where: { id }, data: { status: PackageStatus.RETURNED } });
+        const done = await this.prisma.$transaction(async (tx) => {
+          // status ใน where เป็น compare-and-swap อะตอมมิก กันสแกนซ้ำพร้อมกันจาก 2 เครื่อง
+          const { count } = await tx.package.updateMany({
+            where: { id, status: PackageStatus.ISSUED },
+            data: { status: PackageStatus.RETURNED },
+          });
+          if (count === 0) return false;
           await tx.movement.create({
             data: { packageId: id, type: MovementType.RETURN, departmentId, performedById: userId },
           });
+          return true;
         });
+
+        if (!done) {
+          results.push({ packageId: id, success: false, error: 'ห่อนี้ถูกสแกนไปพร้อมกันจากที่อื่นแล้ว' });
+          continue;
+        }
 
         await this.audit.log(userId, 'SCAN_RETURN', id, { departmentId });
         results.push({ packageId: id, success: true });
