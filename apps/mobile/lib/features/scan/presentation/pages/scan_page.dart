@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 import '../../../../core/api/api_client.dart';
 import '../../../../core/api/repositories.dart';
@@ -48,7 +51,7 @@ class ScanPage extends ConsumerStatefulWidget {
   ConsumerState<ScanPage> createState() => _ScanPageState();
 }
 
-class _ScanPageState extends ConsumerState<ScanPage> {
+class _ScanPageState extends ConsumerState<ScanPage> with WidgetsBindingObserver {
   ScanMode _mode = ScanMode.scanOut;
   final List<_ScannedItem> _items = [];
   bool _torchOn = false;
@@ -58,10 +61,74 @@ class _ScanPageState extends ConsumerState<ScanPage> {
   SterilizationBatch? _batch;
   final _receiverCtrl = TextEditingController();
 
-  late final MobileScannerController _cam = MobileScannerController();
+  // จัดการ lifecycle ของกล้องเอง เพราะเราส่ง controller ของตัวเองให้ MobileScanner
+  // (widget จะไม่ start/stop ให้อัตโนมัติเมื่อสลับแอป/แท็บ) และตั้ง autoStart=false
+  // เพื่อสั่ง start เองหลังได้สิทธิ์กล้องแล้ว — กันเคส start ก่อน permission → ค้างที่ error
+  late final MobileScannerController _cam =
+      MobileScannerController(autoStart: false);
+  StreamSubscription<BarcodeCapture>? _detectSub;
+
+  /// null = ยังไม่ตรวจ, true = อนุญาตแล้ว, false = ถูกปฏิเสธ
+  bool? _cameraGranted;
+  bool _permanentlyDenied = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _detectSub = _cam.barcodes.listen(_onDetect);
+    _initCamera();
+  }
+
+  Future<void> _initCamera() async {
+    final status = await Permission.camera.request();
+    if (!mounted) return;
+    setState(() {
+      _cameraGranted = status.isGranted;
+      _permanentlyDenied = status.isPermanentlyDenied;
+    });
+    if (status.isGranted) {
+      try {
+        await _cam.start();
+      } catch (_) {
+        // MobileScanner จะแสดง error ผ่าน errorBuilder ให้กด "ลองใหม่" ได้
+      }
+    }
+  }
+
+  Future<void> _retry() async {
+    setState(() {
+      _cameraGranted = null;
+      _permanentlyDenied = false;
+    });
+    await _initCamera();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (_cameraGranted != true) {
+      // ผู้ใช้อาจเพิ่งไปกดอนุญาตสิทธิ์ใน "ตั้งค่าเครื่อง" แล้วกลับมาแอป —
+      // ตรวจสิทธิ์ใหม่ตอน resume ไม่งั้นจะค้างที่หน้า "ถูกปฏิเสธ" ตลอดไป
+      // แม้ผู้ใช้จะอนุญาตแล้วก็ตาม (ต้องปิด-เปิดหน้าใหม่ถึงจะเช็คซ้ำ)
+      if (state == AppLifecycleState.resumed) _initCamera();
+      return;
+    }
+    switch (state) {
+      case AppLifecycleState.resumed:
+        _detectSub ??= _cam.barcodes.listen(_onDetect);
+        unawaited(_cam.start());
+      case AppLifecycleState.inactive:
+      case AppLifecycleState.paused:
+      case AppLifecycleState.hidden:
+      case AppLifecycleState.detached:
+        unawaited(_cam.stop());
+    }
+  }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _detectSub?.cancel();
     _cam.dispose();
     _receiverCtrl.dispose();
     super.dispose();
@@ -271,7 +338,7 @@ class _ScanPageState extends ConsumerState<ScanPage> {
           flex: 4,
           child: Container(
             color: SterelisColors.ink900,
-            child: MobileScanner(controller: _cam, onDetect: _onDetect),
+            child: _buildCameraArea(),
           ),
         ),
         Expanded(
@@ -287,6 +354,70 @@ class _ScanPageState extends ConsumerState<ScanPage> {
           ),
         ),
       ]),
+    );
+  }
+
+  Widget _buildCameraArea() {
+    // ยังไม่ตรวจสิทธิ์ → กำลังโหลด
+    if (_cameraGranted == null) {
+      return const Center(child: CircularProgressIndicator(color: Colors.white));
+    }
+    // ถูกปฏิเสธ → แสดงเหตุผล + ปุ่มดำเนินการ (ไม่ปล่อยให้จอดำเฉย ๆ)
+    if (_cameraGranted == false) {
+      return _CameraMessage(
+        icon: Icons.no_photography_outlined,
+        message: _permanentlyDenied
+            ? 'ปิดสิทธิ์กล้องไว้ — เปิดที่ ตั้งค่าเครื่อง > แอป > CSSD > สิทธิ์'
+            : 'ต้องอนุญาตสิทธิ์กล้องเพื่อสแกน QR',
+        actionLabel: _permanentlyDenied ? 'เปิดตั้งค่า' : 'อนุญาตกล้อง',
+        onAction: _permanentlyDenied ? openAppSettings : _retry,
+      );
+    }
+    // ได้สิทธิ์แล้ว → แสดงกล้อง พร้อม errorBuilder ให้ลองใหม่ถ้ากล้องเปิดไม่ได้
+    return MobileScanner(
+      controller: _cam,
+      errorBuilder: (context, error, child) => _CameraMessage(
+        icon: Icons.error_outline,
+        message: 'เปิดกล้องไม่ได้: ${error.errorCode.name}',
+        actionLabel: 'ลองใหม่',
+        onAction: _retry,
+      ),
+    );
+  }
+}
+
+/// ข้อความ + ปุ่มบนพื้นที่กล้อง (สิทธิ์ถูกปฏิเสธ / กล้อง error)
+class _CameraMessage extends StatelessWidget {
+  const _CameraMessage({
+    required this.icon,
+    required this.message,
+    required this.actionLabel,
+    required this.onAction,
+  });
+
+  final IconData icon;
+  final String message;
+  final String actionLabel;
+  final VoidCallback onAction;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, color: Colors.white70, size: 44),
+            const SizedBox(height: 12),
+            Text(message,
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: Colors.white)),
+            const SizedBox(height: 16),
+            FilledButton(onPressed: onAction, child: Text(actionLabel)),
+          ],
+        ),
+      ),
     );
   }
 }

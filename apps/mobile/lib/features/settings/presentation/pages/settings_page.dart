@@ -1,8 +1,11 @@
 import 'dart:async';
+import 'dart:io' show Platform;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:print_bluetooth_thermal/print_bluetooth_thermal.dart';
 
 import '../../../../core/api/api_client.dart';
 import '../../../../core/auth/auth_controller.dart';
@@ -169,7 +172,29 @@ class _PrinterSheet extends ConsumerStatefulWidget {
 class _PrinterSheetState extends ConsumerState<_PrinterSheet> {
   bool _scanning = false;
   List<ScanResult> _found = [];
+  // อุปกรณ์ Bluetooth Classic ที่จับคู่ไว้ในตั้งค่าเครื่องแล้ว — ทางหลักของ
+  // A318BT (เหมือนแอพเครื่องพิมพ์ทั่วไป: pair ในระบบก่อน แล้วเลือกจากรายการนี้)
+  List<BluetoothInfo> _paired = [];
   StreamSubscription<List<ScanResult>>? _sub;
+
+  @override
+  void initState() {
+    super.initState();
+    // โหลดรายการที่จับคู่ไว้ทันทีที่เปิด sheet — ไม่ต้องรอผู้ใช้กดค้นหา
+    _loadPaired();
+  }
+
+  Future<void> _loadPaired() async {
+    if (!Platform.isAndroid) return;
+    // Android 12+ ต้องได้ BLUETOOTH_CONNECT ก่อนถึงจะอ่านรายการ paired ได้
+    if (!await Permission.bluetoothConnect.request().isGranted) return;
+    try {
+      final paired = await PrintBluetoothThermal.pairedBluetooths;
+      if (mounted) setState(() => _paired = paired);
+    } catch (_) {
+      // อ่านไม่ได้ → ปล่อยรายการว่าง ผู้ใช้ยังสแกน BLE ได้
+    }
+  }
 
   @override
   void dispose() {
@@ -178,12 +203,78 @@ class _PrinterSheetState extends ConsumerState<_PrinterSheet> {
     super.dispose();
   }
 
+  /// ขอ permission Bluetooth ตอนรันไทม์ — คืน null เมื่อได้ครบ,
+  /// คืนข้อความ error เมื่อถูกปฏิเสธ
+  ///
+  /// Android 12+ ต้องขอ BLUETOOTH_SCAN/CONNECT ตอนรัน ;
+  /// Android 6–11 ต้องได้ Location ไม่งั้นระบบไม่คืนผลสแกน BLE ให้เลย
+  Future<String?> _requestBluetoothPermissions() async {
+    if (!Platform.isAndroid) return null; // iOS ระบบถามเองตอนเริ่มใช้ Bluetooth
+    final statuses = await [
+      Permission.bluetoothScan,
+      Permission.bluetoothConnect,
+      Permission.locationWhenInUse,
+    ].request();
+    final denied =
+        statuses.entries.where((e) => !e.value.isGranted).toList();
+    if (denied.isEmpty) return null;
+    if (denied.any((e) => e.value.isPermanentlyDenied)) {
+      return 'สิทธิ์ Bluetooth/ตำแหน่งถูกปิดไว้ — เปิดที่ ตั้งค่าเครื่อง > แอป > CSSD > สิทธิ์';
+    }
+    return 'ต้องอนุญาตสิทธิ์ Bluetooth และตำแหน่งก่อน จึงจะค้นหาเครื่องพิมพ์ได้';
+  }
+
+  void _showError(String message, {bool openSettings = false}) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(message),
+      backgroundColor: SterelisColors.danger,
+      action: openSettings
+          ? const SnackBarAction(
+              label: 'เปิดตั้งค่า',
+              textColor: Colors.white,
+              onPressed: openAppSettings,
+            )
+          : null,
+    ));
+  }
+
   Future<void> _scan() async {
+    // 1) permission ต้องมาก่อน startScan — ไม่งั้น Android โยน SecurityException
+    final permError = await _requestBluetoothPermissions();
+    if (permError != null) {
+      _showError(permError, openSettings: permError.contains('ตั้งค่าเครื่อง'));
+      return;
+    }
+
+    // 2) Bluetooth ต้องเปิดอยู่ (Android ขอเปิดให้อัตโนมัติได้)
+    if (await FlutterBluePlus.adapterState.first !=
+        BluetoothAdapterState.on) {
+      if (Platform.isAndroid) {
+        try {
+          await FlutterBluePlus.turnOn();
+          await FlutterBluePlus.adapterState
+              .where((s) => s == BluetoothAdapterState.on)
+              .first
+              .timeout(const Duration(seconds: 5));
+        } catch (_) {
+          _showError('กรุณาเปิด Bluetooth ก่อนค้นหาเครื่องพิมพ์');
+          return;
+        }
+      } else {
+        _showError('กรุณาเปิด Bluetooth ก่อนค้นหาเครื่องพิมพ์');
+        return;
+      }
+    }
+
     setState(() {
       _scanning = true;
       _found = [];
     });
     try {
+      // 3) รีเฟรชรายการที่จับคู่ไว้ (Classic) แล้วสแกน BLE ควบคู่กัน
+      await _loadPaired();
+
       _sub?.cancel();
       _sub = FlutterBluePlus.scanResults.listen((results) {
         if (!mounted) return;
@@ -194,12 +285,7 @@ class _PrinterSheetState extends ConsumerState<_PrinterSheet> {
       await FlutterBluePlus.startScan(timeout: const Duration(seconds: 6));
       await FlutterBluePlus.isScanning.where((s) => !s).first;
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('สแกน Bluetooth ไม่ได้: $e'),
-          backgroundColor: SterelisColors.danger,
-        ));
-      }
+      _showError('สแกน Bluetooth ไม่ได้: $e');
     } finally {
       if (mounted) setState(() => _scanning = false);
     }
@@ -257,42 +343,99 @@ class _PrinterSheetState extends ConsumerState<_PrinterSheet> {
             ),
           ]),
           ConstrainedBox(
-            constraints: const BoxConstraints(maxHeight: 220),
-            child: _found.isEmpty
-                ? Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Text(
-                      _scanning
-                          ? 'กำลังค้นหาอุปกรณ์...'
-                          : 'กด "ค้นหา" เพื่อสแกนหาเครื่องพิมพ์',
-                      textAlign: TextAlign.center,
-                      style:
-                          const TextStyle(color: SterelisColors.textFaint),
-                    ),
-                  )
-                : ListView.builder(
-                    shrinkWrap: true,
-                    itemCount: _found.length,
-                    itemBuilder: (_, i) {
-                      final d = _found[i].device;
-                      return ListTile(
-                        leading: const Icon(Icons.print,
-                            color: SterelisColors.blue500),
-                        title: Text(d.platformName),
-                        subtitle: Text(d.remoteId.str,
-                            style: const TextStyle(
-                                fontSize: 11, fontFamily: 'monospace')),
-                        onTap: () {
-                          ref.read(printerAdapterProvider.notifier).state =
-                              FlashLabelA318Adapter(device: d);
-                          Navigator.of(context).pop();
-                        },
-                      );
-                    },
-                  ),
+            constraints: const BoxConstraints(maxHeight: 260),
+            child: _buildDeviceList(),
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildDeviceList() {
+    // จับคู่ไว้แล้ว (Classic — ทางหลัก) มาก่อน แล้วตามด้วยผลสแกน BLE (ตัดตัวซ้ำ)
+    final pairedMacs =
+        _paired.map((p) => p.macAdress.toUpperCase()).toSet();
+    final scanned = _found
+        .map((r) => r.device)
+        .where((d) => !pairedMacs.contains(d.remoteId.str.toUpperCase()))
+        .toList();
+
+    if (_paired.isEmpty && scanned.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.all(16),
+        child: Text(
+          _scanning
+              ? 'กำลังค้นหาอุปกรณ์...'
+              : 'วิธีที่แนะนำ: จับคู่ (pair) เครื่องพิมพ์ในตั้งค่า Bluetooth '
+                  'ของเครื่องก่อน แล้วกลับมาที่หน้านี้ — เครื่องจะขึ้นในรายการทันที\n'
+                  'หรือกด "ค้นหา" เพื่อสแกนหาแบบ BLE',
+          textAlign: TextAlign.center,
+          style: const TextStyle(color: SterelisColors.textFaint),
+        ),
+      );
+    }
+
+    return ListView(
+      shrinkWrap: true,
+      children: [
+        if (_paired.isNotEmpty) ...[
+          const Padding(
+            padding: EdgeInsets.fromLTRB(16, 4, 16, 0),
+            child: Text('จับคู่ไว้แล้วในเครื่อง (แนะนำ)',
+                style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: SterelisColors.textMuted)),
+          ),
+          ..._paired.map(_pairedTile),
+        ],
+        if (scanned.isNotEmpty) ...[
+          const Padding(
+            padding: EdgeInsets.fromLTRB(16, 4, 16, 0),
+            child: Text('พบจากการค้นหา (BLE)',
+                style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: SterelisColors.textMuted)),
+          ),
+          ...scanned.map(_scannedTile),
+        ],
+      ],
+    );
+  }
+
+  /// อุปกรณ์จับคู่แล้ว → เชื่อมต่อแบบ Bluetooth Classic SPP (ทางหลักของ A318BT)
+  Widget _pairedTile(BluetoothInfo p) {
+    return ListTile(
+      leading:
+          const Icon(Icons.bluetooth_connected, color: SterelisColors.blue500),
+      title: Text(p.name.isEmpty ? '(ไม่มีชื่อ)' : p.name),
+      subtitle: Text(p.macAdress,
+          style: const TextStyle(fontSize: 11, fontFamily: 'monospace')),
+      onTap: () async {
+        // หยุดสแกน BLE ก่อน — RFCOMM (Classic) กับ BLE scan ทำงานพร้อมกัน
+        // ทำให้ BT stack บางเครื่องรวน เชื่อมต่อไม่ติด
+        await FlutterBluePlus.stopScan();
+        ref.read(printerAdapterProvider.notifier).state =
+            FlashLabelA318Adapter.classic(name: p.name, mac: p.macAdress);
+        if (mounted) Navigator.of(context).pop();
+      },
+    );
+  }
+
+  /// อุปกรณ์จากผลสแกน BLE → ใช้ได้กับเครื่องพิมพ์รุ่น dual-mode เท่านั้น
+  Widget _scannedTile(BluetoothDevice d) {
+    return ListTile(
+      leading: const Icon(Icons.print, color: SterelisColors.blue500),
+      title: Text(d.platformName.isEmpty ? '(ไม่มีชื่อ)' : d.platformName),
+      subtitle: Text(d.remoteId.str,
+          style: const TextStyle(fontSize: 11, fontFamily: 'monospace')),
+      onTap: () async {
+        await FlutterBluePlus.stopScan();
+        ref.read(printerAdapterProvider.notifier).state =
+            FlashLabelA318Adapter.ble(device: d);
+        if (mounted) Navigator.of(context).pop();
+      },
     );
   }
 }

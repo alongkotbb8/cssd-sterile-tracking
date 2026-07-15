@@ -2,6 +2,8 @@
 
 ระบบตามรอยอุปกรณ์หัตถการปลอดเชื้อ | Flutter + NestJS + PostgreSQL
 
+> ดูสถานะความคืบหน้าล่าสุด/checklist เฟส 1-3 ที่ [PROGRESS.md](./PROGRESS.md) — อัปเดตทุกครั้งที่มีการแก้ไข
+
 ## Structure
 
 ```

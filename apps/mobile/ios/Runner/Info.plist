@@ -4,6 +4,12 @@
 <dict>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>ใช้กล้องเพื่อสแกน QR code ของห่ออุปกรณ์</string>
+	<key>NSBluetoothAlwaysUsageDescription</key>
+	<string>ใช้ Bluetooth เพื่อเชื่อมต่อเครื่องพิมพ์ฉลาก</string>
+	<key>NSBluetoothPeripheralUsageDescription</key>
+	<string>ใช้ Bluetooth เพื่อเชื่อมต่อเครื่องพิมพ์ฉลาก</string>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>

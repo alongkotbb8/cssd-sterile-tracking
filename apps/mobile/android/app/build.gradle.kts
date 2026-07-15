@@ -72,3 +72,9 @@ flutter {
 dependencies {
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
 }
+
+// google-services.json ยังไม่มี (ยังไม่มีโปรเจกต์ Firebase จริง — ดู PROGRESS.md)
+// apply plugin เฉพาะตอนไฟล์นี้ถูกใส่เข้ามาจริง ไม่งั้น build จะพังตอนไม่มีไฟล์
+if (file("google-services.json").exists()) {
+    apply(plugin = "com.google.gms.google-services")
+}

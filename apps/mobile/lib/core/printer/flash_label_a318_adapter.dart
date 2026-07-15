@@ -1,45 +1,122 @@
-import 'dart:convert';
 import 'dart:typed_data';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
-import 'package:intl/intl.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:print_bluetooth_thermal/print_bluetooth_thermal.dart';
+import 'label_renderer.dart';
 import 'printer_adapter.dart';
 
-/// FlashLabel A318BT adapter — TSPL over Bluetooth Classic (SPP)
+/// FlashLabel A318BT adapter — TSPL over Bluetooth
 ///
 /// FlashLabel A318BT specs:
 ///   Resolution: 203 DPI
-///   Protocol:   TSPL (primary) / CPCL (fallback)
+///   Protocol:   TSPL
 ///   Label size: 60 × 40 mm (default; configurable)
 ///   Connectivity: Bluetooth Classic SPP + USB
 ///
-/// Wiring:
-///   1. Scan BT devices → find one whose name contains "A318" or user selects
-///   2. Connect to SPP service (UUID: 00001101-0000-1000-8000-00805f9b34fb)
-///   3. Write TSPL commands as UTF-8 bytes to the characteristic/channel
-class FlashLabelA318Adapter extends PrinterAdapter {
-  FlashLabelA318Adapter({required this.device, this.labelWidthMm = 60, this.labelHeightMm = 40});
+/// การเชื่อมต่อมี 2 ทาง (เหมือนแอพเครื่องพิมพ์ label ทั่วไป):
+///   1. **Classic SPP** (ทางหลัก) — จับคู่เครื่องพิมพ์ใน Settings ของเครื่องก่อน
+///      แล้วเปิด RFCOMM socket ผ่าน print_bluetooth_thermal (A318BT เป็น BT Classic)
+///   2. **BLE GATT** (ทางสำรอง) — สำหรับเครื่องพิมพ์รุ่น dual-mode ที่โฆษณาเป็น BLE
+///
+/// label ทุกใบ render เป็นภาพ bitmap ก่อนส่ง (ดู [LabelRenderer]) เพื่อให้พิมพ์
+/// ภาษาไทยได้ถูกต้อง — ฟอนต์ในตัวเครื่องพิมพ์ TSPL ไม่มีอักษรไทย
+enum _Transport { classicSpp, ble }
 
-  final BluetoothDevice device;
+class FlashLabelA318Adapter extends PrinterAdapter {
+  FlashLabelA318Adapter.classic({
+    required String name,
+    required String mac,
+    this.labelWidthMm = 60,
+    this.labelHeightMm = 40,
+  })  : _transport = _Transport.classicSpp,
+        _name = name,
+        _mac = mac,
+        device = null;
+
+  FlashLabelA318Adapter.ble({
+    required BluetoothDevice this.device,
+    this.labelWidthMm = 60,
+    this.labelHeightMm = 40,
+  })  : _transport = _Transport.ble,
+        _name = device.platformName,
+        _mac = device.remoteId.str;
+
+  final _Transport _transport;
+  final String _name;
+  final String _mac;
+  final BluetoothDevice? device;
   final int labelWidthMm;
   final int labelHeightMm;
 
   BluetoothCharacteristic? _txChar;
   bool _connected = false;
 
-  // SPP service UUID (standard Bluetooth Serial Port Profile)
-  // Fallback: many BLE-SPP bridges use this write characteristic
-  static const _writeCharUuid   = '0000ff02-0000-1000-8000-00805f9b34fb';
+  static const _writeCharUuid = '0000ff02-0000-1000-8000-00805f9b34fb';
 
   @override
-  String get displayName => 'FlashLabel A318BT (${device.platformName})';
+  String get displayName =>
+      'FlashLabel A318BT ($_name${_transport == _Transport.ble ? ' · BLE' : ''})';
 
   @override
   bool get isConnected => _connected;
 
+  /// print_bluetooth_thermal โค้ด native จะ **ค้าง (ไม่ยิง result กลับ)** ถ้า
+  /// BLUETOOTH_CONNECT ยังไม่ได้รับอนุญาตบน Android 12+ → ต้องเช็คสิทธิ์ก่อน
+  /// เรียก method ใด ๆ ของมันเสมอ ไม่งั้น Future จะค้างตลอดไป
+  Future<void> _ensureConnectPermission() async {
+    final status = await Permission.bluetoothConnect.request();
+    if (!status.isGranted) {
+      throw const PrinterException(
+          'ต้องอนุญาตสิทธิ์ Bluetooth ก่อนเชื่อมต่อเครื่องพิมพ์ '
+          '(ตั้งค่าเครื่อง > แอป > CSSD > สิทธิ์)');
+    }
+  }
+
   @override
   Future<void> connect() async {
-    await device.connect(timeout: const Duration(seconds: 10));
-    final services = await device.discoverServices();
+    switch (_transport) {
+      case _Transport.classicSpp:
+        await _connectClassic();
+      case _Transport.ble:
+        await _connectBle();
+    }
+    _connected = true;
+  }
+
+  Future<void> _connectClassic() async {
+    await _ensureConnectPermission();
+
+    if (!await PrintBluetoothThermal.bluetoothEnabled) {
+      throw const PrinterException('กรุณาเปิด Bluetooth ก่อนเชื่อมต่อเครื่องพิมพ์');
+    }
+
+    // ตัด connection ค้าง (เช่นเครื่องพิมพ์ถูกปิด-เปิดใหม่) เพื่อเริ่ม socket ที่สะอาด
+    if (await PrintBluetoothThermal.connectionStatus) {
+      await PrintBluetoothThermal.disconnect;
+    }
+
+    // native connect ไม่มี timeout — ถ้าเครื่องพิมพ์ปิด/อยู่นอกระยะจะบล็อกนาน
+    // ครอบ timeout ไว้ให้ผู้ใช้ได้ error ที่อ่านรู้เรื่องแทนการค้าง
+    bool ok;
+    try {
+      ok = await PrintBluetoothThermal.connect(macPrinterAddress: _mac)
+          .timeout(const Duration(seconds: 12));
+    } catch (_) {
+      throw const PrinterException(
+          'เชื่อมต่อเครื่องพิมพ์ไม่สำเร็จ (หมดเวลา) — ตรวจว่าเครื่องพิมพ์เปิดอยู่และอยู่ในระยะ');
+    }
+    if (!ok) {
+      throw const PrinterException(
+          'เชื่อมต่อเครื่องพิมพ์ไม่สำเร็จ — ตรวจว่าเครื่องพิมพ์เปิดอยู่ '
+          'และจับคู่ (pair) ไว้ในตั้งค่า Bluetooth ของเครื่องแล้ว');
+    }
+  }
+
+  Future<void> _connectBle() async {
+    await _ensureConnectPermission();
+    final dev = device!;
+    await dev.connect(timeout: const Duration(seconds: 12));
+    final services = await dev.discoverServices();
 
     BluetoothCharacteristic? found;
     for (final svc in services) {
@@ -47,7 +124,6 @@ class FlashLabelA318Adapter extends PrinterAdapter {
         final props = char.properties;
         if (props.write || props.writeWithoutResponse) {
           found ??= char;
-          // Prefer the known write char UUID
           if (char.uuid.toString().toLowerCase() == _writeCharUuid) {
             found = char;
             break;
@@ -56,82 +132,70 @@ class FlashLabelA318Adapter extends PrinterAdapter {
       }
     }
 
-    if (found == null) throw const PrinterException('ไม่พบ characteristic สำหรับเขียนข้อมูล');
+    if (found == null) {
+      await dev.disconnect();
+      throw const PrinterException(
+          'ไม่พบช่องทางเขียนข้อมูลแบบ BLE — เครื่องพิมพ์รุ่นนี้น่าจะเป็น '
+          'Bluetooth Classic: จับคู่ในตั้งค่า Bluetooth ของเครื่องก่อน '
+          'แล้วเลือกจากรายการ "จับคู่ไว้แล้ว" แทน');
+    }
     _txChar = found;
-    _connected = true;
   }
 
   @override
   Future<void> disconnect() async {
-    await device.disconnect();
+    switch (_transport) {
+      case _Transport.classicSpp:
+        try {
+          await PrintBluetoothThermal.disconnect;
+        } catch (_) {/* ปล่อยผ่าน — ตั้งใจจะตัดการเชื่อมต่ออยู่แล้ว */}
+      case _Transport.ble:
+        try {
+          await device!.disconnect();
+        } catch (_) {/* ignore */}
+        _txChar = null;
+    }
     _connected = false;
-    _txChar = null;
   }
 
   @override
   Future<void> printLabel(LabelData data) async {
-    if (!_connected || _txChar == null) throw const PrinterException('ยังไม่ได้เชื่อมต่อเครื่องพิมพ์');
+    if (!_connected) throw const PrinterException('ยังไม่ได้เชื่อมต่อเครื่องพิมพ์');
 
-    final tspl = _buildTspl(data);
-    await _send(tspl);
-  }
-
-  Future<void> _send(String tspl) async {
-    final bytes = utf8.encode(tspl);
-    // MTU for BT Classic SPP: send in 512-byte chunks
-    const chunkSize = 512;
-    for (var i = 0; i < bytes.length; i += chunkSize) {
-      final end = (i + chunkSize < bytes.length) ? i + chunkSize : bytes.length;
-      final chunk = Uint8List.fromList(bytes.sublist(i, end));
-      await _txChar!.write(chunk, withoutResponse: _txChar!.properties.writeWithoutResponse);
-      await Future.delayed(const Duration(milliseconds: 20)); // let printer buffer
-    }
-  }
-
-  String _buildTspl(LabelData d) {
-    final fmt = DateFormat('dd/MM/yyyy');
-    // Dots per mm at 203 DPI ≈ 8 dots/mm
-    return '''
-SIZE $labelWidthMm mm, $labelHeightMm mm
-GAP 3 mm, 0
-DIRECTION 1
-REFERENCE 0,0
-OFFSET 0 mm
-SET PEEL OFF
-SET CUTTER OFF
-CLS
-
-; Set name (large)
-TEXT 20,8,"3",0,1,1,"${_esc(d.setName)}"
-
-; Wrap type badge
-TEXT 20,30,"2",0,1,1,"${_esc(d.wrapType)}"
-
-; QR code — content = packageId only (per domain rule)
-QRCODE 20,50,L,4,A,0,"${d.packageId}"
-
-; Running number text beside QR
-TEXT 185,50,"2",0,1,1,"${d.packageId}"
-
-; Dates
-TEXT 20,145,"2",0,1,1,"นึ่ง: ${fmt.format(d.sterilizeDate)}"
-TEXT 20,163,"2",0,1,1,"หมดอายุ: ${fmt.format(d.expiryDate)}"
-
-PRINT 1,1
-''';
-  }
-
-  String _esc(String s) => s.replaceAll('"', '\\"');
-
-  // ─── Bluetooth device discovery helpers ──────────────────────────────────
-
-  /// Scan for nearby A318BT devices (call once from UI, then let user pick)
-  static Stream<List<ScanResult>> scan({Duration timeout = const Duration(seconds: 8)}) {
-    FlutterBluePlus.startScan(timeout: timeout);
-    return FlutterBluePlus.scanResults.map(
-      (results) => results.where((r) =>
-        r.device.platformName.toUpperCase().contains('A318') ||
-        r.device.platformName.toUpperCase().contains('FLASH')).toList(),
+    final bytes = await LabelRenderer.buildTsplBitmap(
+      data,
+      widthMm: labelWidthMm,
+      heightMm: labelHeightMm,
     );
+    await _send(bytes);
+  }
+
+  Future<void> _send(List<int> bytes) async {
+    switch (_transport) {
+      case _Transport.classicSpp:
+        // เช็คว่า socket ยังอยู่ก่อนเขียน (เครื่องพิมพ์อาจถูกปิดระหว่างทาง)
+        if (!await PrintBluetoothThermal.connectionStatus) {
+          _connected = false;
+          throw const PrinterException(
+              'การเชื่อมต่อหลุด — กรุณาเชื่อมต่อเครื่องพิมพ์ใหม่อีกครั้ง');
+        }
+        final ok = await PrintBluetoothThermal.writeBytes(bytes);
+        if (!ok) {
+          _connected = false;
+          throw const PrinterException('ส่งข้อมูลไปเครื่องพิมพ์ไม่สำเร็จ');
+        }
+      case _Transport.ble:
+        // BLE: ส่งเป็น chunk ตาม MTU
+        const chunkSize = 512;
+        final data = Uint8List.fromList(bytes);
+        for (var i = 0; i < data.length; i += chunkSize) {
+          final end = (i + chunkSize < data.length) ? i + chunkSize : data.length;
+          await _txChar!.write(
+            data.sublist(i, end),
+            withoutResponse: _txChar!.properties.writeWithoutResponse,
+          );
+          await Future.delayed(const Duration(milliseconds: 20)); // let printer buffer
+        }
+    }
   }
 }

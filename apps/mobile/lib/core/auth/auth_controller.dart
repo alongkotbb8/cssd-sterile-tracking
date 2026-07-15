@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../api/api_client.dart';
 import '../models/models.dart';
+import '../notifications/fcm_service.dart';
 
 const kTokenKey = 'access_token';
 const kUserKey = 'auth_user';
@@ -92,6 +93,8 @@ class AuthController extends Notifier<AuthState> {
   }
 
   Future<void> logout() async {
+    // ยกเลิก token ก่อนเคลียร์ state/token ที่ dio interceptor ใช้แนบ Authorization
+    await unregisterFcmToken(ref);
     state = const AuthState.unauthenticated();
     await ref.read(secureStorageProvider).delete(key: kTokenKey);
     await ref.read(sharedPreferencesProvider).remove(kUserKey);

@@ -8,6 +8,7 @@ import { DepartmentsModule } from './modules/departments/departments.module';
 import { BatchesModule } from './modules/batches/batches.module';
 import { ReportsModule } from './modules/reports/reports.module';
 import { MasterDataModule } from './modules/master-data/master-data.module';
+import { NotificationsModule } from './modules/notifications/notifications.module';
 import { HealthController } from './health.controller';
 
 @Module({
@@ -21,6 +22,7 @@ import { HealthController } from './health.controller';
     BatchesModule,
     ReportsModule,
     MasterDataModule,
+    NotificationsModule,
   ],
   controllers: [HealthController],
 })

@@ -189,8 +189,23 @@ model User {
   createdPackages   Package[]  @relation("PackageCreator")
   performedMovements Movement[] @relation("MovementPerformer")
   auditLogs         AuditLog[]
+  fcmTokens         FcmToken[]
 
   @@map("users")
+}
+
+// One row per (user, device). Refreshed on each login / token-refresh event.
+model FcmToken {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  token     String   @unique @db.VarChar(300)
+  deviceId  String?  @db.VarChar(100)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@map("fcm_tokens")
 }
 
 model AuditLog {
