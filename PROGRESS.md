@@ -102,8 +102,6 @@
 
 ---
 
----
-
 ## บั๊กฟิกซ์: หน้าสแกน QR กล้องขึ้น error ไม่แสดง preview (2026-07-15, v1.1.4+6)
 
 **อาการ:** เข้าหน้าสแกน อนุญาตกล้องแล้ว แต่พื้นที่กล้องเป็นจอดำมีไอคอน "!" (error) ไม่แสดงภาพ
@@ -121,8 +119,6 @@
 
 ---
 
----
-
 ## ตรวจทั้งระบบอีกรอบ (2026-07-15, v1.1.5+7) — เจอ 5 จุด แก้ครบ
 
 หลังแก้ 3 บั๊กใหญ่ (printer, ไทย, กล้อง) ตรวจซ้ำทั้ง backend + mobile หาช่องโหว่ที่ยังไม่เจอ:
@@ -137,10 +133,42 @@
 
 ---
 
+## PWA (เว็บ) — deploy บน Cloudflare Pages (ไม่ใช่ Vercel)
+
+**URL production:** https://sterelis-cssd.pages.dev/#/login
+**Cloudflare Pages project:** `sterelis-cssd` (dashboard: `dash.cloudflare.com` → Pages → sterelis-cssd)
+
+**⚠️ ไม่มี CI/CD ผูกไว้ — deploy ด้วยมือผ่าน `wrangler` CLI เท่านั้น** ก่อนหน้านี้ค้างอยู่ที่ commit `4e65d23` (เก่ากว่างานในเซสชันนี้ทั้งหมด) เพราะไม่มีใคร deploy ซ้ำหลัง commit ใหม่ๆ **ต้องจำ deploy เองทุกครั้งที่แก้โค้ด mobile แล้วอยากให้เว็บอัปเดตด้วย:**
+
+```bash
+cd apps/mobile
+flutter build web --release
+npx wrangler pages deploy build/web --project-name=sterelis-cssd --branch=main
+```
+
+เช็คว่า deploy ไปจริงและเป็นเวอร์ชันไหน: `curl https://sterelis-cssd.pages.dev/version.json`
+
+### บั๊กเฉพาะเว็บที่เจอ + แก้แล้ว (2026-07-15, v1.1.5+7)
+โค้ด mobile ใช้ `dart:io Platform` (เช่น `Platform.isAndroid`, `Platform.operatingSystem`) ซึ่ง **throw `UnsupportedError` ทันทีที่เรียกบนเว็บ** (ไม่ใช่แค่คืนค่า false) — เจอ 2 จุดที่จะพังจริงถ้าไม่ guard ด้วย `kIsWeb` ก่อน:
+
+1. **`registerFcmToken()`** (`fcm_service.dart`) เรียก `Platform.operatingSystem` เพื่อสร้าง deviceId → **พังทันทีหลัง login สำเร็จทุกครั้งบนเว็บ** (ฟังก์ชันนี้ถูกเรียกอัตโนมัติผ่าน `ref.listen(authControllerProvider)` ใน `main.dart`)
+2. **หน้าตั้งค่า > เครื่องพิมพ์** (`settings_page.dart`) เช็ค `Platform.isAndroid` ใน 3 จุด (`_loadPaired`, `_requestBluetoothPermissions`, `_scan`) → **พังทันทีที่เปิดหน้านี้บนเว็บ**
+
+**แก้:** เพิ่ม `kIsWeb` (จาก `flutter/foundation.dart`) เช็คก่อน `Platform.*` ทุกจุด (short-circuit ป้องกันไม่ให้ evaluate `Platform` เลยบนเว็บ) และซ่อนปุ่ม "ค้นหา" Bluetooth printer บนเว็บ (เครื่องพิมพ์ Bluetooth Classic SPP ของ A318BT ใช้ไม่ได้ในเบราว์เซอร์อยู่แล้ว เป็นข้อจำกัดฮาร์ดแวร์/แพลตฟอร์ม ไม่ใช่บั๊ก) แสดงข้อความอธิบายแทนว่าเวอร์ชันเว็บใช้ Mock Printer ได้อย่างเดียว
+
+ยืนยันด้วย `flutter build web --release` ผ่านสำเร็จไม่มี error หลังแก้ (ก่อนแก้คอมไพล์ผ่านเหมือนกัน แต่จะ throw ตอน **runtime** ในเบราว์เซอร์ ซึ่งเทสต์แบบ static analysis จับไม่ได้ — ต้องรู้พฤติกรรม `dart:io` บนเว็บถึงจะเจอ)
+
+### ข้อจำกัดของเวอร์ชันเว็บที่รู้ไว้ (ไม่ต้องแก้ เป็นข้อจำกัดแพลตฟอร์มจริง)
+- พิมพ์ label ผ่าน Bluetooth ไม่ได้ (ใช้ Mock Printer แทน) — ต้องใช้แอปมือถือ Android/iOS ถึงจะพิมพ์ label จริงได้
+- FCM push notification บนเว็บต้องตั้งค่า Firebase web config (VAPID key) แยกจากมือถือ ยังไม่ได้ทำ (อยู่ในสโคปเดียวกับที่ยังไม่ได้สร้าง Firebase project จริงตามหมายเหตุด้านบน)
+
+---
+
 ## Log การเปลี่ยนแปลง
 
 | วันที่ | สรุป | ไฟล์หลัก |
 |---|---|---|
+| 2026-07-15 | **Deploy PWA + แก้บั๊กเฉพาะเว็บ:** เจอ `Platform.*` (dart:io) throw บนเว็บที่หน้า login/ตั้งค่า → guard ด้วย `kIsWeb`, ซ่อน UI printer Bluetooth บนเว็บ, deploy เข้า Cloudflare Pages (`sterelis-cssd`) ที่ค้างมา 3 วัน ให้เป็น v1.1.5+7 | `apps/mobile/lib/core/notifications/fcm_service.dart`, `apps/mobile/lib/features/settings/presentation/pages/settings_page.dart` |
 | 2026-07-15 | **ตรวจทั้งระบบรอบ 2:** แก้ camera-permission recheck on resume, FCM token chunking (500 limit), duplicate Firebase app guard, DTO length validation, bump v1.1.5+7 | `apps/mobile/lib/features/scan/presentation/pages/scan_page.dart`, `apps/api/src/modules/notifications/fcm.service.ts`, `apps/api/src/modules/notifications/dto/register-token.dto.ts` |
 | 2026-07-15 | **Fix:** หน้าสแกนกล้องขึ้น error — ขอ permission ก่อน start + จัดการ lifecycle เอง + errorBuilder/retry + CAMERA manifest + iOS usage keys, bump v1.1.4+6 | `apps/mobile/lib/features/scan/presentation/pages/scan_page.dart`, `apps/mobile/android/app/src/main/AndroidManifest.xml`, `apps/mobile/ios/Runner/Info.plist` |
 | 2026-07-15 | **Fix:** ตัวอักษรไทยเพี้ยน (render label เป็น bitmap แทน TSPL TEXT) + อุดช่องโหว่เชื่อมต่อค้าง/ไม่ติด (permission guard, connect timeout, stop BLE scan), bump v1.1.3+5 | `apps/mobile/lib/core/printer/label_renderer.dart` (ใหม่), `apps/mobile/lib/core/printer/flash_label_a318_adapter.dart`, `apps/mobile/lib/features/settings/presentation/pages/settings_page.dart` |

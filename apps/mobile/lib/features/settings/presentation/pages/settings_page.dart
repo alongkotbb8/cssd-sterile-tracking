@@ -1,6 +1,9 @@
 import 'dart:async';
+// dart:io Platform ต้องเช็ค kIsWeb ก่อนใช้เสมอ — บนเว็บ getter ทุกตัวของ Platform
+// (isAndroid, isIOS, ...) throw UnsupportedError ทันที ไม่ใช่แค่คืนค่า false
 import 'dart:io' show Platform;
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -185,7 +188,7 @@ class _PrinterSheetState extends ConsumerState<_PrinterSheet> {
   }
 
   Future<void> _loadPaired() async {
-    if (!Platform.isAndroid) return;
+    if (kIsWeb || !Platform.isAndroid) return;
     // Android 12+ ต้องได้ BLUETOOTH_CONNECT ก่อนถึงจะอ่านรายการ paired ได้
     if (!await Permission.bluetoothConnect.request().isGranted) return;
     try {
@@ -209,6 +212,7 @@ class _PrinterSheetState extends ConsumerState<_PrinterSheet> {
   /// Android 12+ ต้องขอ BLUETOOTH_SCAN/CONNECT ตอนรัน ;
   /// Android 6–11 ต้องได้ Location ไม่งั้นระบบไม่คืนผลสแกน BLE ให้เลย
   Future<String?> _requestBluetoothPermissions() async {
+    if (kIsWeb) return null; // เว็บไม่รองรับ Bluetooth printer อยู่แล้ว (เช็คแยกที่ปุ่ม)
     if (!Platform.isAndroid) return null; // iOS ระบบถามเองตอนเริ่มใช้ Bluetooth
     final statuses = await [
       Permission.bluetoothScan,
@@ -250,7 +254,7 @@ class _PrinterSheetState extends ConsumerState<_PrinterSheet> {
     // 2) Bluetooth ต้องเปิดอยู่ (Android ขอเปิดให้อัตโนมัติได้)
     if (await FlutterBluePlus.adapterState.first !=
         BluetoothAdapterState.on) {
-      if (Platform.isAndroid) {
+      if (!kIsWeb && Platform.isAndroid) {
         try {
           await FlutterBluePlus.turnOn();
           await FlutterBluePlus.adapterState
@@ -327,25 +331,38 @@ class _PrinterSheetState extends ConsumerState<_PrinterSheet> {
             ),
           ),
           const SizedBox(height: 14),
-          Row(children: [
-            const Text('FlashLabel A318BT (Bluetooth)',
-                style: TextStyle(fontWeight: FontWeight.w600)),
-            const Spacer(),
-            TextButton.icon(
-              onPressed: _scanning ? null : _scan,
-              icon: _scanning
-                  ? const SizedBox(
-                      width: 14,
-                      height: 14,
-                      child: CircularProgressIndicator(strokeWidth: 2))
-                  : const Icon(Icons.bluetooth_searching, size: 18),
-              label: Text(_scanning ? 'กำลังค้นหา...' : 'ค้นหา'),
+          if (kIsWeb)
+            // Bluetooth Classic SPP (ทางหลักของ A318BT) ไม่มีในเบราว์เซอร์เลย
+            // ไม่ลองแสดงปุ่มค้นหาให้เข้าใจผิดว่าใช้ได้
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 8),
+              child: Text(
+                'เชื่อมต่อเครื่องพิมพ์ FlashLabel A318BT ผ่าน Bluetooth ใช้ได้เฉพาะ '
+                'แอปมือถือ (Android/iOS) เท่านั้น — เวอร์ชันเว็บใช้ Mock Printer ได้',
+                style: TextStyle(fontSize: 12.5, color: SterelisColors.textFaint),
+              ),
+            )
+          else ...[
+            Row(children: [
+              const Text('FlashLabel A318BT (Bluetooth)',
+                  style: TextStyle(fontWeight: FontWeight.w600)),
+              const Spacer(),
+              TextButton.icon(
+                onPressed: _scanning ? null : _scan,
+                icon: _scanning
+                    ? const SizedBox(
+                        width: 14,
+                        height: 14,
+                        child: CircularProgressIndicator(strokeWidth: 2))
+                    : const Icon(Icons.bluetooth_searching, size: 18),
+                label: Text(_scanning ? 'กำลังค้นหา...' : 'ค้นหา'),
+              ),
+            ]),
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxHeight: 260),
+              child: _buildDeviceList(),
             ),
-          ]),
-          ConstrainedBox(
-            constraints: const BoxConstraints(maxHeight: 260),
-            child: _buildDeviceList(),
-          ),
+          ],
         ],
       ),
     );

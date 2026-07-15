@@ -96,9 +96,11 @@ Future<void> registerFcmToken(WidgetRef ref) async {
   final token = await FcmService.getToken();
   if (token == null) return;
   try {
+    // dart:io Platform.operatingSystem throws บนเว็บ — ต้องเช็ค kIsWeb ก่อนเสมอ
+    final platformLabel = kIsWeb ? 'web' : Platform.operatingSystem;
     await ref.read(dioProvider).post('/notifications/fcm-token', data: {
       'token': token,
-      'deviceId': '${Platform.operatingSystem}-${identityHashCode(token)}',
+      'deviceId': '$platformLabel-${identityHashCode(token)}',
     });
   } catch (e) {
     debugPrint('[FcmService] ลงทะเบียน token ไม่สำเร็จ: $e');
