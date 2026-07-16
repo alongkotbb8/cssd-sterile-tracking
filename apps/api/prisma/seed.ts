@@ -26,6 +26,12 @@ async function main() {
       update: {},
       create: { code: 'WOUND', name: 'ห้องทำแผล', type: 'clinic' },
     }),
+    // สถานที่ภายนอก (type: 'external') — ปลายทางของการส่งชุด PACKED ออกนอกโรงพยาบาล
+    prisma.department.upsert({
+      where: { code: 'EXT-PYT' },
+      update: {},
+      create: { code: 'EXT-PYT', name: 'รพ.พญาไท', type: 'external' },
+    }),
   ]);
   console.log(`✅ Departments: ${departments.length}`);
 

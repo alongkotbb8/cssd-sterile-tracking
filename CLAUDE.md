@@ -34,10 +34,12 @@
 ### สถานะของห่อ (Package.status) — state machine
 ```
 PACKED → STERILE → ISSUED → RETURNED → (reprocess) → PACKED ...
-                 ↘ EXPIRED (เมื่อเกิน expiry_date ขณะยังอยู่ในคลัง)
+   ↕              ↘ EXPIRED (เมื่อเกิน expiry_date ขณะยังอยู่ในคลัง)
+PACKED_OUT (ส่งออกโดยยังไม่ฆ่าเชื้อ เช่น ส่ง รพ.อื่น — รับคืนแล้วกลับเป็น PACKED ทันที ไม่ต้อง reprocess)
 ทุกสถานะ → DISCARDED (ชำรุด/ทิ้ง)
 ```
 อนุญาตให้เปลี่ยนสถานะตามลูกศรเท่านั้น เขียน guard กันการ transition ที่ผิด
+- ปลายทางของ `PACKED_OUT` ใช้ตาราง `Department` เดิม โดยสถานที่ภายนอกใช้ `type = 'external'`
 
 ---
 

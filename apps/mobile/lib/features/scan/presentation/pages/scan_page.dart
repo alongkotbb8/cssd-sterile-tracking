@@ -8,6 +8,7 @@ import 'package:permission_handler/permission_handler.dart';
 
 import '../../../../core/api/api_client.dart';
 import '../../../../core/api/repositories.dart';
+import '../../../../core/auth/auth_controller.dart';
 import '../../../../core/models/models.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/domain_widgets.dart';
@@ -22,10 +23,12 @@ extension on ScanMode {
       };
 
   /// สถานะห่อที่ mode นี้รับได้
-  String get requiredStatus => switch (this) {
-        ScanMode.scanIn => 'PACKED',
-        ScanMode.scanOut => 'STERILE',
-        ScanMode.scanReturn => 'ISSUED',
+  /// - เบิกออก: STERILE (ปกติ) และ PACKED (ส่งออกโดยยังไม่ฆ่าเชื้อ เช่น ส่ง รพ.อื่น)
+  /// - ส่งคืน: ISSUED (ปกติ → รอ reprocess) และ PACKED_OUT (คืนแล้วกลับเป็น PACKED)
+  Set<String> get allowedStatuses => switch (this) {
+        ScanMode.scanIn => const {'PACKED'},
+        ScanMode.scanOut => const {'STERILE', 'PACKED'},
+        ScanMode.scanReturn => const {'ISSUED', 'PACKED_OUT'},
       };
 }
 
@@ -38,6 +41,7 @@ class _ScannedItem {
   bool isExpired = false;
   bool loading = true;
   String? blockReason; // null = ผ่าน
+  String? warning; // เตือนแต่ไม่บล็อก (เช่น เบิกออกของที่ยังไม่ฆ่าเชื้อ)
   String? serverError; // error จากตอนยืนยัน
 
   _ScannedItem(this.id);
@@ -156,7 +160,8 @@ class _ScanPageState extends ConsumerState<ScanPage> with WidgetsBindingObserver
         ..daysLeft = r.daysLeft
         ..isExpired = r.isExpired
         ..loading = false
-        ..blockReason = _blockReason(r);
+        ..blockReason = _blockReason(r)
+        ..warning = _warning(r);
     } catch (e) {
       item
         ..loading = false
@@ -171,9 +176,17 @@ class _ScanPageState extends ConsumerState<ScanPage> with WidgetsBindingObserver
       return 'ห้ามใช้ — ห่อหมดอายุแล้ว';
     }
     final st = r.package.status;
-    if (st != _mode.requiredStatus) {
+    if (!_mode.allowedStatuses.contains(st)) {
       final label = packageStatusStyle(st).label;
       return 'สถานะปัจจุบัน: $label — ${_mode.title}ไม่ได้';
+    }
+    return null;
+  }
+
+  /// เตือนแต่ไม่บล็อก — เบิกออกของที่แพ็กแล้วแต่ยังไม่ผ่านการฆ่าเชื้อ
+  String? _warning(LookupResult r) {
+    if (_mode == ScanMode.scanOut && r.package.status == 'PACKED') {
+      return '⚠ ยังไม่ฆ่าเชื้อ — จะบันทึกเป็น "ส่งออก (ยังไม่ฆ่าเชื้อ)"';
     }
     return null;
   }
@@ -502,6 +515,10 @@ class _TargetSelector extends ConsumerWidget {
     }
 
     final departments = ref.watch(departmentsProvider);
+    // เพิ่มสถานที่ใหม่ได้เฉพาะ SUPERVISOR/ADMIN (ตรงกับ guard ฝั่ง server)
+    final role = ref.watch(authControllerProvider).user?.role;
+    final canAddPlace = role == 'SUPERVISOR' || role == 'ADMIN';
+
     return Container(
       color: SterelisColors.white,
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
@@ -510,21 +527,44 @@ class _TargetSelector extends ConsumerWidget {
         error: (e, _) => Text('โหลดแผนกไม่ได้: ${apiErrorMessage(e)}',
             style: const TextStyle(color: SterelisColors.danger, fontSize: 12)),
         data: (list) => Column(children: [
-          DropdownButtonFormField<Department>(
-            initialValue: department,
-            isExpanded: true,
-            decoration: InputDecoration(
-              labelText: mode == ScanMode.scanOut
-                  ? 'แผนกปลายทาง (บังคับ)'
-                  : 'แผนกที่ส่งของคืน (บังคับ)',
-              prefixIcon: const Icon(Icons.apartment_outlined),
+          Row(children: [
+            Expanded(
+              child: DropdownButtonFormField<Department>(
+                initialValue:
+                    list.any((d) => d.id == department?.id) ? department : null,
+                isExpanded: true,
+                decoration: InputDecoration(
+                  labelText: mode == ScanMode.scanOut
+                      ? 'แผนกปลายทาง (บังคับ)'
+                      : 'แผนกที่ส่งของคืน (บังคับ)',
+                  prefixIcon: const Icon(Icons.apartment_outlined),
+                ),
+                items: list
+                    .map((d) => DropdownMenuItem(
+                        value: d, child: Text(d.displayName)))
+                    .toList(),
+                onChanged: onDepartment,
+              ),
             ),
-            items: list
-                .map((d) =>
-                    DropdownMenuItem(value: d, child: Text(d.name)))
-                .toList(),
-            onChanged: onDepartment,
-          ),
+            if (canAddPlace) ...[
+              const SizedBox(width: 8),
+              FilledButton.tonalIcon(
+                onPressed: () async {
+                  final created = await showCreateDepartmentSheet(context);
+                  if (created != null) {
+                    ref.invalidate(departmentsProvider);
+                    onDepartment(created);
+                  }
+                },
+                icon: const Icon(Icons.add_location_alt_outlined, size: 18),
+                label: const Text('เพิ่มสถานที่'),
+                style: FilledButton.styleFrom(
+                    minimumSize: const Size(0, 48),
+                    backgroundColor: SterelisColors.blue50,
+                    foregroundColor: SterelisColors.blue600),
+              ),
+            ],
+          ]),
           if (mode == ScanMode.scanOut) ...[
             const SizedBox(height: 8),
             TextField(
@@ -618,6 +658,146 @@ class _ScannedPanel extends StatelessWidget {
 }
 
 /// เปิด sheet เปิดรอบนึ่งใหม่ (บันทึกผล CI/BI ผ่านให้เลย) — คืน batch ที่พร้อมใช้
+/// เปิด sheet เพิ่มแผนก/สถานที่ปลายทางใหม่ — คืน Department ที่สร้างเมื่อสำเร็จ
+Future<Department?> showCreateDepartmentSheet(BuildContext context) {
+  return showModalBottomSheet<Department>(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: SterelisColors.surface,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+    ),
+    builder: (_) => const _CreateDepartmentSheet(),
+  );
+}
+
+class _CreateDepartmentSheet extends ConsumerStatefulWidget {
+  const _CreateDepartmentSheet();
+
+  @override
+  ConsumerState<_CreateDepartmentSheet> createState() =>
+      _CreateDepartmentSheetState();
+}
+
+class _CreateDepartmentSheetState
+    extends ConsumerState<_CreateDepartmentSheet> {
+  final _codeCtrl = TextEditingController();
+  final _nameCtrl = TextEditingController();
+  bool _isExternal = true; // เคสหลักของฟีเจอร์นี้คือส่งออกนอกโรงพยาบาล
+  bool _saving = false;
+
+  @override
+  void dispose() {
+    _codeCtrl.dispose();
+    _nameCtrl.dispose();
+    super.dispose();
+  }
+
+  bool get _valid =>
+      _codeCtrl.text.trim().length >= 2 && _nameCtrl.text.trim().isNotEmpty;
+
+  Future<void> _submit() async {
+    setState(() => _saving = true);
+    try {
+      final created = await ref.read(departmentRepositoryProvider).create(
+            code: _codeCtrl.text.trim().toUpperCase(),
+            name: _nameCtrl.text.trim(),
+            type: _isExternal ? 'external' : null,
+          );
+      if (!mounted) return;
+      Navigator.of(context).pop(created);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _saving = false);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(apiErrorMessage(e)),
+        backgroundColor: SterelisColors.danger,
+      ));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bottom = MediaQuery.of(context).viewInsets.bottom;
+
+    return Padding(
+      padding: EdgeInsets.fromLTRB(20, 16, 20, 20 + bottom),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Center(
+            child: Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                  color: SterelisColors.border,
+                  borderRadius: BorderRadius.circular(2)),
+            ),
+          ),
+          const SizedBox(height: 16),
+          const Text('เพิ่มสถานที่ปลายทาง',
+              style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800,
+                  color: SterelisColors.textStrong)),
+          const SizedBox(height: 4),
+          const Text('เช่น โรงพยาบาลอื่นที่ส่งชุดอุปกรณ์ไปให้',
+              style: TextStyle(fontSize: 13, color: SterelisColors.textMuted)),
+          const SizedBox(height: 18),
+          TextField(
+            controller: _codeCtrl,
+            enabled: !_saving,
+            textCapitalization: TextCapitalization.characters,
+            decoration: const InputDecoration(
+              labelText: 'รหัส (ห้ามซ้ำ)',
+              hintText: 'เช่น EXT-PYT',
+              prefixIcon: Icon(Icons.tag),
+            ),
+            onChanged: (_) => setState(() {}),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _nameCtrl,
+            enabled: !_saving,
+            decoration: const InputDecoration(
+              labelText: 'ชื่อสถานที่',
+              hintText: 'เช่น รพ.พญาไท',
+              prefixIcon: Icon(Icons.apartment_outlined),
+            ),
+            onChanged: (_) => setState(() {}),
+          ),
+          const SizedBox(height: 8),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('สถานที่ภายนอกโรงพยาบาล',
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+            subtitle: const Text('แสดงป้าย "(ภายนอก)" ต่อท้ายชื่อ',
+                style: TextStyle(fontSize: 12, color: SterelisColors.textMuted)),
+            value: _isExternal,
+            activeThumbColor: SterelisColors.blue500,
+            onChanged: _saving ? null : (v) => setState(() => _isExternal = v),
+          ),
+          const SizedBox(height: 12),
+          FilledButton.icon(
+            onPressed: !_valid || _saving ? null : _submit,
+            icon: _saving
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                        strokeWidth: 2, color: Colors.white))
+                : const Icon(Icons.check),
+            label: const Text('บันทึกสถานที่'),
+            style:
+                FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 Future<SterilizationBatch?> showCreateBatchSheet(
     BuildContext context, WidgetRef ref) {
   return showModalBottomSheet<SterilizationBatch>(
@@ -857,6 +1037,12 @@ class _ScannedTile extends StatelessWidget {
                     style: const TextStyle(
                         fontSize: 12,
                         color: SterelisColors.danger,
+                        fontWeight: FontWeight.w600))
+              else if (item.warning != null)
+                Text(item.warning!,
+                    style: const TextStyle(
+                        fontSize: 12,
+                        color: SterelisColors.warning,
                         fontWeight: FontWeight.w600)),
             ]),
           ),

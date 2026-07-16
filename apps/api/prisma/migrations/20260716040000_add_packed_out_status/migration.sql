@@ -1,0 +1,2 @@
+-- AlterEnum
+ALTER TYPE "PackageStatus" ADD VALUE 'PACKED_OUT' BEFORE 'STERILE';

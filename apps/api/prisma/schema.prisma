@@ -20,6 +20,7 @@ enum WrapType {
 
 enum PackageStatus {
   PACKED             // Created, label printed, awaiting sterilisation
+  PACKED_OUT         // Issued out while NOT yet sterilised (e.g. sent to another hospital); returns to PACKED
   STERILE            // Sterilisation passed, in sterile store
   ISSUED             // Scanned out to destination department
   RETURNED           // Returned from department, awaiting reprocess

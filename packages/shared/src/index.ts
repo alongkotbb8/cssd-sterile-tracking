@@ -7,7 +7,7 @@ export const SHELF_LIFE_DAYS = {
 
 export type WrapType = keyof typeof SHELF_LIFE_DAYS;
 
-export const PACKAGE_STATUSES = ['PACKED', 'STERILE', 'ISSUED', 'RETURNED', 'DISCARDED'] as const;
+export const PACKAGE_STATUSES = ['PACKED', 'PACKED_OUT', 'STERILE', 'ISSUED', 'RETURNED', 'DISCARDED'] as const;
 export type PackageStatus = typeof PACKAGE_STATUSES[number];
 
 export const MOVEMENT_TYPES = ['IN', 'OUT', 'RETURN'] as const;
@@ -32,7 +32,8 @@ export function formatPackageId(code: string, date: Date, seq: number): string {
 
 /** Validate that a status transition is allowed */
 const ALLOWED_TRANSITIONS: Record<PackageStatus, PackageStatus[]> = {
-  PACKED:     ['STERILE', 'DISCARDED'],
+  PACKED:     ['STERILE', 'PACKED_OUT', 'DISCARDED'],
+  PACKED_OUT: ['PACKED', 'DISCARDED'], // ส่งออกโดยยังไม่ฆ่าเชื้อ — คืนแล้วกลับเป็น PACKED ทันที (ไม่ต้อง reprocess)
   STERILE:    ['ISSUED', 'DISCARDED'],
   ISSUED:     ['RETURNED', 'DISCARDED'],
   RETURNED:   ['PACKED', 'DISCARDED'], // PACKED = reprocess loop (CLAUDE.md state machine)

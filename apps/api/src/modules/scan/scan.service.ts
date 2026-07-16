@@ -80,7 +80,11 @@ export class ScanService {
     return results;
   }
 
-  /** Scan out: STERILE → ISSUED. Blocks if expired. */
+  /**
+   * Scan out — two paths, chosen by the package's current status:
+   *   STERILE → ISSUED     (ปกติ — บล็อกของหมดอายุ)
+   *   PACKED  → PACKED_OUT (ส่งออกโดยยังไม่ฆ่าเชื้อ เช่น ส่งไป รพ. อื่น — ไม่มี expiry ให้เช็ค)
+   */
   async scanOut(
     packageIds: string[],
     departmentId: string,
@@ -102,15 +106,19 @@ export class ScanService {
         if (pkg.expiryDate && pkg.expiryDate < now) {
           results.push({ packageId: id, success: false, error: '⛔ ห้ามใช้ — ห่อหมดอายุแล้ว' }); continue;
         }
-        if (pkg.status !== PackageStatus.STERILE) {
+        if (pkg.status !== PackageStatus.STERILE && pkg.status !== PackageStatus.PACKED) {
           results.push({ packageId: id, success: false, error: `สถานะปัจจุบัน: ${pkg.status}` }); continue;
         }
+
+        const fromStatus = pkg.status;
+        const toStatus =
+          fromStatus === PackageStatus.STERILE ? PackageStatus.ISSUED : PackageStatus.PACKED_OUT;
 
         const done = await this.prisma.$transaction(async (tx) => {
           // status ใน where เป็น compare-and-swap อะตอมมิก กันสแกนซ้ำพร้อมกันจาก 2 เครื่อง
           const { count } = await tx.package.updateMany({
-            where: { id, status: PackageStatus.STERILE },
-            data: { status: PackageStatus.ISSUED },
+            where: { id, status: fromStatus },
+            data: { status: toStatus },
           });
           if (count === 0) return false;
           await tx.movement.create({
@@ -130,7 +138,11 @@ export class ScanService {
           continue;
         }
 
-        await this.audit.log(userId, 'SCAN_OUT', id, { departmentId, receiverName });
+        await this.audit.log(userId, 'SCAN_OUT', id, {
+          departmentId,
+          receiverName,
+          ...(toStatus === PackageStatus.PACKED_OUT ? { unsterile: true } : {}),
+        });
         results.push({ packageId: id, success: true });
       } catch (e) {
         results.push({ packageId: id, success: false, error: this.safeError(e, id) });
@@ -139,7 +151,11 @@ export class ScanService {
     return results;
   }
 
-  /** Return: ISSUED → RETURNED (awaiting reprocess) */
+  /**
+   * Return — two paths, chosen by the package's current status:
+   *   ISSUED     → RETURNED (ปกติ — รอ reprocess)
+   *   PACKED_OUT → PACKED   (ของไม่เคยฆ่าเชื้อ คืนแล้วพร้อมเข้ารอบนึ่งได้ทันที)
+   */
   async scanReturn(packageIds: string[], departmentId: string, userId: string): Promise<ScanResult[]> {
     const dept = await this.prisma.department.findUnique({ where: { id: departmentId } });
     if (!dept) throw new NotFoundException('ไม่พบแผนก');
@@ -149,15 +165,19 @@ export class ScanService {
       try {
         const pkg = await this.prisma.package.findUnique({ where: { id } });
         if (!pkg) { results.push({ packageId: id, success: false, error: 'ไม่พบห่อ' }); continue; }
-        if (pkg.status !== PackageStatus.ISSUED) {
+        if (pkg.status !== PackageStatus.ISSUED && pkg.status !== PackageStatus.PACKED_OUT) {
           results.push({ packageId: id, success: false, error: `สถานะปัจจุบัน: ${pkg.status}` }); continue;
         }
+
+        const fromStatus = pkg.status;
+        const toStatus =
+          fromStatus === PackageStatus.ISSUED ? PackageStatus.RETURNED : PackageStatus.PACKED;
 
         const done = await this.prisma.$transaction(async (tx) => {
           // status ใน where เป็น compare-and-swap อะตอมมิก กันสแกนซ้ำพร้อมกันจาก 2 เครื่อง
           const { count } = await tx.package.updateMany({
-            where: { id, status: PackageStatus.ISSUED },
-            data: { status: PackageStatus.RETURNED },
+            where: { id, status: fromStatus },
+            data: { status: toStatus },
           });
           if (count === 0) return false;
           await tx.movement.create({
@@ -171,7 +191,10 @@ export class ScanService {
           continue;
         }
 
-        await this.audit.log(userId, 'SCAN_RETURN', id, { departmentId });
+        await this.audit.log(userId, 'SCAN_RETURN', id, {
+          departmentId,
+          ...(fromStatus === PackageStatus.PACKED_OUT ? { unsterile: true } : {}),
+        });
         results.push({ packageId: id, success: true });
       } catch (e) {
         results.push({ packageId: id, success: false, error: this.safeError(e, id) });

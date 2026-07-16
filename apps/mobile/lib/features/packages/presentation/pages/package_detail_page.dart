@@ -64,7 +64,9 @@ class PackageDetailPage extends ConsumerWidget {
               const SizedBox(height: 12),
               PackageQrCard(packageId: pkg.id),
               const SizedBox(height: 12),
-              _LifecycleCard(status: pkg.status),
+              _LifecycleCard(
+                  status: pkg.status,
+                  locationName: pkg.currentLocationName),
               const SizedBox(height: 12),
               _InfoCard(pkg: pkg),
               const SizedBox(height: 12),
@@ -121,8 +123,9 @@ class _HeaderCard extends StatelessWidget {
 }
 
 class _LifecycleCard extends StatelessWidget {
-  const _LifecycleCard({required this.status});
+  const _LifecycleCard({required this.status, this.locationName});
   final String status;
+  final String? locationName;
 
   static const _steps = [
     ('PACKED', 'แพ็ก'),
@@ -133,6 +136,46 @@ class _LifecycleCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // PACKED_OUT อยู่นอกวงจรหลัก (แพ็ก→ปลอดเชื้อ→เบิก→คืน) — แสดงการ์ดสถานะแยก
+    if (status == 'PACKED_OUT') {
+      return Container(
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF3EEFE), // โทนม่วงอ่อน เข้าชุดกับ StatusBadge
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: const Color(0xFFD9CCFA)),
+        ),
+        child: Row(children: [
+          const Icon(Icons.local_shipping_outlined,
+              color: Color(0xFF8B5CF6), size: 28),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('ส่งออกโดยยังไม่ฆ่าเชื้อ',
+                      style: TextStyle(
+                          fontWeight: FontWeight.w800,
+                          fontSize: 15,
+                          color: Color(0xFF6D28D9))),
+                  const SizedBox(height: 4),
+                  Text(
+                    locationName != null
+                        ? 'อยู่ที่ $locationName · ยังไม่คืนคลัง'
+                        : 'ยังไม่คืนคลัง',
+                    style: const TextStyle(
+                        fontSize: 13, color: Color(0xFF7C5CC4)),
+                  ),
+                  const SizedBox(height: 2),
+                  const Text('เมื่อสแกนรับคืน สถานะจะกลับเป็น "แพ็กแล้ว" พร้อมเข้ารอบนึ่งต่อ',
+                      style: TextStyle(
+                          fontSize: 12, color: Color(0xFF9B87CE))),
+                ]),
+          ),
+        ]),
+      );
+    }
+
     final currentIdx = _steps.indexWhere((s) => s.$1 == status);
     final isTerminal = status == 'EXPIRED' || status == 'DISCARDED';
 

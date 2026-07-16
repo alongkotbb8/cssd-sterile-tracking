@@ -168,6 +168,7 @@ class _StatusFilterBar extends ConsumerWidget {
   static const _filters = [
     (null, 'ทั้งหมด'),
     ('PACKED', 'แพ็กแล้ว'),
+    ('PACKED_OUT', 'ส่งออกไม่ฆ่าเชื้อ'),
     ('STERILE', 'ปลอดเชื้อ'),
     ('ISSUED', 'เบิกออก'),
     ('RETURNED', 'รอ Reprocess'),
@@ -384,6 +385,23 @@ class _PackageCard extends StatelessWidget {
                             : SterelisColors.textMuted,
                         fontWeight:
                             danger ? FontWeight.w700 : FontWeight.w400)),
+              ],
+              // ตำแหน่งปัจจุบัน — เฉพาะห่อที่ออกไปอยู่ข้างนอก (ISSUED/PACKED_OUT)
+              if (pkg.currentLocationName != null) ...[
+                const SizedBox(height: 6),
+                Row(mainAxisSize: MainAxisSize.min, children: [
+                  const Icon(Icons.place_outlined,
+                      size: 14, color: SterelisColors.blue600),
+                  const SizedBox(width: 3),
+                  Flexible(
+                    child: Text('อยู่ที่ ${pkg.currentLocationName}',
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                            fontSize: 12,
+                            color: SterelisColors.blue600,
+                            fontWeight: FontWeight.w600)),
+                  ),
+                ]),
               ],
             ]),
           ),

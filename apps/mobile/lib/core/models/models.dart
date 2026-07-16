@@ -35,14 +35,30 @@ class Department {
   final String id;
   final String code;
   final String name;
+  final String? type; // clinic | ward | er | external (สถานที่นอกโรงพยาบาล)
 
-  const Department({required this.id, required this.code, required this.name});
+  const Department(
+      {required this.id, required this.code, required this.name, this.type});
+
+  bool get isExternal => type == 'external';
+
+  /// ชื่อที่ใช้แสดงใน dropdown — ต่อท้าย "(ภายนอก)" ให้เห็นชัดว่าออกนอกโรงพยาบาล
+  String get displayName => isExternal ? '$name (ภายนอก)' : name;
 
   factory Department.fromJson(Map<String, dynamic> j) => Department(
         id: j['id'] as String,
         code: (j['code'] ?? '') as String,
         name: j['name'] as String,
+        type: j['type'] as String?,
       );
+
+  // เทียบด้วย id — ให้ dropdown จับคู่ค่าที่เลือกไว้กับ list ที่ refetch ใหม่ได้
+  // (จำเป็นตอนกด "เพิ่มสถานที่" แล้ว invalidate departmentsProvider)
+  @override
+  bool operator ==(Object other) => other is Department && other.id == id;
+
+  @override
+  int get hashCode => id.hashCode;
 }
 
 class SetTemplate {
@@ -148,6 +164,19 @@ class PackageModel {
   int? get daysLeft => expiryDate?.difference(DateTime.now()).inDays;
 
   int get shelfLifeDays => wrapType == 'CLOTH' ? 7 : 180;
+
+  /// ตำแหน่งปัจจุบันของห่อ — มีค่าเมื่อห่อออกไปอยู่ข้างนอก (ISSUED/PACKED_OUT)
+  /// อ่านจาก movement OUT ล่าสุด (list endpoint ส่ง movement ล่าสุด 1 รายการ,
+  /// detail endpoint ส่งทั้งหมด — จึงค้นตัวแรกที่เป็น OUT จากรายการเรียงล่าสุดก่อน)
+  String? get currentLocationName {
+    if (status != 'ISSUED' && status != 'PACKED_OUT') return null;
+    final sorted = [...movements]..sort((a, b) =>
+        (b.createdAt ?? DateTime(0)).compareTo(a.createdAt ?? DateTime(0)));
+    for (final m in sorted) {
+      if (m.type == 'OUT') return m.departmentName;
+    }
+    return null;
+  }
 }
 
 class LookupResult {

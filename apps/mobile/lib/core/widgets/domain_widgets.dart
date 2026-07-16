@@ -72,6 +72,13 @@ class PackageQrCard extends StatelessWidget {
         bg: SterelisColors.stPackedBg,
         label: 'แพ็กแล้ว'
       );
+    case 'PACKED_OUT':
+      // ส่งออกโดยยังไม่ฆ่าเชื้อ — โทนม่วง แยกจาก ISSUED (น้ำเงิน) ให้เห็นชัด
+      return (
+        fg: const Color(0xFF8B5CF6),
+        bg: const Color(0xFFF3EEFE),
+        label: 'ส่งออก (ยังไม่ฆ่าเชื้อ)'
+      );
     case 'STERILE':
       return (
         fg: SterelisColors.stSterile,

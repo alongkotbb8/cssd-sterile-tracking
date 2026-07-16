@@ -21,7 +21,7 @@ export class ReportsService {
   /** FR-6: Dashboard data */
   async dashboard() {
     const now = new Date();
-    const [sterileByTemplate, issuedByDept, expiringSoon, expired, awaitingReprocess] =
+    const [sterileByTemplate, issuedByDept, expiringSoon, expired, awaitingReprocess, packedOut] =
       await Promise.all([
         // Stock by set template
         this.prisma.package.groupBy({
@@ -51,6 +51,8 @@ export class ReportsService {
         }),
         // Awaiting reprocess
         this.prisma.package.count({ where: { status: PackageStatus.RETURNED } }),
+        // ส่งออกโดยยังไม่ฆ่าเชื้อ ที่ยังไม่คืน
+        this.prisma.package.count({ where: { status: PackageStatus.PACKED_OUT } }),
       ]);
 
     // Enrich template names
@@ -74,7 +76,7 @@ export class ReportsService {
         departmentName: r.departmentId ? deptMap[r.departmentId] ?? r.departmentId : 'ไม่ระบุ',
         count: r._count.id,
       })),
-      summary: { expiringSoon, expired, awaitingReprocess },
+      summary: { expiringSoon, expired, awaitingReprocess, packedOut },
     };
   }
 

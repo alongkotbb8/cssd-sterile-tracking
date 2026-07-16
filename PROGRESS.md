@@ -18,6 +18,19 @@
 - [x] Mobile: สแกน QR, batch scan, แดชบอร์ดโดนัท, รายงานรายสัปดาห์ + PDF
 - [x] **แจ้งเตือน FCM (ใกล้หมดอายุ + ลืมสรุปรายวัน)** — โครง backend + mobile ครบ (ดูหมายเหตุด้านล่าง)
 
+## ฟีเจอร์: ส่งออก/รับคืนชุดที่ยังไม่ฆ่าเชื้อ + แสดงตำแหน่งชุด (2026-07-16, v1.2.0+9)
+
+รองรับ workflow ส่งชุด `PACKED` (แพ็กแล้วยังไม่ฆ่าเชื้อ) ออกไปสถานที่ภายนอก เช่น รพ.พญาไท แล้วตามสถานะคืน/ยังไม่คืนได้:
+
+- **สถานะใหม่ `PACKED_OUT`** ใน state machine: `PACKED → PACKED_OUT → PACKED` (รับคืนแล้วพร้อมเข้ารอบนึ่งทันที ไม่ต้อง reprocess) — แยกจาก `ISSUED` เพราะเส้นทางคืนต่างกัน
+- **โหมดเบิกออกเดิมรับทั้ง STERILE และ PACKED** — ถ้าสแกนของ PACKED จะขึ้นเตือนสีส้ม "⚠ ยังไม่ฆ่าเชื้อ" บนการ์ด (ไม่บล็อก), โหมดส่งคืนรับทั้ง ISSUED และ PACKED_OUT
+- **สถานที่ภายนอก** ใช้ตาราง Department เดิม + `type='external'` (seed เพิ่ม "รพ.พญาไท" ตัวอย่าง) — ชื่อใน dropdown ต่อท้าย "(ภายนอก)"
+- **`POST /departments`** endpoint ใหม่ (SUPERVISOR/ADMIN) + ปุ่ม "เพิ่มสถานที่" ในหน้าสแกน เปิด sheet สร้างสถานที่ใหม่ได้ทันที
+- **การ์ดห่อแสดงตำแหน่งปัจจุบัน** "📍 อยู่ที่ ..." (จาก movement OUT ล่าสุด — เพิ่ม last movement ใน `GET /packages`) + filter ใหม่ "ส่งออกไม่ฆ่าเชื้อ"
+- **หน้ารายละเอียด**: สถานะ PACKED_OUT แสดงการ์ดม่วง "ส่งออกโดยยังไม่ฆ่าเชื้อ · อยู่ที่ X · ยังไม่คืนคลัง" แทน stepper
+- Dashboard summary เพิ่ม `packedOut` count; Movement ใช้ type OUT/RETURN เดิม (รายงานรายสัปดาห์ไม่กระทบ)
+- Migration: `20260716040000_add_packed_out_status` (ALTER TYPE ADD VALUE) — Render รัน `prisma migrate deploy` อัตโนมัติตอน deploy
+
 ## Checklist เฟส 2 (บางส่วนเริ่มแล้ว — ยังไม่ครบ)
 
 - [x] Recall อัตโนมัติเมื่อ batch ผล indicator ไม่ผ่าน (`batches.service.ts: recall()`)
@@ -189,6 +202,7 @@ npx wrangler pages deploy build/web --project-name=sterelis-cssd --branch=main
 
 | วันที่ | สรุป | ไฟล์หลัก |
 |---|---|---|
+| 2026-07-16 | **Feature:** ส่งออก/รับคืนชุด PACKED ที่ยังไม่ฆ่าเชื้อไปสถานที่ภายนอก + สถานะ PACKED_OUT + การ์ดแสดงตำแหน่ง + POST /departments + ปุ่มเพิ่มสถานที่, bump v1.2.0+9 | `packages/shared/src/index.ts`, `apps/api/prisma/schema.prisma`, `apps/api/src/modules/scan/scan.service.ts`, `apps/api/src/modules/departments/*`, `apps/mobile/lib/features/scan/presentation/pages/scan_page.dart`, `apps/mobile/lib/features/packages/presentation/pages/*` |
 | 2026-07-16 | **Fix:** เลือกเครื่องพิมพ์ Bluetooth ไว้แล้วพิมพ์ไปตกที่ Mock เสมอ — printerAdapterProvider ไม่เคย persist เลย เปลี่ยนเป็น NotifierProvider + SharedPreferences, bump v1.1.6+8 | `apps/mobile/lib/core/printer/printer_provider.dart`, `apps/mobile/lib/features/settings/presentation/pages/settings_page.dart` |
 | 2026-07-16 | **Fix:** พิมพ์รายงาน PDF บนเว็บพัง (`MissingPluginException: printPdf`) — cache plugin registrant เก่าไม่มี PrintingPlugin, แก้ด้วย `flutter clean` + build ใหม่ + deploy | ไม่มีไฟล์ source เปลี่ยน — เป็น build-cache issue ล้วนๆ |
 | 2026-07-15 | **Deploy PWA + แก้บั๊กเฉพาะเว็บ:** เจอ `Platform.*` (dart:io) throw บนเว็บที่หน้า login/ตั้งค่า → guard ด้วย `kIsWeb`, ซ่อน UI printer Bluetooth บนเว็บ, deploy เข้า Cloudflare Pages (`sterelis-cssd`) ที่ค้างมา 3 วัน ให้เป็น v1.1.5+7 | `apps/mobile/lib/core/notifications/fcm_service.dart`, `apps/mobile/lib/features/settings/presentation/pages/settings_page.dart` |

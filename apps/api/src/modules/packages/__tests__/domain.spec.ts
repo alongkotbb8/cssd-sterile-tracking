@@ -38,16 +38,28 @@ describe('Domain: isValidTransition (state machine)', () => {
   it('STERILE → ISSUED ✓', () => expect(isValidTransition('STERILE', 'ISSUED')).toBe(true));
   it('ISSUED → RETURNED ✓', () => expect(isValidTransition('ISSUED', 'RETURNED')).toBe(true));
   it('any → DISCARDED ✓', () => {
-    (['PACKED', 'STERILE', 'ISSUED', 'RETURNED'] as const).forEach(s =>
+    (['PACKED', 'PACKED_OUT', 'STERILE', 'ISSUED', 'RETURNED'] as const).forEach(s =>
       expect(isValidTransition(s, 'DISCARDED')).toBe(true));
   });
+
+  // ส่งออกโดยยังไม่ฆ่าเชื้อ (PACKED_OUT loop)
+  it('PACKED → PACKED_OUT ✓ (ส่งออกไม่ฆ่าเชื้อ)', () =>
+    expect(isValidTransition('PACKED', 'PACKED_OUT')).toBe(true));
+  it('PACKED_OUT → PACKED ✓ (รับคืน พร้อมนึ่งต่อ)', () =>
+    expect(isValidTransition('PACKED_OUT', 'PACKED')).toBe(true));
+  it('PACKED_OUT → STERILE ✗ (ต้องคืนก่อนถึงเข้ารอบนึ่งได้)', () =>
+    expect(isValidTransition('PACKED_OUT', 'STERILE')).toBe(false));
+  it('PACKED_OUT → ISSUED ✗', () =>
+    expect(isValidTransition('PACKED_OUT', 'ISSUED')).toBe(false));
+  it('STERILE → PACKED_OUT ✗ (ของฆ่าเชื้อแล้วใช้เส้นทาง ISSUED)', () =>
+    expect(isValidTransition('STERILE', 'PACKED_OUT')).toBe(false));
 
   // Blocked paths
   it('STERILE → PACKED ✗ (no reverse)', () => expect(isValidTransition('STERILE', 'PACKED')).toBe(false));
   it('ISSUED → STERILE ✗', () => expect(isValidTransition('ISSUED', 'STERILE')).toBe(false));
   it('RETURNED → ISSUED ✗', () => expect(isValidTransition('RETURNED', 'ISSUED')).toBe(false));
   it('DISCARDED → anything ✗', () => {
-    (['PACKED', 'STERILE', 'ISSUED', 'RETURNED'] as const).forEach(s =>
+    (['PACKED', 'PACKED_OUT', 'STERILE', 'ISSUED', 'RETURNED'] as const).forEach(s =>
       expect(isValidTransition('DISCARDED', s)).toBe(false));
   });
 });

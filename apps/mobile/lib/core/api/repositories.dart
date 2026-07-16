@@ -12,6 +12,32 @@ final departmentsProvider = FutureProvider.autoDispose<List<Department>>((ref) a
       .toList();
 });
 
+final departmentRepositoryProvider =
+    Provider<DepartmentRepository>((ref) => DepartmentRepository(ref));
+
+class DepartmentRepository {
+  DepartmentRepository(this._ref);
+  final Ref _ref;
+
+  /// เพิ่มแผนก/สถานที่ปลายทางใหม่ (SUPERVISOR/ADMIN เท่านั้น)
+  /// [type] = 'external' สำหรับสถานที่นอกโรงพยาบาล เช่น รพ.อื่น
+  Future<Department> create({
+    required String code,
+    required String name,
+    String? type,
+  }) async {
+    final res = await _ref.read(dioProvider).post<Map<String, dynamic>>(
+      '/departments',
+      data: {
+        'code': code,
+        'name': name,
+        if (type != null) 'type': type,
+      },
+    );
+    return Department.fromJson(res.data!);
+  }
+}
+
 final templatesProvider = FutureProvider.autoDispose<List<SetTemplate>>((ref) async {
   final res =
       await ref.watch(dioProvider).get<List<dynamic>>('/master-data/templates');

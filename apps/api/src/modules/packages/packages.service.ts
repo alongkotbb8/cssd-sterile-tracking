@@ -77,7 +77,16 @@ export class PackagesService {
         ...(status ? { status } : {}),
         ...(templateId ? { setTemplateId: templateId } : {}),
       },
-      include: { setTemplate: true, batch: { select: { id: true, status: true } } },
+      include: {
+        setTemplate: true,
+        batch: { select: { id: true, status: true } },
+        // movement ล่าสุด → บอกตำแหน่งปัจจุบันของห่อ (การ์ดแสดง "อยู่ที่ ...")
+        movements: {
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+          include: { department: true },
+        },
+      },
       orderBy: { expiryDate: 'asc' }, // FEFO order
     }).then(pkgs =>
       pkgs.map(p => ({
