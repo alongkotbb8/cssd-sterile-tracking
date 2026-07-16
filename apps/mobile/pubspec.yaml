@@ -2,7 +2,7 @@ name: cssd_mobile
 description: ระบบตามรอยอุปกรณ์หัตถการปลอดเชื้อ — CSSD Sterile Tracking
 
 publish_to: 'none'
-version: 1.1.5+7
+version: 1.1.6+8
 
 environment:
   sdk: '>=3.3.0 <4.0.0'

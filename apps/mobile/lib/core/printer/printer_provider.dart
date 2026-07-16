@@ -1,9 +1,74 @@
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'printer_adapter.dart';
-import 'mock_printer_adapter.dart';
+import 'dart:convert';
 
-/// Global printer provider — swap out adapter via overrideWithValue() in tests
-/// or when user connects a real device.
-final printerAdapterProvider = StateProvider<PrinterAdapter>(
-  (ref) => MockPrinterAdapter(),
-);
+import 'package:flutter_blue_plus/flutter_blue_plus.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../api/api_client.dart';
+import 'flash_label_a318_adapter.dart';
+import 'mock_printer_adapter.dart';
+import 'printer_adapter.dart';
+
+const _kPrefPrinterSelection = 'printer_selection';
+
+/// Printer ที่เลือกไว้ — **ต้องจำข้าม session** ไม่งั้นทุกครั้งที่เปิดแอปใหม่
+/// จะเด้งกลับไปที่ MockPrinterAdapter ทั้งที่ผู้ใช้เพิ่งจับคู่เครื่องพิมพ์จริงไป
+/// (เดิมเป็น StateProvider ธรรมดา ไม่เขียนลง storage เลย — นี่คือสาเหตุที่พิมพ์
+/// ไปตกที่ Mock Printer ทั้งที่เลือกเครื่องพิมพ์ Bluetooth ไว้แล้วในเซสชันก่อน)
+final printerAdapterProvider =
+    NotifierProvider<PrinterAdapterNotifier, PrinterAdapter>(
+        PrinterAdapterNotifier.new);
+
+class PrinterAdapterNotifier extends Notifier<PrinterAdapter> {
+  @override
+  PrinterAdapter build() {
+    final saved = ref.read(sharedPreferencesProvider).getString(_kPrefPrinterSelection);
+    if (saved == null) return MockPrinterAdapter();
+
+    try {
+      final map = jsonDecode(saved) as Map<String, dynamic>;
+      switch (map['transport']) {
+        case 'classic':
+          return FlashLabelA318Adapter.classic(
+            name: map['name'] as String,
+            mac: map['mac'] as String,
+          );
+        case 'ble':
+          // BluetoothDevice.fromId คืนค่า reference จาก remoteId ได้โดยไม่ต้องสแกนใหม่
+          return FlashLabelA318Adapter.ble(
+            device: BluetoothDevice.fromId(map['mac'] as String),
+          );
+      }
+    } catch (_) {
+      // ข้อมูลที่บันทึกไว้อ่านไม่ได้ (เช่น รูปแบบเปลี่ยนตอนอัปเดตแอป) → กลับไป Mock ปลอดภัยสุด
+    }
+    return MockPrinterAdapter();
+  }
+
+  void _persist(Map<String, dynamic>? data) {
+    final prefs = ref.read(sharedPreferencesProvider);
+    if (data == null) {
+      prefs.remove(_kPrefPrinterSelection);
+    } else {
+      prefs.setString(_kPrefPrinterSelection, jsonEncode(data));
+    }
+  }
+
+  void selectMock() {
+    state = MockPrinterAdapter();
+    _persist(null);
+  }
+
+  void selectClassic({required String name, required String mac}) {
+    state = FlashLabelA318Adapter.classic(name: name, mac: mac);
+    _persist({'transport': 'classic', 'name': name, 'mac': mac});
+  }
+
+  void selectBle(BluetoothDevice device) {
+    state = FlashLabelA318Adapter.ble(device: device);
+    _persist({
+      'transport': 'ble',
+      'name': device.platformName,
+      'mac': device.remoteId.str,
+    });
+  }
+}

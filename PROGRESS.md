@@ -158,6 +158,27 @@ npx wrangler pages deploy build/web --project-name=sterelis-cssd --branch=main
 
 ยืนยันด้วย `flutter build web --release` ผ่านสำเร็จไม่มี error หลังแก้ (ก่อนแก้คอมไพล์ผ่านเหมือนกัน แต่จะ throw ตอน **runtime** ในเบราว์เซอร์ ซึ่งเทสต์แบบ static analysis จับไม่ได้ — ต้องรู้พฤติกรรม `dart:io` บนเว็บถึงจะเจอ)
 
+### บั๊กฟิกซ์: พิมพ์รายงาน PDF บนเว็บพัง — `MissingPluginException: printPdf` (2026-07-16)
+
+**อาการ:** กดพิมพ์รายงานสรุปในเวอร์ชันเว็บ → แถบแดง `MissingPluginException(No implementation found for method printPdf on channel net.nfet.printing)`
+
+**สาเหตุ:** `.dart_tool/flutter_build/<hash>/web_plugin_registrant.dart` เป็นไฟล์ที่ Flutter auto-generate รายชื่อ web plugin ที่ต้อง register — cache ตัวที่ค้างอยู่ (สร้างก่อนที่ session นี้จะเพิ่ม `printing`, `permission_handler`, `firebase_*` เข้า pubspec) **ไม่มี `PrintingPlugin.registerWith(registrar)` เลย** ทำให้ `PrintingPlatform.instance` fallback ไปใช้ `MethodChannelPrinting` ตัวเดิม (ของ mobile) ซึ่งยิง native channel ที่ไม่มีจริงในเบราว์เซอร์ → throw ทันทีที่กดพิมพ์
+
+**แก้:** `flutter clean` + `flutter pub get` + build ใหม่ทั้งหมด บังคับให้ regenerate plugin registrant ให้ตรงกับ pubspec ปัจจุบัน (ตรวจแล้วว่ามี `PrintingPlugin.registerWith` ในไฟล์ที่ build จริงก่อน deploy) แล้ว deploy ใหม่
+
+**ข้อควรระวังสำหรับอนาคต:** ถ้าเพิ่ม/ลบ plugin ใน pubspec.yaml แล้วจะ build web ต่อ ให้ `flutter clean` ก่อนเสมอ อย่าพึ่ง incremental build เฉยๆ — cache นี้ไม่ invalidate ให้อัตโนมัติเสมอไปเวลาจำนวน plugin เปลี่ยน
+
+### บั๊กฟิกซ์: เลือกเครื่องพิมพ์ Bluetooth ไว้แล้ว แต่พิมพ์ไปตกที่ Mock Printer เสมอ (2026-07-16, v1.1.6+8)
+
+**อาการ:** ตั้งค่าเลือก FlashLabel A318BT ไว้แล้ว แต่พอกดพิมพ์ฉลากกลับขึ้น "ส่งพิมพ์ไปยัง Mock Printer (Console) แล้ว"
+
+**สาเหตุ:** `printerAdapterProvider` เป็น `StateProvider` ธรรมดา เก็บค่าไว้ใน **memory เท่านั้น ไม่เขียนลง storage เลย** ทุกครั้งที่แอปถูกปิด-เปิดใหม่ (หรือรีเฟรชหน้าเว็บ) provider จะ rebuild ใหม่แล้วกลับไปที่ default `MockPrinterAdapter()` เสมอ ทั้งที่ผู้ใช้เพิ่งเลือกเครื่องพิมพ์จริงไปในเซสชันก่อนหน้า
+
+**แก้:** เปลี่ยน `printerAdapterProvider` เป็น `NotifierProvider` (`PrinterAdapterNotifier`) ที่:
+- บันทึกการเลือกลง `SharedPreferences` (key `printer_selection`) ทุกครั้งที่เลือกเครื่องพิมพ์ในหน้าตั้งค่า
+- ตอนเปิดแอปใหม่ อ่านค่าที่บันทึกไว้กลับมาสร้าง adapter ใหม่ให้ตรงกัน — สำหรับ BLE ใช้ `BluetoothDevice.fromId(mac)` เพื่อคืนค่า device reference ได้โดยไม่ต้องสแกนใหม่
+- ยังไม่ได้ auto-connect ทันทีตอนเปิดแอป (connect แบบ lazy ตอนกดพิมพ์ครั้งแรกเหมือนเดิม) — แค่ "จำ" ว่าควรใช้เครื่องไหน ไม่ใช่ค้างที่ Mock
+
 ### ข้อจำกัดของเวอร์ชันเว็บที่รู้ไว้ (ไม่ต้องแก้ เป็นข้อจำกัดแพลตฟอร์มจริง)
 - พิมพ์ label ผ่าน Bluetooth ไม่ได้ (ใช้ Mock Printer แทน) — ต้องใช้แอปมือถือ Android/iOS ถึงจะพิมพ์ label จริงได้
 - FCM push notification บนเว็บต้องตั้งค่า Firebase web config (VAPID key) แยกจากมือถือ ยังไม่ได้ทำ (อยู่ในสโคปเดียวกับที่ยังไม่ได้สร้าง Firebase project จริงตามหมายเหตุด้านบน)
@@ -168,6 +189,8 @@ npx wrangler pages deploy build/web --project-name=sterelis-cssd --branch=main
 
 | วันที่ | สรุป | ไฟล์หลัก |
 |---|---|---|
+| 2026-07-16 | **Fix:** เลือกเครื่องพิมพ์ Bluetooth ไว้แล้วพิมพ์ไปตกที่ Mock เสมอ — printerAdapterProvider ไม่เคย persist เลย เปลี่ยนเป็น NotifierProvider + SharedPreferences, bump v1.1.6+8 | `apps/mobile/lib/core/printer/printer_provider.dart`, `apps/mobile/lib/features/settings/presentation/pages/settings_page.dart` |
+| 2026-07-16 | **Fix:** พิมพ์รายงาน PDF บนเว็บพัง (`MissingPluginException: printPdf`) — cache plugin registrant เก่าไม่มี PrintingPlugin, แก้ด้วย `flutter clean` + build ใหม่ + deploy | ไม่มีไฟล์ source เปลี่ยน — เป็น build-cache issue ล้วนๆ |
 | 2026-07-15 | **Deploy PWA + แก้บั๊กเฉพาะเว็บ:** เจอ `Platform.*` (dart:io) throw บนเว็บที่หน้า login/ตั้งค่า → guard ด้วย `kIsWeb`, ซ่อน UI printer Bluetooth บนเว็บ, deploy เข้า Cloudflare Pages (`sterelis-cssd`) ที่ค้างมา 3 วัน ให้เป็น v1.1.5+7 | `apps/mobile/lib/core/notifications/fcm_service.dart`, `apps/mobile/lib/features/settings/presentation/pages/settings_page.dart` |
 | 2026-07-15 | **ตรวจทั้งระบบรอบ 2:** แก้ camera-permission recheck on resume, FCM token chunking (500 limit), duplicate Firebase app guard, DTO length validation, bump v1.1.5+7 | `apps/mobile/lib/features/scan/presentation/pages/scan_page.dart`, `apps/api/src/modules/notifications/fcm.service.ts`, `apps/api/src/modules/notifications/dto/register-token.dto.ts` |
 | 2026-07-15 | **Fix:** หน้าสแกนกล้องขึ้น error — ขอ permission ก่อน start + จัดการ lifecycle เอง + errorBuilder/retry + CAMERA manifest + iOS usage keys, bump v1.1.4+6 | `apps/mobile/lib/features/scan/presentation/pages/scan_page.dart`, `apps/mobile/android/app/src/main/AndroidManifest.xml`, `apps/mobile/ios/Runner/Info.plist` |

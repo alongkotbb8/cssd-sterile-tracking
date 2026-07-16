@@ -12,7 +12,6 @@ import 'package:print_bluetooth_thermal/print_bluetooth_thermal.dart';
 
 import '../../../../core/api/api_client.dart';
 import '../../../../core/auth/auth_controller.dart';
-import '../../../../core/printer/flash_label_a318_adapter.dart';
 import '../../../../core/printer/mock_printer_adapter.dart';
 import '../../../../core/printer/printer_provider.dart';
 import '../../../../core/theme/app_theme.dart';
@@ -320,8 +319,7 @@ class _PrinterSheetState extends ConsumerState<_PrinterSheet> {
               groupValue: isMock,
               // ignore: deprecated_member_use
               onChanged: (_) {
-                ref.read(printerAdapterProvider.notifier).state =
-                    MockPrinterAdapter();
+                ref.read(printerAdapterProvider.notifier).selectMock();
                 Navigator.of(context).pop();
               },
               title: const Text('Mock Printer (สำหรับพัฒนา)'),
@@ -433,8 +431,8 @@ class _PrinterSheetState extends ConsumerState<_PrinterSheet> {
         // หยุดสแกน BLE ก่อน — RFCOMM (Classic) กับ BLE scan ทำงานพร้อมกัน
         // ทำให้ BT stack บางเครื่องรวน เชื่อมต่อไม่ติด
         await FlutterBluePlus.stopScan();
-        ref.read(printerAdapterProvider.notifier).state =
-            FlashLabelA318Adapter.classic(name: p.name, mac: p.macAdress);
+        ref.read(printerAdapterProvider.notifier)
+            .selectClassic(name: p.name, mac: p.macAdress);
         if (mounted) Navigator.of(context).pop();
       },
     );
@@ -449,8 +447,7 @@ class _PrinterSheetState extends ConsumerState<_PrinterSheet> {
           style: const TextStyle(fontSize: 11, fontFamily: 'monospace')),
       onTap: () async {
         await FlutterBluePlus.stopScan();
-        ref.read(printerAdapterProvider.notifier).state =
-            FlashLabelA318Adapter.ble(device: d);
+        ref.read(printerAdapterProvider.notifier).selectBle(d);
         if (mounted) Navigator.of(context).pop();
       },
     );
