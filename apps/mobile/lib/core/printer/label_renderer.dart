@@ -49,6 +49,22 @@ class LabelRenderer {
     return <int>[...header, ...mono, ...footer];
   }
 
+  /// คืนภาพ label เป็น PNG — ใช้กับการพิมพ์ผ่านระบบพิมพ์ของเครื่อง/เบราว์เซอร์
+  /// (System Print) ที่ต้องฝังรูปลง PDF แทนการส่ง TSPL ตรง
+  /// ใช้ความละเอียดเดียวกับ TSPL (480×320 @203DPI) เพราะพิกัด layout ตายตัว
+  /// PDF จะขยายภาพเต็มหน้ากระดาษ 60×40mm ให้เอง
+  static Future<Uint8List> renderPng(
+    LabelData data, {
+    int widthMm = 60,
+    int heightMm = 40,
+  }) async {
+    final image =
+        await _renderImage(data, widthMm * dotsPerMm, heightMm * dotsPerMm);
+    final png = await image.toByteData(format: ui.ImageByteFormat.png);
+    image.dispose();
+    return png!.buffer.asUint8List();
+  }
+
   static Future<ui.Image> _renderImage(
       LabelData d, int widthDots, int heightDots) async {
     final recorder = ui.PictureRecorder();

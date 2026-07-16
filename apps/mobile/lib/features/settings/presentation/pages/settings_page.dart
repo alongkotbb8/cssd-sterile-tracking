@@ -12,8 +12,8 @@ import 'package:print_bluetooth_thermal/print_bluetooth_thermal.dart';
 
 import '../../../../core/api/api_client.dart';
 import '../../../../core/auth/auth_controller.dart';
-import '../../../../core/printer/mock_printer_adapter.dart';
 import '../../../../core/printer/printer_provider.dart';
+import '../../../../core/printer/system_print_adapter.dart';
 import '../../../../core/theme/app_theme.dart';
 
 class SettingsPage extends ConsumerWidget {
@@ -297,7 +297,7 @@ class _PrinterSheetState extends ConsumerState<_PrinterSheet> {
   @override
   Widget build(BuildContext context) {
     final current = ref.watch(printerAdapterProvider);
-    final isMock = current is MockPrinterAdapter;
+    final isSystem = current is SystemPrintAdapter;
 
     return Padding(
       padding: const EdgeInsets.all(20),
@@ -316,14 +316,16 @@ class _PrinterSheetState extends ConsumerState<_PrinterSheet> {
             child: RadioListTile<bool>(
               value: true,
               // ignore: deprecated_member_use
-              groupValue: isMock,
+              groupValue: isSystem,
               // ignore: deprecated_member_use
               onChanged: (_) {
-                ref.read(printerAdapterProvider.notifier).selectMock();
+                ref.read(printerAdapterProvider.notifier).selectSystem();
                 Navigator.of(context).pop();
               },
-              title: const Text('Mock Printer (สำหรับพัฒนา)'),
-              subtitle: const Text('พิมพ์คำสั่ง TSPL ลง console',
+              title: const Text('ระบบพิมพ์ของเครื่อง / เบราว์เซอร์ (แนะนำ)'),
+              subtitle: const Text(
+                  'เปิดหน้าต่างพิมพ์ → เลือกเครื่องพิมพ์ผ่านแอปของเครื่องพิมพ์เอง '
+                  'หรือ print service ที่ติดตั้งไว้ (ใช้ได้ทั้งมือถือและเว็บ)',
                   style: TextStyle(
                       fontSize: 12, color: SterelisColors.textMuted)),
             ),
@@ -331,20 +333,20 @@ class _PrinterSheetState extends ConsumerState<_PrinterSheet> {
           const SizedBox(height: 14),
           if (kIsWeb)
             // Bluetooth Classic SPP (ทางหลักของ A318BT) ไม่มีในเบราว์เซอร์เลย
-            // ไม่ลองแสดงปุ่มค้นหาให้เข้าใจผิดว่าใช้ได้
             const Padding(
               padding: EdgeInsets.symmetric(vertical: 8),
               child: Text(
-                'เชื่อมต่อเครื่องพิมพ์ FlashLabel A318BT ผ่าน Bluetooth ใช้ได้เฉพาะ '
-                'แอปมือถือ (Android/iOS) เท่านั้น — เวอร์ชันเว็บใช้ Mock Printer ได้',
+                'เชื่อมต่อ FlashLabel A318BT ผ่าน Bluetooth ตรง ใช้ได้เฉพาะแอปมือถือ '
+                '(Android/iOS) — เวอร์ชันเว็บให้ใช้ "ระบบพิมพ์" ด้านบน',
                 style: TextStyle(fontSize: 12.5, color: SterelisColors.textFaint),
               ),
             )
           else ...[
             Row(children: [
-              const Text('FlashLabel A318BT (Bluetooth)',
-                  style: TextStyle(fontWeight: FontWeight.w600)),
-              const Spacer(),
+              const Expanded(
+                child: Text('FlashLabel A318BT (Bluetooth ต่อตรง)',
+                    style: TextStyle(fontWeight: FontWeight.w600)),
+              ),
               TextButton.icon(
                 onPressed: _scanning ? null : _scan,
                 icon: _scanning

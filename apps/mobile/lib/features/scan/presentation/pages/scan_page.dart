@@ -75,6 +75,9 @@ class _ScanPageState extends ConsumerState<ScanPage> with WidgetsBindingObserver
   /// null = ยังไม่ตรวจ, true = อนุญาตแล้ว, false = ถูกปฏิเสธ
   bool? _cameraGranted;
   bool _permanentlyDenied = false;
+  // กัน race: การขอ permission จะ pause→resume แอป ทำให้ lifecycle handler
+  // เรียก init/start ซ้อนกับรอบแรก → mobile_scanner โยน genericError
+  bool _busy = false;
 
   @override
   void initState() {
@@ -85,18 +88,34 @@ class _ScanPageState extends ConsumerState<ScanPage> with WidgetsBindingObserver
   }
 
   Future<void> _initCamera() async {
-    final status = await Permission.camera.request();
-    if (!mounted) return;
-    setState(() {
-      _cameraGranted = status.isGranted;
-      _permanentlyDenied = status.isPermanentlyDenied;
-    });
-    if (status.isGranted) {
-      try {
+    if (_busy) return; // มี init/start ค้างอยู่ อย่าเริ่มซ้ำ (กัน genericError)
+    _busy = true;
+    try {
+      final status = await Permission.camera.request();
+      if (!mounted) return;
+      setState(() {
+        _cameraGranted = status.isGranted;
+        _permanentlyDenied = status.isPermanentlyDenied;
+      });
+      if (status.isGranted) {
         await _cam.start();
-      } catch (_) {
-        // MobileScanner จะแสดง error ผ่าน errorBuilder ให้กด "ลองใหม่" ได้
       }
+    } catch (_) {
+      // MobileScanner จะแสดง error ผ่าน errorBuilder ให้กด "ลองใหม่" ได้
+    } finally {
+      _busy = false;
+    }
+  }
+
+  /// start กล้องแบบกัน start ซ้อน (ใช้ตอน resume)
+  Future<void> _safeStart() async {
+    if (_busy) return;
+    _busy = true;
+    try {
+      await _cam.start();
+    } catch (_) {
+    } finally {
+      _busy = false;
     }
   }
 
@@ -112,15 +131,14 @@ class _ScanPageState extends ConsumerState<ScanPage> with WidgetsBindingObserver
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (_cameraGranted != true) {
       // ผู้ใช้อาจเพิ่งไปกดอนุญาตสิทธิ์ใน "ตั้งค่าเครื่อง" แล้วกลับมาแอป —
-      // ตรวจสิทธิ์ใหม่ตอน resume ไม่งั้นจะค้างที่หน้า "ถูกปฏิเสธ" ตลอดไป
-      // แม้ผู้ใช้จะอนุญาตแล้วก็ตาม (ต้องปิด-เปิดหน้าใหม่ถึงจะเช็คซ้ำ)
-      if (state == AppLifecycleState.resumed) _initCamera();
+      // ตรวจสิทธิ์ใหม่ตอน resume ถ้ายังไม่มี init ค้างอยู่ (กัน start ซ้อน)
+      if (state == AppLifecycleState.resumed && !_busy) _initCamera();
       return;
     }
     switch (state) {
       case AppLifecycleState.resumed:
         _detectSub ??= _cam.barcodes.listen(_onDetect);
-        unawaited(_cam.start());
+        unawaited(_safeStart());
       case AppLifecycleState.inactive:
       case AppLifecycleState.paused:
       case AppLifecycleState.hidden:

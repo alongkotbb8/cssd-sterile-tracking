@@ -198,10 +198,37 @@ npx wrangler pages deploy build/web --project-name=sterelis-cssd --branch=main
 
 ---
 
+---
+
+## บั๊กฟิกซ์รอบใหญ่: กล้อง genericError + ยกเครื่องระบบพิมพ์ (2026-07-16, v1.2.1+10)
+
+รายงานจากเครื่องจริง (Xiaomi/MIUI): กล้องขึ้น `genericError`, กดเชื่อมเครื่องพิมพ์ Bluetooth ไม่ขอ permission และต่อไม่ติด, พิมพ์ไปตกที่ Mock ตลอด
+
+### 1. กล้องสแกน genericError — race condition (แก้)
+**สาเหตุ:** ตอนเปิดหน้าสแกน `initState → _initCamera()` ขอ permission (async) → ระบบเด้ง dialog ทำให้แอป pause→resume → `didChangeAppLifecycleState(resumed)` เห็น `_cameraGranted == null` เลยเรียก `_initCamera()` **ซ้ำอีกรอบพร้อมกัน** → `_cam.start()` ถูกเรียก 2 ครั้งซ้อน → mobile_scanner โยน `genericError`
+**แก้:** เพิ่ม flag `_busy` กัน init/start ซ้อน + resume จะ re-init เฉพาะตอนไม่มีงานค้าง + แยก `_safeStart()` สำหรับ resume
+
+### 2. ยกเครื่องระบบพิมพ์ — เพิ่ม "ระบบพิมพ์ของเครื่อง/เบราว์เซอร์" เป็นค่าเริ่มต้น + เอา Mock ออก
+**ปัญหาเดิม:** default เป็น Mock (แค่ log ไม่พิมพ์จริง) ทำให้ทุกครั้งพิมพ์ไปตกที่ Mock อย่างงงๆ + Bluetooth ต่อตรง (Classic SPP) ต่อไม่ติดในหลายเครื่อง (ขึ้นกับ MIUI/รุ่นเครื่องพิมพ์/การจับคู่) + เว็บพิมพ์ label ไม่ได้เลย
+**แก้:**
+- เพิ่ม [`SystemPrintAdapter`](apps/mobile/lib/core/printer/system_print_adapter.dart) — render label เป็นภาพ (รองรับไทย) ฝังลง PDF 60×40mm แล้วเปิดหน้าต่างพิมพ์ผ่าน `Printing.layoutPdf` (แพ็กเกจ `printing`)
+  - บนมือถือ: เปิด Android print dialog → เลือกเครื่องพิมพ์ผ่าน **แอปของผู้ผลิตเครื่องพิมพ์เอง / print service ที่ติดตั้งไว้** (Mopria ฯลฯ)
+  - บนเว็บ: เปิดหน้าต่างพิมพ์ของเบราว์เซอร์
+- ตั้งเป็น **ค่าเริ่มต้น** ใน `printer_provider.dart` (แทน Mock) — พิมพ์ได้จริงทุกแพลตฟอร์มตั้งแต่ติดตั้ง
+- **ลบ Mock Printer ออกทั้งหมด** (`mock_printer_adapter.dart` ลบทิ้ง, เอาออกจากหน้าเลือกเครื่องพิมพ์) ตามที่ผู้ใช้ขอ ลดความสับสน
+- Bluetooth ต่อตรง (FlashLabel A318BT SPP) ยังมีอยู่เป็น "ทางเลือก" สำหรับคนที่ต้องการส่ง TSPL ตรง
+
+**ตอบคำถามเรื่องเว็บ + แอปเครื่องพิมพ์:** เบราว์เซอร์ต่อ Bluetooth Classic SPP ตรงไม่ได้ (ข้อจำกัด browser security) แต่ผ่าน `Printing.layoutPdf` จะเปิดหน้าต่างพิมพ์ของระบบ ซึ่งบน Android จะส่งต่อไปยัง print service — **รวมถึงแอปของเครื่องพิมพ์นั้นๆ ที่ลงทะเบียนเป็น print service ไว้** จึงพิมพ์ผ่านแอปของเครื่องพิมพ์ได้ (ทางอ้อมผ่าน OS ไม่ใช่ต่อ Bluetooth ตรงใน lib)
+
+**หมายเหตุ:** เครื่องพิมพ์ label แบบ TSPL บางรุ่นอาจไม่มี Android print service ของตัวเอง → ต้องเช็คกับรุ่นจริง ถ้าไม่มี ให้ใช้ Bluetooth ต่อตรงแทน
+
+---
+
 ## Log การเปลี่ยนแปลง
 
 | วันที่ | สรุป | ไฟล์หลัก |
 |---|---|---|
+| 2026-07-16 | **Fix:** กล้อง genericError (race ตอนขอ permission) + เพิ่ม SystemPrintAdapter (พิมพ์ผ่าน OS/เบราว์เซอร์ → แอปเครื่องพิมพ์) เป็นค่าเริ่มต้น + ลบ Mock, bump v1.2.1+10 | `apps/mobile/lib/features/scan/presentation/pages/scan_page.dart`, `apps/mobile/lib/core/printer/system_print_adapter.dart` (ใหม่), `printer_provider.dart`, `label_renderer.dart`, `settings_page.dart` |
 | 2026-07-16 | **Feature:** ส่งออก/รับคืนชุด PACKED ที่ยังไม่ฆ่าเชื้อไปสถานที่ภายนอก + สถานะ PACKED_OUT + การ์ดแสดงตำแหน่ง + POST /departments + ปุ่มเพิ่มสถานที่, bump v1.2.0+9 | `packages/shared/src/index.ts`, `apps/api/prisma/schema.prisma`, `apps/api/src/modules/scan/scan.service.ts`, `apps/api/src/modules/departments/*`, `apps/mobile/lib/features/scan/presentation/pages/scan_page.dart`, `apps/mobile/lib/features/packages/presentation/pages/*` |
 | 2026-07-16 | **Fix:** เลือกเครื่องพิมพ์ Bluetooth ไว้แล้วพิมพ์ไปตกที่ Mock เสมอ — printerAdapterProvider ไม่เคย persist เลย เปลี่ยนเป็น NotifierProvider + SharedPreferences, bump v1.1.6+8 | `apps/mobile/lib/core/printer/printer_provider.dart`, `apps/mobile/lib/features/settings/presentation/pages/settings_page.dart` |
 | 2026-07-16 | **Fix:** พิมพ์รายงาน PDF บนเว็บพัง (`MissingPluginException: printPdf`) — cache plugin registrant เก่าไม่มี PrintingPlugin, แก้ด้วย `flutter clean` + build ใหม่ + deploy | ไม่มีไฟล์ source เปลี่ยน — เป็น build-cache issue ล้วนๆ |
