@@ -83,3 +83,13 @@ flutter:
     # (เดิมใช้ PdfGoogleFonts ดาวน์โหลดจากเน็ตตอนสร้าง → offline พัง)
     - assets/fonts/Sarabun-Regular.ttf
     - assets/fonts/Sarabun-Bold.ttf
+  # ฟอนต์ UI ของแอป (Pulse design system) — ใช้ Sarabun เป็น family หลักเพราะรองรับ
+  # ไทย+ละติน และ bundle มาแล้ว (Pulse ต้นฉบับใช้ Plus Jakarta/Inter ซึ่งไม่มี glyph ไทย
+  # จึงคง Sarabun ไว้สำหรับ UI ไทยเป็นหลัก ให้เรนเดอร์ตรงกันทุกแพลตฟอร์ม/ออฟไลน์ได้)
+  fonts:
+    - family: Sarabun
+      fonts:
+        - asset: assets/fonts/Sarabun-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/Sarabun-Bold.ttf
+          weight: 700
