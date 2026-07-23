@@ -14,7 +14,8 @@ test('PWA โหลดขึ้นและ Flutter bootstrap สำเร็จ
 
   await page.goto('/');
   // Flutter web ใส่ <flt-glass-pane>/<flutter-view> เมื่อ engine บูตเสร็จ
-  await expect(page.locator('flutter-view, flt-glass-pane')).toBeVisible({
+  // (รุ่นใหม่มีทั้งคู่ → .first() กัน strict mode violation)
+  await expect(page.locator('flutter-view, flt-glass-pane').first()).toBeVisible({
     timeout: 20_000,
   });
 

@@ -6,7 +6,9 @@ import { Page, expect } from '@playwright/test';
  * ที่ Flutter ใส่ไว้ตอนบูต
  */
 export async function enableFlutterSemantics(page: Page): Promise<void> {
-  await expect(page.locator('flutter-view, flt-glass-pane')).toBeVisible({
+  // Flutter รุ่นใหม่ render ทั้ง <flutter-view> และ <flt-glass-pane> — ใช้ .first()
+  // กัน strict mode violation (locator เจอ 2 elements)
+  await expect(page.locator('flutter-view, flt-glass-pane').first()).toBeVisible({
     timeout: 20_000,
   });
   const placeholder = page.locator(
