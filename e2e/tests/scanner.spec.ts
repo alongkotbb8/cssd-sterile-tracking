@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { byLabel, login, openTab } from './helpers';
+import { byLabel, login, openTab, typeInto } from './helpers';
 
 /**
  * QR Scanner — Safari/WebKit compatibility + manual-entry fallback (master directive §4B.1)
@@ -29,16 +29,17 @@ test.describe('QR scanner (WebKit compat + manual fallback)', () => {
     await manualBtn.click();
 
     // dialog เปิด — กรอกค่าผิดรูปแบบ → ต้องขึ้น validation ไม่รับเข้ารายการ
+    // (typeInto = click+keyboard เพราะ fill() ไม่ส่งค่าถึง Flutter controller)
     const dialogInput = page.locator('flt-semantics input, input').last();
     await dialogInput.waitFor({ state: 'attached', timeout: 10_000 });
-    await dialogInput.fill('bad qr https://evil');
+    await typeInto(page, dialogInput, 'bad qr https://evil');
     await byLabel(page, 'เพิ่ม').last().click();
     await expect(byLabel(page, 'ใช้ได้เฉพาะตัวอักษร').first()).toBeVisible({
       timeout: 8_000,
     });
 
     // แก้เป็นเลขห่อรูปแบบถูกต้อง → ถูกเพิ่มเข้ารายการ (ไม่ auto-submit — §4B.1.12)
-    await dialogInput.fill('DELIV-20260101-0001');
+    await typeInto(page, dialogInput, 'DELIV-20260101-0001');
     await byLabel(page, 'เพิ่ม').last().click();
     await expect(byLabel(page, 'DELIV-20260101-0001').first()).toBeVisible({
       timeout: 10_000,

@@ -46,6 +46,24 @@ export function byLabel(page: Page, text: string): Locator {
     .or(page.getByText(text, { exact: false }));
 }
 
+/**
+ * พิมพ์ข้อความลง TextField ของ Flutter web — ห้ามใช้ locator.fill():
+ * fill() ตั้ง value บน <input> ของ semantics ซึ่ง Flutter ไม่อ่าน (framework ฟัง
+ * key events ผ่าน editing element ของตัวเองตอนได้ focus) ต้อง click ให้ focus
+ * แล้วพิมพ์ด้วย keyboard จริงเท่านั้น (พิสูจน์จาก trace CI: fill แล้ว validator
+ * ยังฟ้อง "กรุณากรอก..." เพราะค่าไม่ถึง controller)
+ */
+export async function typeInto(
+  page: Page,
+  input: Locator,
+  text: string,
+): Promise<void> {
+  await input.click();
+  await page.keyboard.press('ControlOrMeta+a');
+  await page.keyboard.press('Backspace');
+  await page.keyboard.type(text, { delay: 15 });
+}
+
 /** login ด้วย semantics (label ไทยจากหน้า login) */
 export async function login(
   page: Page,
@@ -58,8 +76,8 @@ export async function login(
   // TextField ของ Flutter web สร้าง <input> ใน flt-semantics — จับตามลำดับ
   const inputs = page.locator('flt-semantics input, input');
   await inputs.nth(0).waitFor({ state: 'attached', timeout: 15_000 });
-  await inputs.nth(0).fill(employeeCode);
-  await inputs.nth(1).fill(password);
+  await typeInto(page, inputs.nth(0), employeeCode);
+  await typeInto(page, inputs.nth(1), password);
 
   await byLabel(page, 'เข้าสู่ระบบ').last().click();
   // รอหลุดจากหน้า login — ช่องรหัสผ่านหายไป (unique ต่อหน้า login;
