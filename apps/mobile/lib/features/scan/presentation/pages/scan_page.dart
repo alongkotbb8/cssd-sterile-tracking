@@ -456,13 +456,22 @@ class _ScanPageState extends ConsumerState<ScanPage> with WidgetsBindingObserver
       final okCount = results.where((r) => r.success).length;
       final failCount = results.length - okCount;
 
+      // error ราย item: map errorCode → ARB ตาม locale; item เก่าที่ไม่มี code
+      // แสดงข้อความ server (ไทย) เฉพาะ locale ไทย — locale อื่นได้ generic
+      String? itemError(ScanResultItem? r) {
+        if (r == null || r.success) return null;
+        return serverErrorFromCode(l10n, r.errorCode) ??
+            (l10n.localeName.startsWith('th') ? r.error : null) ??
+            l10n.errUnknown;
+      }
+
       // เก็บรายละเอียดผลลัพธ์ไว้ก่อนแก้ _items — ใช้แสดงในหน้าสรุปผล
       final attempted = eligible
           .map((i) => (
                 id: i.id,
                 name: i.name,
                 success: byId[i.id]?.success ?? false,
-                error: byId[i.id]?.error,
+                error: itemError(byId[i.id]),
               ))
           .toList();
 
@@ -471,7 +480,7 @@ class _ScanPageState extends ConsumerState<ScanPage> with WidgetsBindingObserver
         _items.removeWhere((i) => byId[i.id]?.success == true);
         for (final i in _items) {
           final r = byId[i.id];
-          if (r != null && !r.success) i.serverError = r.error;
+          if (r != null && !r.success) i.serverError = itemError(r);
         }
         _submitting = false;
       });
@@ -1006,15 +1015,25 @@ class _ScannedPanel extends StatelessWidget {
       Padding(
         padding: const EdgeInsets.fromLTRB(16, 10, 16, 4),
         child: Row(children: [
-          Text(l10n.scanCountLabel(items.length),
-              style: const TextStyle(
-                  fontWeight: FontWeight.w700,
-                  color: SterelisColors.textStrong)),
+          // Flexible+ellipsis — จอ 320px + text scale 1.3 ข้อความนับรายการยาว
+          // กว่าพื้นที่เมื่อมีปุ่ม "ล้าง" ขวามือ (Gate 1 layout test)
+          Flexible(
+            child: Text(l10n.scanCountLabel(items.length),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                    fontWeight: FontWeight.w700,
+                    color: SterelisColors.textStrong)),
+          ),
           if (okCount != items.length) ...[
             const SizedBox(width: 6),
-            Text(l10n.scanEligibleSuffix(okCount),
-                style: const TextStyle(
-                    fontSize: 12, color: SterelisColors.textMuted)),
+            Flexible(
+              child: Text(l10n.scanEligibleSuffix(okCount),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                      fontSize: 12, color: SterelisColors.textMuted)),
+            ),
           ],
           const Spacer(),
           if (items.isNotEmpty)

@@ -246,16 +246,22 @@ class ScanResultItem {
   final bool success;
   final String? error;
 
+  /// stable code จาก backend — client map เป็นข้อความตาม locale
+  /// (ดู serverErrorFromCode ใน api_client.dart); [error] ไทยคงไว้เป็น fallback
+  final String? errorCode;
+
   const ScanResultItem({
     required this.packageId,
     required this.success,
     this.error,
+    this.errorCode,
   });
 
   factory ScanResultItem.fromJson(Map<String, dynamic> j) => ScanResultItem(
         packageId: j['packageId'] as String,
         success: (j['success'] ?? false) as bool,
         error: j['error'] as String?,
+        errorCode: j['errorCode'] as String?,
       );
 }
 

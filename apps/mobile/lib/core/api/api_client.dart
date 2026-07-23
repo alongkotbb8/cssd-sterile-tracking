@@ -130,17 +130,88 @@ final dioProvider = Provider<Dio>((ref) {
   return dio;
 });
 
+/// แปลง stable error code จาก backend (`data['code']` ของ HttpException /
+/// `errorCode` ราย item ของ scan) เป็นข้อความตาม locale — ตาราง code ตรงกับที่
+/// backend ประกาศ (apps/api services: PKG_* / BATCH_* / PRINT_JOB_* ฯลฯ)
+/// คืน null เมื่อไม่มี/ไม่รู้จัก code
+String? serverErrorFromCode(AppLocalizations l10n, String? code) {
+  switch (code) {
+    case 'PKG_NOT_FOUND':
+      return l10n.srvPkgNotFound;
+    case 'PKG_WRONG_STATUS':
+      return l10n.srvPkgWrongStatus;
+    case 'PKG_ALREADY_IN_THIS_BATCH':
+      return l10n.srvPkgAlreadyInThisBatch;
+    case 'PKG_IN_OTHER_BATCH':
+      return l10n.srvPkgInOtherBatch;
+    case 'PKG_CONCURRENT':
+      return l10n.srvPkgConcurrent;
+    case 'PKG_EXPIRED':
+      return l10n.srvPkgExpired;
+    case 'PKG_UNSTERILE_EXTERNAL_ONLY':
+      return l10n.srvPkgUnsterileExternalOnly;
+    case 'PKG_DISCARDED':
+      return l10n.srvPkgDiscarded;
+    case 'REPRINT_REASON_REQUIRED':
+      return l10n.srvReprintReasonRequired;
+    case 'BATCH_NOT_FOUND':
+      return l10n.srvBatchNotFound;
+    case 'BATCH_DUPLICATE':
+      return l10n.srvBatchDuplicate;
+    case 'BATCH_ALREADY_RESULTED':
+      return l10n.srvBatchAlreadyResulted;
+    case 'BATCH_STATE':
+      return l10n.srvBatchState;
+    case 'STERILIZER_NOT_FOUND':
+      return l10n.srvSterilizerNotFound;
+    case 'TEMPLATE_NOT_FOUND':
+      return l10n.srvTemplateNotFound;
+    case 'DEPT_NOT_FOUND':
+      return l10n.srvDeptNotFound;
+    case 'PRINT_JOB_NOT_FOUND':
+      return l10n.srvPrintJobNotFound;
+    case 'PRINT_JOB_FORBIDDEN':
+      return l10n.srvPrintJobForbidden;
+    case 'PRINT_JOB_STATE':
+      return l10n.srvPrintJobState;
+    case 'PRINT_JOB_NOTE_REQUIRED':
+      return l10n.srvPrintJobNoteRequired;
+    case 'GATEWAY_NOT_FOUND':
+      return l10n.srvGatewayNotFound;
+    case 'GATEWAY_REVOKED':
+      return l10n.srvGatewayRevoked;
+    case 'GATEWAY_CONFIG':
+      return l10n.srvGatewayConfig;
+    case 'PRINTER_NOT_FOUND':
+      return l10n.srvPrinterNotFound;
+    default:
+      return null;
+  }
+}
+
+/// ข้อความ error ฝั่ง server ตาม locale: code ที่รู้จัก → ARB (ทุกภาษา);
+/// error ที่ยังไม่มี code → แสดงข้อความดิบจาก server ได้เฉพาะ locale ไทย
+/// (server เขียนเป็นไทย) — locale อื่น **ห้าม** โชว์ข้อความไทย คืน null
+/// เพื่อให้ caller ตกไปที่ generic ตาม locale แทน
+String? localizedServerError(AppLocalizations l10n, dynamic data) {
+  if (data is! Map) return null;
+  final coded = serverErrorFromCode(l10n, data['code'] as String?);
+  if (coded != null) return coded;
+  final m = data['message'];
+  final raw = m is List ? m.join('\n') : m?.toString();
+  if (raw == null || raw.isEmpty) return null;
+  return l10n.localeName.startsWith('th') ? raw : null;
+}
+
 /// แปลง DioException เป็นข้อความ error ที่ผู้ใช้อ่านรู้เรื่อง (i18n)
 ///
-/// ข้อความจาก backend (`data['message']`) ส่งต่อตามที่ server กำหนด (server เป็นผู้แปล
-/// — ไม่ใช่ client hardcode) ; fallback ฝั่ง client แปลผ่าน [l10n]
+/// backend แนบ stable `code` มากับ error → map เป็น ARB ตาม locale;
+/// error เก่าที่ยังไม่มี code → แสดงข้อความ server ได้เฉพาะ locale ไทย
+/// ส่วน locale อื่นได้ generic — จอภาษาอังกฤษไม่มีทางเห็นข้อความไทย
 String apiErrorMessage(AppLocalizations l10n, Object error) {
   if (error is DioException) {
-    final data = error.response?.data;
-    if (data is Map && data['message'] != null) {
-      final m = data['message'];
-      return m is List ? m.join('\n') : m.toString();
-    }
+    final fromServer = localizedServerError(l10n, error.response?.data);
+    if (fromServer != null) return fromServer;
     switch (error.type) {
       case DioExceptionType.connectionTimeout:
       case DioExceptionType.receiveTimeout:

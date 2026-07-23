@@ -113,6 +113,87 @@ class AppLocalizationsEn extends AppLocalizations {
   String get errUnknown => 'An unknown error occurred';
 
   @override
+  String get srvPkgNotFound => 'Package not found';
+
+  @override
+  String get srvPkgWrongStatus =>
+      'The package status does not allow this action';
+
+  @override
+  String get srvPkgAlreadyInThisBatch =>
+      'This package is already in this batch';
+
+  @override
+  String get srvPkgInOtherBatch => 'This package is already in another batch';
+
+  @override
+  String get srvPkgConcurrent =>
+      'This package was just processed from another device';
+
+  @override
+  String get srvPkgExpired => '⛔ Do not use — this package has expired';
+
+  @override
+  String get srvPkgUnsterileExternalOnly =>
+      'This package is not sterilized — it can only be sent to an external destination';
+
+  @override
+  String get srvPkgDiscarded => 'This package has been discarded';
+
+  @override
+  String get srvReprintReasonRequired =>
+      'This label was printed before — a reprint reason is required';
+
+  @override
+  String get srvBatchNotFound => 'Sterilization batch not found';
+
+  @override
+  String get srvBatchDuplicate =>
+      'This batch already exists (same machine/date/round)';
+
+  @override
+  String get srvBatchAlreadyResulted =>
+      'This batch result has already been recorded';
+
+  @override
+  String get srvBatchState => 'The batch status does not allow this action';
+
+  @override
+  String get srvSterilizerNotFound => 'Sterilizer not found';
+
+  @override
+  String get srvTemplateNotFound => 'Instrument set template not found';
+
+  @override
+  String get srvDeptNotFound => 'Department not found';
+
+  @override
+  String get srvPrintJobNotFound => 'Print job not found';
+
+  @override
+  String get srvPrintJobForbidden =>
+      'You do not have permission for this print job';
+
+  @override
+  String get srvPrintJobState =>
+      'The print job status has changed — reload and try again';
+
+  @override
+  String get srvPrintJobNoteRequired => 'A resolution note is required';
+
+  @override
+  String get srvGatewayNotFound => 'Gateway not found';
+
+  @override
+  String get srvGatewayRevoked => 'This gateway has been revoked';
+
+  @override
+  String get srvGatewayConfig => 'Invalid gateway configuration';
+
+  @override
+  String get srvPrinterNotFound => 'Printer not found';
+
+  @override
   String get urlErrFormat =>
       'Invalid URL (must start with http:// or https://)';
 

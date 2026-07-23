@@ -89,17 +89,68 @@ void main() {
       expect(apiErrorMessage(en, Exception('boom')), equals(en.errUnknown));
     });
 
-    test('apiErrorMessage — ข้อความจาก backend ส่งต่อตามเดิม (server เป็นผู้แปล)', () {
-      final serverErr = DioException(
+    test('backend error code → map เป็น ARB ตาม locale (Gate 1 blocker #1)', () {
+      final coded = DioException(
         requestOptions: RequestOptions(path: '/x'),
         type: DioExceptionType.badResponse,
         response: Response(
           requestOptions: RequestOptions(path: '/x'),
           statusCode: 400,
-          data: {'message': 'ห่อนี้อยู่ในรอบนึ่งอื่นอยู่แล้ว'},
+          data: {
+            'message': 'ห่อนี้อยู่ในรอบนึ่งอื่นอยู่แล้ว',
+            'code': 'PKG_IN_OTHER_BATCH',
+          },
         ),
       );
-      expect(apiErrorMessage(en, serverErr), 'ห่อนี้อยู่ในรอบนึ่งอื่นอยู่แล้ว');
+      // code เดียวกัน → ภาษาตาม locale ของผู้ใช้ ไม่ใช่ภาษาของ server
+      expect(apiErrorMessage(en, coded), equals(en.srvPkgInOtherBatch));
+      expect(apiErrorMessage(th, coded), equals(th.srvPkgInOtherBatch));
+      expect(_hasThai(apiErrorMessage(en, coded)), isFalse,
+          reason: 'locale en ต้องไม่เห็นอักษรไทย');
+    });
+
+    test('error เก่าไม่มี code: th = passthrough, en = generic (ห้ามโชว์ไทย)', () {
+      final uncoded = DioException(
+        requestOptions: RequestOptions(path: '/x'),
+        type: DioExceptionType.badResponse,
+        response: Response(
+          requestOptions: RequestOptions(path: '/x'),
+          statusCode: 400,
+          data: {'message': 'ข้อความไทยจาก server ที่ยังไม่มี code'},
+        ),
+      );
+      // ไทย: server เขียนไทยอยู่แล้ว — ส่งต่อได้ (ข้อมูลครบกว่า generic)
+      expect(apiErrorMessage(th, uncoded), 'ข้อความไทยจาก server ที่ยังไม่มี code');
+      // อังกฤษ: ห้ามเห็นไทยเด็ดขาด → generic ตาม locale พร้อม status code
+      final enMsg = apiErrorMessage(en, uncoded);
+      expect(_hasThai(enMsg), isFalse,
+          reason: 'locale en ต้องไม่ leak ข้อความไทยจาก server: "$enMsg"');
+      expect(enMsg, equals(en.errGeneric('400')));
+    });
+
+    test('serverErrorFromCode ครอบทุก code แล้วให้ข้อความ en ที่ไม่มีอักษรไทย', () {
+      const codes = [
+        'PKG_NOT_FOUND', 'PKG_WRONG_STATUS', 'PKG_ALREADY_IN_THIS_BATCH',
+        'PKG_IN_OTHER_BATCH', 'PKG_CONCURRENT', 'PKG_EXPIRED',
+        'PKG_UNSTERILE_EXTERNAL_ONLY', 'PKG_DISCARDED', 'REPRINT_REASON_REQUIRED',
+        'BATCH_NOT_FOUND', 'BATCH_DUPLICATE', 'BATCH_ALREADY_RESULTED',
+        'BATCH_STATE', 'STERILIZER_NOT_FOUND', 'TEMPLATE_NOT_FOUND',
+        'DEPT_NOT_FOUND', 'PRINT_JOB_NOT_FOUND', 'PRINT_JOB_FORBIDDEN',
+        'PRINT_JOB_STATE', 'PRINT_JOB_NOTE_REQUIRED', 'GATEWAY_NOT_FOUND',
+        'GATEWAY_REVOKED', 'GATEWAY_CONFIG', 'PRINTER_NOT_FOUND',
+      ];
+      for (final c in codes) {
+        final thMsg = serverErrorFromCode(th, c);
+        final enMsg = serverErrorFromCode(en, c);
+        expect(thMsg, isNotNull, reason: 'th ไม่รู้จัก code $c');
+        expect(enMsg, isNotNull, reason: 'en ไม่รู้จัก code $c');
+        expect(_hasThai(enMsg!), isFalse, reason: 'en ของ $c มีอักษรไทย: "$enMsg"');
+      }
+      expect(serverErrorFromCode(en, 'NO_SUCH_CODE'), isNull);
+      expect(serverErrorFromCode(en, null), isNull);
     });
   });
 }
+
+/// มีอักษรไทย (U+0E00–U+0E7F) ในข้อความหรือไม่
+bool _hasThai(String s) => RegExp(r'[฀-๿]').hasMatch(s);

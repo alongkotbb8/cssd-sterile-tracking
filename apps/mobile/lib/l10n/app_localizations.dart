@@ -296,6 +296,150 @@ abstract class AppLocalizations {
   /// **'เกิดข้อผิดพลาดไม่ทราบสาเหตุ'**
   String get errUnknown;
 
+  /// No description provided for @srvPkgNotFound.
+  ///
+  /// In th, this message translates to:
+  /// **'ไม่พบห่อ'**
+  String get srvPkgNotFound;
+
+  /// No description provided for @srvPkgWrongStatus.
+  ///
+  /// In th, this message translates to:
+  /// **'สถานะห่อไม่ถูกต้องสำหรับการดำเนินการนี้'**
+  String get srvPkgWrongStatus;
+
+  /// No description provided for @srvPkgAlreadyInThisBatch.
+  ///
+  /// In th, this message translates to:
+  /// **'ห่อนี้อยู่ในรอบนี้แล้ว'**
+  String get srvPkgAlreadyInThisBatch;
+
+  /// No description provided for @srvPkgInOtherBatch.
+  ///
+  /// In th, this message translates to:
+  /// **'ห่อนี้อยู่ในรอบนึ่งอื่นอยู่แล้ว'**
+  String get srvPkgInOtherBatch;
+
+  /// No description provided for @srvPkgConcurrent.
+  ///
+  /// In th, this message translates to:
+  /// **'ห่อนี้ถูกดำเนินการไปพร้อมกันจากที่อื่นแล้ว'**
+  String get srvPkgConcurrent;
+
+  /// No description provided for @srvPkgExpired.
+  ///
+  /// In th, this message translates to:
+  /// **'⛔ ห้ามใช้ — ห่อหมดอายุแล้ว'**
+  String get srvPkgExpired;
+
+  /// No description provided for @srvPkgUnsterileExternalOnly.
+  ///
+  /// In th, this message translates to:
+  /// **'ห่อนี้ยังไม่ผ่านการฆ่าเชื้อ — ส่งออกได้เฉพาะปลายทางภายนอก (external) เท่านั้น'**
+  String get srvPkgUnsterileExternalOnly;
+
+  /// No description provided for @srvPkgDiscarded.
+  ///
+  /// In th, this message translates to:
+  /// **'ห่อนี้ถูกทิ้งไปแล้ว'**
+  String get srvPkgDiscarded;
+
+  /// No description provided for @srvReprintReasonRequired.
+  ///
+  /// In th, this message translates to:
+  /// **'ห่อนี้เคยพิมพ์แล้ว ต้องระบุเหตุผลการพิมพ์ซ้ำ'**
+  String get srvReprintReasonRequired;
+
+  /// No description provided for @srvBatchNotFound.
+  ///
+  /// In th, this message translates to:
+  /// **'ไม่พบรอบนึ่ง'**
+  String get srvBatchNotFound;
+
+  /// No description provided for @srvBatchDuplicate.
+  ///
+  /// In th, this message translates to:
+  /// **'มีรอบนึ่งนี้อยู่แล้ว (เครื่อง/วัน/รอบซ้ำ)'**
+  String get srvBatchDuplicate;
+
+  /// No description provided for @srvBatchAlreadyResulted.
+  ///
+  /// In th, this message translates to:
+  /// **'รอบนึ่งนี้บันทึกผลไปแล้ว'**
+  String get srvBatchAlreadyResulted;
+
+  /// No description provided for @srvBatchState.
+  ///
+  /// In th, this message translates to:
+  /// **'สถานะรอบนึ่งไม่ถูกต้องสำหรับการดำเนินการนี้'**
+  String get srvBatchState;
+
+  /// No description provided for @srvSterilizerNotFound.
+  ///
+  /// In th, this message translates to:
+  /// **'ไม่พบเครื่องนึ่งที่ระบุ'**
+  String get srvSterilizerNotFound;
+
+  /// No description provided for @srvTemplateNotFound.
+  ///
+  /// In th, this message translates to:
+  /// **'ไม่พบชุดอุปกรณ์ที่ระบุ'**
+  String get srvTemplateNotFound;
+
+  /// No description provided for @srvDeptNotFound.
+  ///
+  /// In th, this message translates to:
+  /// **'ไม่พบแผนกที่ระบุ'**
+  String get srvDeptNotFound;
+
+  /// No description provided for @srvPrintJobNotFound.
+  ///
+  /// In th, this message translates to:
+  /// **'ไม่พบงานพิมพ์'**
+  String get srvPrintJobNotFound;
+
+  /// No description provided for @srvPrintJobForbidden.
+  ///
+  /// In th, this message translates to:
+  /// **'ไม่มีสิทธิ์ดำเนินการกับงานพิมพ์นี้'**
+  String get srvPrintJobForbidden;
+
+  /// No description provided for @srvPrintJobState.
+  ///
+  /// In th, this message translates to:
+  /// **'สถานะงานพิมพ์เปลี่ยนไปแล้ว — โหลดใหม่แล้วลองอีกครั้ง'**
+  String get srvPrintJobState;
+
+  /// No description provided for @srvPrintJobNoteRequired.
+  ///
+  /// In th, this message translates to:
+  /// **'ต้องระบุหมายเหตุการตัดสินใจ'**
+  String get srvPrintJobNoteRequired;
+
+  /// No description provided for @srvGatewayNotFound.
+  ///
+  /// In th, this message translates to:
+  /// **'ไม่พบ gateway'**
+  String get srvGatewayNotFound;
+
+  /// No description provided for @srvGatewayRevoked.
+  ///
+  /// In th, this message translates to:
+  /// **'gateway นี้ถูกเพิกถอนแล้ว'**
+  String get srvGatewayRevoked;
+
+  /// No description provided for @srvGatewayConfig.
+  ///
+  /// In th, this message translates to:
+  /// **'ค่าตั้ง gateway ไม่ถูกต้อง'**
+  String get srvGatewayConfig;
+
+  /// No description provided for @srvPrinterNotFound.
+  ///
+  /// In th, this message translates to:
+  /// **'ไม่พบเครื่องพิมพ์ที่ระบุ'**
+  String get srvPrinterNotFound;
+
   /// No description provided for @urlErrFormat.
   ///
   /// In th, this message translates to:

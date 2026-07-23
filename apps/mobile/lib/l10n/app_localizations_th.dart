@@ -114,6 +114,81 @@ class AppLocalizationsTh extends AppLocalizations {
   String get errUnknown => 'เกิดข้อผิดพลาดไม่ทราบสาเหตุ';
 
   @override
+  String get srvPkgNotFound => 'ไม่พบห่อ';
+
+  @override
+  String get srvPkgWrongStatus => 'สถานะห่อไม่ถูกต้องสำหรับการดำเนินการนี้';
+
+  @override
+  String get srvPkgAlreadyInThisBatch => 'ห่อนี้อยู่ในรอบนี้แล้ว';
+
+  @override
+  String get srvPkgInOtherBatch => 'ห่อนี้อยู่ในรอบนึ่งอื่นอยู่แล้ว';
+
+  @override
+  String get srvPkgConcurrent => 'ห่อนี้ถูกดำเนินการไปพร้อมกันจากที่อื่นแล้ว';
+
+  @override
+  String get srvPkgExpired => '⛔ ห้ามใช้ — ห่อหมดอายุแล้ว';
+
+  @override
+  String get srvPkgUnsterileExternalOnly =>
+      'ห่อนี้ยังไม่ผ่านการฆ่าเชื้อ — ส่งออกได้เฉพาะปลายทางภายนอก (external) เท่านั้น';
+
+  @override
+  String get srvPkgDiscarded => 'ห่อนี้ถูกทิ้งไปแล้ว';
+
+  @override
+  String get srvReprintReasonRequired =>
+      'ห่อนี้เคยพิมพ์แล้ว ต้องระบุเหตุผลการพิมพ์ซ้ำ';
+
+  @override
+  String get srvBatchNotFound => 'ไม่พบรอบนึ่ง';
+
+  @override
+  String get srvBatchDuplicate => 'มีรอบนึ่งนี้อยู่แล้ว (เครื่อง/วัน/รอบซ้ำ)';
+
+  @override
+  String get srvBatchAlreadyResulted => 'รอบนึ่งนี้บันทึกผลไปแล้ว';
+
+  @override
+  String get srvBatchState => 'สถานะรอบนึ่งไม่ถูกต้องสำหรับการดำเนินการนี้';
+
+  @override
+  String get srvSterilizerNotFound => 'ไม่พบเครื่องนึ่งที่ระบุ';
+
+  @override
+  String get srvTemplateNotFound => 'ไม่พบชุดอุปกรณ์ที่ระบุ';
+
+  @override
+  String get srvDeptNotFound => 'ไม่พบแผนกที่ระบุ';
+
+  @override
+  String get srvPrintJobNotFound => 'ไม่พบงานพิมพ์';
+
+  @override
+  String get srvPrintJobForbidden => 'ไม่มีสิทธิ์ดำเนินการกับงานพิมพ์นี้';
+
+  @override
+  String get srvPrintJobState =>
+      'สถานะงานพิมพ์เปลี่ยนไปแล้ว — โหลดใหม่แล้วลองอีกครั้ง';
+
+  @override
+  String get srvPrintJobNoteRequired => 'ต้องระบุหมายเหตุการตัดสินใจ';
+
+  @override
+  String get srvGatewayNotFound => 'ไม่พบ gateway';
+
+  @override
+  String get srvGatewayRevoked => 'gateway นี้ถูกเพิกถอนแล้ว';
+
+  @override
+  String get srvGatewayConfig => 'ค่าตั้ง gateway ไม่ถูกต้อง';
+
+  @override
+  String get srvPrinterNotFound => 'ไม่พบเครื่องพิมพ์ที่ระบุ';
+
+  @override
   String get urlErrFormat =>
       'รูปแบบ URL ไม่ถูกต้อง (ต้องขึ้นต้นด้วย http:// หรือ https://)';
 
