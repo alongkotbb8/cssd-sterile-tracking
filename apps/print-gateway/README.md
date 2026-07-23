@@ -62,8 +62,11 @@ backend ให้ job ค้างแล้วกลายเป็น `ACK_UNKN
   `NODE_ENV=production` และ `PRINTER_TRANSPORT=console`
 - **`usb_spool`** — ส่ง raw TSPL เข้า OS printer queue สำหรับ **Xprinter XP-420B USB**
   (printer-class ไม่ใช่ COM/serial) ต้องตั้ง `PRINTER_QUEUE_NAME` (ชื่อ queue ที่ติดตั้ง
-  ไว้บน OS) — posix ใช้ CUPS `lp -o raw`, windows ใช้ `lpr` (ยังไม่ทดสอบบน Windows จริง
-  ต้องยืนยันตอน hardware verification) ไม่ใช้ shell + validate ชื่อ queue กัน injection
+  ไว้บน OS) ไม่ใช้ shell + validate ชื่อ queue กัน injection
+  - ✅ **Pilot = Raspberry Pi/Linux + CUPS `lp -o raw`** (posix path — เส้นทางที่รองรับ)
+  - ⚠️ **Windows `lpr` = UNSUPPORTED** ยังไม่ผ่าน hardware verification — โดน**ล็อก**ไว้
+    (gateway โยน error ตอนสตาร์ทบน win32) เก็บเป็น fallback/ทดสอบเท่านั้น ต้อง opt-in ด้วย
+    `PRINTER_ALLOW_UNVERIFIED_WINDOWS_SPOOL=true` (จะขึ้น warning) — ยังไม่ลบจนกว่าจะยืนยัน Linux
 - **`serial`** — ส่ง TSPL ผ่าน virtual COM/serial (`serialport` npm) ถ้า driver สร้าง COM
   ให้ ต้องตั้ง `PRINTER_SERIAL_PATH` + `PRINTER_SERIAL_BAUD_RATE`
 

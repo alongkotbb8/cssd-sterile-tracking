@@ -18,7 +18,12 @@ function makeTransport(name: string): PrinterTransport {
     }
     case 'usb_spool':
       // Xprinter XP-420B USB (printer-class) → ส่ง raw TSPL เข้า OS printer queue
-      return new UsbSpoolTransport(config.printerQueueName, config.spoolTimeoutMs);
+      // Pilot: Raspberry Pi/Linux + CUPS (lp -o raw); Windows lpr = unsupported (opt-in)
+      return new UsbSpoolTransport(
+        config.printerQueueName,
+        config.spoolTimeoutMs,
+        config.allowUnverifiedWindowsSpool,
+      );
     default:
       throw new Error(
         `Unknown PRINTER_TRANSPORT "${name}" — รองรับ "console" (mock), "serial", "usb_spool" เท่านั้น`,

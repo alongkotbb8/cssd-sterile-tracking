@@ -55,6 +55,21 @@
 - ☐ บันทึก RTO/RPO ที่ยอมรับได้ + ผู้รับผิดชอบ
 - ☐ ทดสอบว่า migration ใหม่ apply บน DB ที่ restore มาได้ (มี migration dry-run แล้ว — ดู `TEST_EVIDENCE.md`)
 
+### 5.1 ตรวจข้อมูลก่อน migration `PackageBatchAttempt` (สำคัญ — ทำก่อน migrate จริง)
+
+migration `20260723120000_batch_attempt_history_pending_bi` มี backfill สร้างประวัติ
+`PackageBatchAttempt` จาก `Package.batchId` ที่ยังมีอยู่ — **แต่กู้ได้เฉพาะห่อที่ยังผูก batchId**
+รอบ **FAILED จากโค้ดเก่า** (ก่อน early-release) ที่ล้าง `batchId` ทิ้งไปแล้ว จะไม่มีข้อมูลให้ backfill
+→ ประวัติที่สูญไปสร้างกลับ**อัตโนมัติไม่ได้**
+
+- ☐ ก่อน migrate: `SELECT count(*) FROM sterilization_batches WHERE status='FAILED';` — ถ้ามีรอบ
+  FAILED เก่า ให้ตรวจว่าห่อของรอบนั้นยังมี `batchId` ชี้อยู่ไหม
+- ☐ ถ้ามีห่อที่ถูกปลด `batchId` แล้ว: กู้รายชื่อห่อจาก **AuditLog** (`action IN
+  ('BATCH_RESULT','RECALL_BATCH')` — payload เก็บ `releasedPackages`/`affectedPackages` ids)
+  หรือจาก **backup** แล้ว `INSERT INTO package_batch_attempts (...)` ด้วยมือ (result=FAILED/RECALLED
+  ตามจริง, `resolvedAt`=เวลาที่บันทึกผล)
+- ☐ ถ้า deploy บน DB ใหม่ (ไม่มีข้อมูลเก่า) — ข้ามได้ (backfill รันบนตารางว่าง = ไม่มีผล)
+
 ## 6. Monitoring
 
 - **Gateway heartbeat:** `GET /print-jobs/gateways/list` คืน `lastHeartbeatAt` + `isOnline` (mobile UI แสดงแล้ว) — ☐ ตั้ง alert ถ้า gateway ที่ควรออนไลน์เงียบ > X นาที
@@ -68,6 +83,16 @@
 - **เครื่องพิมพ์เสีย/ออฟไลน์:** งานจะค้าง QUEUED (ยังไม่ถูก claim) → ตรวจ gateway/เครื่องพิมพ์ → เมื่อกลับมา งานถูก claim ต่อ; ถ้าค้าง CLAIMED นานเกิน lease timeout ระบบคืนเป็น QUEUED ให้เอง (CLAIMED) หรือ ACK_UNKNOWN (PRINTING/SENT)
 - **DEAD_LETTER:** พิมพ์ล้มเหลวครบจำนวนครั้ง → ตรวจเครื่องพิมพ์ → สั่งพิมพ์ใหม่ (สร้างงานใหม่)
 - **ระบบออนไลน์อย่างเดียว (online-only):** ไม่มี offline queue — ถ้าเน็ตหลุด สแกน/พิมพ์ไม่ได้ชั่วคราว (ขึ้น error ชัดเจน) รอเน็ตกลับแล้วทำใหม่ (Idempotency-Key กันซ้ำถ้ากดไปแล้ว)
+
+## 8. Print Gateway — host OS & transport (Pilot decision) ✅
+
+- **การตัดสินใจ (ยืนยันแล้ว): Raspberry Pi / Linux + CUPS `lp -o raw`** (`PRINTER_TRANSPORT=usb_spool`,
+  posix path) เป็น host ประจำจุดพิมพ์ของ Pilot — เสี่ยงน้อยกว่า Windows `lpr`, รันเป็น systemd service ได้
+  - ☐ ติดตั้ง XP-420B เป็น CUPS **raw queue** + ตั้ง `PRINTER_QUEUE_NAME` ให้ตรง (`lpstat -p`)
+  - ☐ ผ่าน hardware verification (`HARDWARE_VERIFICATION.md` ข้อ 0.1 + checklist) ก่อนเปิด Pilot
+- **Windows `lpr` = UNSUPPORTED** จนกว่า Linux+XP-420B จะผ่าน verification — โค้ด gateway **ล็อก**
+  win32 path ไว้ (โยน error ตอนสตาร์ท) เก็บเป็น fallback/ทดสอบเท่านั้น ต้อง opt-in
+  `PRINTER_ALLOW_UNVERIFIED_WINDOWS_SPOOL=true` (ขึ้น warning) — **ยังไม่ลบ** จนกว่าจะยืนยัน Linux path จริง
 
 ---
 

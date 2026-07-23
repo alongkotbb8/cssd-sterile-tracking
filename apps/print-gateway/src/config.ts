@@ -79,6 +79,10 @@ export const config = {
   serialBaudRate: Number(process.env.PRINTER_SERIAL_BAUD_RATE ?? 9600),
   printerQueueName,
   spoolTimeoutMs: Number(process.env.PRINTER_SPOOL_TIMEOUT_MS ?? 15_000),
+  // usb_spool บน Windows (lpr) = UNSUPPORTED จนกว่าจะผ่าน hardware verification —
+  // ต้อง opt-in ชัดเจน (Pilot ใช้ Raspberry Pi/Linux + CUPS เป็นหลัก)
+  allowUnverifiedWindowsSpool:
+    process.env.PRINTER_ALLOW_UNVERIFIED_WINDOWS_SPOOL === 'true',
   printerDpi,
   labelWidthMm,
   labelHeightMm,

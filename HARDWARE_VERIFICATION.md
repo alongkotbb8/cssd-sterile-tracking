@@ -33,8 +33,14 @@
     - **Linux/Raspberry Pi**: เขียน raw ไป `/dev/usb/lp0` (usblp) หรือใช้ `usb`/libusb เขียน bulk endpoint
     - **mac**: CUPS raw queue
   - ถ้า driver **สร้าง virtual COM ให้** → `SerialTransport` ใช้ได้ (ยืนยัน path + baud)
-- **ต้องตัดสินก่อน (blocker ของ transport):** host OS ที่รัน Print Gateway + วิธีที่ XP-420B ปรากฏ
-  (COM / USB printer-class / CUPS) → เลือก/สร้าง transport ให้ตรง
+- ✅ **การตัดสินใจ host OS ของ Pilot (ยืนยันแล้ว): Raspberry Pi / Linux + CUPS `lp -o raw`**
+  (`usb_spool` posix path) — เสี่ยงน้อยกว่า Windows `lpr`, เหมาะรันเป็นบริการประจำจุดพิมพ์
+  - ติดตั้ง XP-420B เป็น CUPS **raw queue** (`lpadmin -p CSSD-XP420B-01 -E -v usb://... -m raw`),
+    ยืนยันด้วย `lpstat -p`, ตั้ง `PRINTER_QUEUE_NAME` ให้ตรง
+  - **Windows `lpr` = UNSUPPORTED** จนกว่า Linux+XP-420B จะผ่าน hardware verification —
+    โค้ด gateway **ล็อก** win32 path ไว้ (โยน error ตอนสตาร์ท) เก็บเป็น fallback/ทดสอบเท่านั้น
+    ต้อง opt-in ด้วย `PRINTER_ALLOW_UNVERIFIED_WINDOWS_SPOOL=true` (จะ log warning "unsupported")
+    → **ยังไม่ลบ** win32 transport จนกว่าจะยืนยัน Linux path จริง
 - พิมพ์ label ทดสอบ 1 ใบ ยืนยัน bitmap + QR + ไทย ออกถูกต้องก่อนทำ soak test เต็ม
 
 ## 1. รายการที่ต้องทดสอบ (checklist)

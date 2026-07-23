@@ -32,6 +32,12 @@ ALTER TABLE "package_batch_attempts" ADD CONSTRAINT "package_batch_attempts_batc
 -- (ตามที่ยืนยัน: การผูกห่อ–รอบต้องมีประวัติถาวร) result อิงสถานะรอบปัจจุบัน:
 --   PASSED → PASSED, FAILED → FAILED, PENDING/PENDING_BI → PENDING (resolvedAt = NULL จนกว่าจะตัดสิน)
 -- idempotent: NOT EXISTS กันสร้างซ้ำถ้ารันซ้ำ
+--
+-- ⚠️ ข้อจำกัด (ต้องตรวจก่อน deploy จริง): backfill นี้กู้ได้เฉพาะห่อที่ "ยังมี batchId" อยู่
+--    รอบ FAILED จากโค้ดเก่า (ก่อน early-release) ที่ล้าง Package.batchId ทิ้งไปแล้ว จะ
+--    สร้างประวัติที่สูญหายกลับมา "อัตโนมัติไม่ได้" — ต้องตรวจข้อมูล production ก่อน migrate
+--    และกู้ประวัติจาก AuditLog (action BATCH_RESULT/RECALL_BATCH เก็บ affected/released
+--    package ids ไว้) หรือ backup แล้ว INSERT ด้วยมือ ดูขั้นตอนใน OPERATIONAL_READINESS.md
 INSERT INTO "package_batch_attempts" ("id", "packageId", "batchId", "result", "boundAt", "resolvedAt")
 SELECT
     gen_random_uuid()::text,

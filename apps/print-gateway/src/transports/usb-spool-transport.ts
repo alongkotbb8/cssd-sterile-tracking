@@ -7,9 +7,12 @@ import { PrinterTransport, TransportSendError } from './transport';
  *
  * ข้ามแพลตฟอร์ม (เลือกตอน runtime ตาม `process.platform`):
  * - posix (linux/darwin): `lp -d <queue> -o raw` อ่าน TSPL จาก stdin (CUPS)
- * - win32: `lpr -S 127.0.0.1 -P <queue> -o l <stdin?>` ... Windows lpr อ่านจากไฟล์
- *   เท่านั้น ไม่รับ stdin → ใช้ temp file (ยังไม่ทดสอบบน Windows จริง — ดู README/
- *   HARDWARE_VERIFICATION) *ต้องยืนยัน mechanism กับ host Windows จริงก่อน pilot*
+ *   → **แนวทางที่รองรับสำหรับ Pilot** (Raspberry Pi/Linux + CUPS)
+ * - win32: `lpr -S 127.0.0.1 -P <queue> -o l <file>` ... Windows lpr อ่านจากไฟล์
+ *   เท่านั้น ไม่รับ stdin → ใช้ temp file **⚠️ UNSUPPORTED / ยังไม่ผ่าน hardware
+ *   verification กับ XP-420B** — ถูกล็อกไว้ ต้อง opt-in ด้วย
+ *   `PRINTER_ALLOW_UNVERIFIED_WINDOWS_SPOOL=true` เท่านั้น (เก็บไว้เป็น fallback
+ *   สำหรับทดสอบ ไม่ใช่เส้นทางหลักของ Pilot — ดู README/HARDWARE_VERIFICATION)
  *
  * ความปลอดภัย: **ไม่ใช้ shell** (spawn + arg array) และ validate ชื่อ queue ให้เป็น
  * ตัวอักษร/ตัวเลข/`._-` เท่านั้น กัน command/arg injection (บรีฟ section 4.2)
@@ -28,11 +31,28 @@ export class UsbSpoolTransport implements PrinterTransport {
   constructor(
     private readonly queueName: string,
     private readonly timeoutMs: number = 15_000,
+    allowUnverifiedWindows = false,
   ) {
     if (!QUEUE_NAME_RE.test(queueName)) {
       // ผิดตั้งแต่ config — โยนตอนสร้าง (fail fast ก่อนสตาร์ท) กัน injection
       throw new Error(
         `PRINTER_QUEUE_NAME ไม่ถูกต้อง: "${queueName}" (ใช้ได้เฉพาะ A-Z a-z 0-9 . _ -)`,
+      );
+    }
+    // Windows lpr path ยังไม่ผ่าน hardware verification กับ XP-420B — ล็อกไว้ (fail
+    // fast) จนกว่าจะยืนยัน ต้อง opt-in ชัดเจนถึงจะใช้ได้ (เก็บเป็น fallback/ทดสอบเท่านั้น)
+    if (process.platform === 'win32' && !allowUnverifiedWindows) {
+      throw new Error(
+        'usb_spool บน Windows (lpr) ยังไม่ผ่าน hardware verification กับ XP-420B — ' +
+          'สำหรับ Pilot ให้ใช้ Raspberry Pi/Linux + CUPS (lp -o raw). ' +
+          'หากต้องการทดสอบบน Windows (unsupported) ให้ตั้ง PRINTER_ALLOW_UNVERIFIED_WINDOWS_SPOOL=true',
+      );
+    }
+    if (process.platform === 'win32' && allowUnverifiedWindows) {
+      console.warn(
+        '[usb_spool] ⚠️ ใช้ Windows lpr transport แบบ UNSUPPORTED (ยังไม่ผ่าน hardware ' +
+          'verification กับ XP-420B) — ผลการพิมพ์อาจไม่น่าเชื่อถือ ห้ามใช้ใน production ' +
+          'จนกว่าจะยืนยันจริง',
       );
     }
   }
