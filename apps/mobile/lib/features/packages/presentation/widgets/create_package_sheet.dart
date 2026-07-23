@@ -242,7 +242,9 @@ class _CreatePackageSheetState extends ConsumerState<_CreatePackageSheet> {
     final role = ref.watch(authControllerProvider).user?.role;
     final canCreateTemplate = role == 'SUPERVISOR' || role == 'ADMIN';
 
-    return Padding(
+    return SingleChildScrollView(
+      // จอเตี้ย/text scale ใหญ่ เนื้อหา sheet สูงกว่าพื้นที่ → ต้อง scroll ได้
+      // (Gate 1 layout test @320x568 จับ bottom overflow)
       padding: EdgeInsets.fromLTRB(20, 16, 20, 20 + bottom),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -356,8 +358,14 @@ class _CreatePackageSheetState extends ConsumerState<_CreatePackageSheet> {
           const SizedBox(height: 18),
           // จำนวนห่อที่จะสร้างพร้อมกัน
           Row(children: [
-            Text(l10n.cpQuantity,
-                style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+            // Flexible+ellipsis — จอ 320px + text scale 1.3 label ชนปุ่ม +/-
+            Flexible(
+              child: Text(l10n.cpQuantity,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                      fontWeight: FontWeight.w600, fontSize: 14)),
+            ),
             const Spacer(),
             _QtyButton(
               icon: Icons.remove,
@@ -493,7 +501,9 @@ class _CreateTemplateSheetState extends ConsumerState<_CreateTemplateSheet> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final bottom = MediaQuery.of(context).viewInsets.bottom;
-    return Padding(
+    return SingleChildScrollView(
+      // จอเตี้ย/text scale ใหญ่ เนื้อหา sheet สูงกว่าพื้นที่ → ต้อง scroll ได้
+      // (Gate 1 layout test @320x568 จับ bottom overflow)
       padding: EdgeInsets.fromLTRB(20, 16, 20, 20 + bottom),
       child: Column(
         mainAxisSize: MainAxisSize.min,

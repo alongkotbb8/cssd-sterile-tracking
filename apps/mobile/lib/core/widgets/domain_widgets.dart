@@ -142,9 +142,14 @@ class StatusBadge extends StatelessWidget {
             decoration: BoxDecoration(color: s.fg, shape: BoxShape.circle),
           ),
           const SizedBox(width: 6),
-          Text(s.label,
-              style: TextStyle(
-                  color: s.fg, fontSize: 12, fontWeight: FontWeight.w600)),
+          // Flexible+ellipsis — จอแคบ/text scale ใหญ่ ป้ายต้องหดได้ ไม่ล้นการ์ด
+          Flexible(
+            child: Text(s.label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                    color: s.fg, fontSize: 12, fontWeight: FontWeight.w600)),
+          ),
         ],
       ),
     );

@@ -66,9 +66,15 @@ class PrintJobsPage extends ConsumerWidget {
               padding: const EdgeInsets.all(16),
               children: [
                 Row(children: [
-                  Text(l10n.pjScopeLine(scope),
-                      style: const TextStyle(fontSize: 13, color: SterelisColors.textMuted)),
-                  const Spacer(),
+                  // Expanded + ellipsis — จอแคบ (320px) ข้อความ scope ยาวกว่าพื้นที่
+                  // เมื่อมี badge "ต้องดูแล" ด้านขวา (Gate 1 layout test จับ overflow)
+                  Expanded(
+                    child: Text(l10n.pjScopeLine(scope),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                            fontSize: 13, color: SterelisColors.textMuted)),
+                  ),
                   if (needAttention > 0)
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),

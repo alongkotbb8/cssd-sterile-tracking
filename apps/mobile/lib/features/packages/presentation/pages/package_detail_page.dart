@@ -287,13 +287,21 @@ class _LifecycleNode extends StatelessWidget {
         ),
       ),
       const SizedBox(height: 6),
-      Text(label,
-          style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-              color: state == _NodeState.idle
-                  ? SterelisColors.textFaint
-                  : SterelisColors.text)),
+      // จำกัดความกว้าง + ellipsis — 4 node บนจอ 320px ที่ text scale 1.3
+      // label กว้างเกินจน Row วงจรชีวิตล้น (Gate 1 layout test)
+      ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 64),
+        child: Text(label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: state == _NodeState.idle
+                    ? SterelisColors.textFaint
+                    : SterelisColors.text)),
+      ),
     ]);
   }
 }
