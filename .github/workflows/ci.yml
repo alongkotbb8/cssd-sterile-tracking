@@ -98,9 +98,12 @@ jobs:
     env:
       DATABASE_URL: postgresql://cssd:cssd_dev_pw@localhost:5432/cssd_db
       JWT_SECRET: e2e-ci-secret-not-for-prod
-      NODE_ENV: development # seed ใช้รหัส default + CORS เปิด
+      # NODE_ENV=e2e = non-production → seed ใช้รหัส default + CORS เปิด (main.ts/seed.ts
+      # แยกเฉพาะ === 'production') และ throttle guard ยอมรับค่า override ที่ผ่อนปรน
+      # (RELAXED_ENVS = test/e2e/ci เท่านั้น — production ceiling ยังบังคับเหมือนเดิม)
+      NODE_ENV: e2e
       # E2E ทุก request มาจาก 127.0.0.1 เดียวกัน — per-IP login throttle (10/นาที)
-      # จะปัดตกทั้งชุด จึงยกเพดานเฉพาะ CI (guard ยังทำงาน; ค่า production ไม่เปลี่ยน)
+      # จะปัดตกทั้งชุด จึงยกเพดานเฉพาะ e2e/ci (guard ยังทำงาน; ค่า production ไม่เปลี่ยน)
       LOGIN_THROTTLE_MAX: "1000"
     steps:
       - uses: actions/checkout@v4
@@ -124,9 +127,11 @@ jobs:
           (cd apps/api && node dist/main &)
           # wait-for-health แบบ fail-fast: ครบ timeout แล้วยังไม่พร้อม → exit 1
           # (กัน job เดินต่อทั้งที่ API ไม่ขึ้น แล้ว e2e ล้มแบบสับสน)
+          # ต้องยิง /api/v1/health (คืน {status:ok}) — /api/v1 เป็น 404 route จึงเป็น
+          # readiness ที่ผิด (curl -f จะ fail แม้ API พร้อมแล้ว)
           ok=0
           for _ in $(seq 1 60); do
-            if curl -fsS -o /dev/null http://localhost:3000/api/v1; then ok=1; break; fi
+            if curl -fsS -o /dev/null http://localhost:3000/api/v1/health; then ok=1; break; fi
             sleep 1
           done
           [ "$ok" = 1 ] || { echo "::error::API did not become ready within 60s"; exit 1; }
