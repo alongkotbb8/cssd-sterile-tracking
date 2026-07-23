@@ -35,10 +35,14 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm ci
-      # audit ทั้ง workspace — ระดับ high ขึ้นไปถือว่าต้องแก้ (fail); ต่ำกว่านั้นรายงานเฉย ๆ
+      # Blocking gate = ช่องโหว่ระดับ high+ ทั้ง tree (รวม dev). แก้ให้ครบด้วย overrides +
+      # dep bump (bcrypt@6 ตัด node-pre-gyp/tar; @nestjs/cli@11 → webpack patched;
+      # lodash/multer/js-yaml/qs/libxmljs2 pin เวอร์ชันที่ patch แล้ว) → high+ = 0
+      # (เหลือ moderate ของ uuid ใน firebase-admin/google-cloud tree ที่ยังไม่มี fix
+      # แบบ non-breaking — ต่ำกว่าเกณฑ์ block, รายงานด้านล่าง)
       - name: npm audit (high+, blocking)
         run: npm audit --audit-level=high
-      - name: npm audit (full report, non-blocking)
+      - name: npm audit (full report incl. moderate, non-blocking)
         if: always()
         run: npm audit || true
 
@@ -54,7 +58,17 @@ jobs:
         with:
           channel: stable
       - run: flutter pub get
-      # รายงาน dependency ที่ล้าสมัย/มีข้อจำกัด (ไม่ fail — Dart ยังไม่มี audit CVE ในตัว)
+      # Real advisory/CVE scan สำหรับ Dart/Flutter deps — Dart ไม่มี `pub audit` ในตัว
+      # จึงใช้ osv-scanner (Google OSV database) สแกน pubspec.lock จริง = blocking gate.
+      # ปักหมุด binary v2.4.0 (ไม่ดาวน์โหลดแบบ unpinned/npx --yes; asset ล็อกเวอร์ชัน)
+      - name: install osv-scanner (pinned v2.4.0)
+        working-directory: ${{ github.workspace }}
+        run: |
+          curl -sSfL https://github.com/google/osv-scanner/releases/download/v2.4.0/osv-scanner_linux_amd64 -o "$RUNNER_TEMP/osv-scanner"
+          chmod +x "$RUNNER_TEMP/osv-scanner"
+      - name: Flutter/Dart CVE scan (osv-scanner, blocking)
+        run: '"$RUNNER_TEMP/osv-scanner" scan --lockfile=pubspec.lock'
+      # เสริม: รายงาน dependency ที่ล้าสมัย (ไม่ fail)
       - name: flutter pub outdated (report)
         run: flutter pub outdated || true
 
