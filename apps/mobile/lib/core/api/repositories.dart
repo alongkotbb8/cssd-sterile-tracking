@@ -124,21 +124,35 @@ class ReportRepository {
 
 /// ---------- Packages ----------
 
-/// filter = null → ทั้งหมด, มิฉะนั้นส่ง status ไปกรองที่ server (เรียง FEFO จาก server)
+/// คีย์ query รายการห่อ — กรองด้วย status และ/หรือ tag พร้อมกันได้
+/// (record มี value-equality → family cache ทำงานถูกต้องเมื่อค่าเท่ากัน)
+typedef PackageQuery = ({String? status, String? tagId});
+
+/// status = null → ทั้งหมด, มิฉะนั้นส่ง status ไปกรองที่ server (เรียง FEFO จาก server)
 /// 'EXPIRED' เป็นค่าคำนวณ ไม่ใช่สถานะใน DB — ดึงของในคลังแล้วกรอง isExpired ฝั่งนี้
+/// tagId != null → กรองตาม tag ที่ server (ดู packages.controller `?tagId=`)
 final packagesProvider =
-    FutureProvider.autoDispose.family<List<PackageModel>, String?>((ref, status) async {
+    FutureProvider.autoDispose.family<List<PackageModel>, PackageQuery>((ref, q) async {
+  final status = q.status;
   final isExpiredFilter = status == 'EXPIRED';
   final res = await ref.watch(dioProvider).get<List<dynamic>>(
     '/packages',
     queryParameters: {
       if (status != null) 'status': isExpiredFilter ? 'STERILE' : status,
+      if (q.tagId != null) 'tagId': q.tagId,
     },
   );
   final list = res.data!
       .map((e) => PackageModel.fromJson(e as Map<String, dynamic>))
       .toList();
   return isExpiredFilter ? list.where((p) => p.isExpired).toList() : list;
+});
+
+/// รายการ tag ทั้งหมด (ใช้เป็นตัวกรองในหน้ารายการห่อ) — GET /master-data/tags
+final tagsProvider = FutureProvider.autoDispose<List<Tag>>((ref) async {
+  final res =
+      await ref.watch(dioProvider).get<List<dynamic>>('/master-data/tags');
+  return res.data!.map((e) => Tag.fromJson(e as Map<String, dynamic>)).toList();
 });
 
 final packageDetailProvider =

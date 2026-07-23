@@ -16,18 +16,59 @@ import '../../../../core/printer/printer_provider.dart';
 import '../../../../core/printer/system_print_adapter.dart';
 import '../../../../core/theme/app_theme.dart';
 
+/// โฮสต์ production ที่อนุญาต (allowlist/pin) — กำหนดตอน build ด้วย
+/// `--dart-define=CSSD_ALLOWED_HOSTS=host-a.example.com,host-b.example.com`
+/// ถ้าไม่กำหนด จะ pin ไว้ที่ host ของ [kDefaultServerUrl] อย่างเดียว
+///
+/// เหตุผล (2.3): release build ไม่ควรให้ผู้ใช้ (หรือผู้ไม่หวังดี) ชี้แอปไป
+/// เซิร์ฟเวอร์ใดก็ได้ — แม้เป็น https ก็ยัง harvest JWT/ข้อมูลผู้ป่วยได้ ถ้าชี้ไป
+/// โดเมนปลอม จึงจำกัดให้ต่อได้เฉพาะโฮสต์ที่อนุมัติไว้เท่านั้น
+Set<String> productionAllowedHosts() {
+  const raw = String.fromEnvironment('CSSD_ALLOWED_HOSTS');
+  final hosts = raw
+      .split(',')
+      .map((h) => h.trim().toLowerCase())
+      .where((h) => h.isNotEmpty)
+      .toSet();
+  if (hosts.isEmpty) {
+    final def = Uri.tryParse(kDefaultServerUrl)?.host.toLowerCase();
+    if (def != null && def.isNotEmpty) hosts.add(def);
+  }
+  return hosts;
+}
+
 /// ตรวจ server URL — คืน `null` ถ้าใช้ได้ หรือข้อความ error (ไทย) ถ้าไม่ผ่าน
 ///
-/// กติกา (ให้ตรง FIX-06 ฝั่ง Gateway): **release/production = https:// เท่านั้น**
-/// (แม้ localhost/LAN ก็ไม่ยอม http — กัน JWT/ข้อมูลรั่ว) ; **debug/dev = http:// ได้
-/// เฉพาะ localhost/LAN** (ทดสอบในตึก) ปลายทางสาธารณะต้อง https เสมอ
-/// แยกเป็น pure function เพื่อ unit-test ได้ (ดู settings_url_validation_test.dart)
-String? serverUrlValidationError(String url, {required bool isRelease}) {
+/// กติกา:
+/// - **release/production = https:// เท่านั้น** (ให้ตรง FIX-06 ฝั่ง Gateway — แม้
+///   localhost/LAN ก็ไม่ยอม http เพื่อกัน JWT/ข้อมูลรั่ว) **และ host ต้องอยู่ใน
+///   allowlist** ([allowedHosts] / [productionAllowedHosts]) — pin กันชี้ไป
+///   เซิร์ฟเวอร์ปลอม (2.3)
+/// - **debug/dev = http:// ได้เฉพาะ localhost/LAN** (ทดสอบในตึก) ; ปลายทาง
+///   สาธารณะต้อง https ; dev ไม่บังคับ allowlist (นักพัฒนาชี้ไปที่ไหนก็ได้)
+///
+/// แยกเป็น pure function เพื่อ unit-test ได้ (ดู server_url_validation_test.dart)
+/// [allowedHosts] override ได้ในเทส ; ถ้าไม่ส่งจะใช้ [productionAllowedHosts]
+String? serverUrlValidationError(
+  String url, {
+  required bool isRelease,
+  Set<String>? allowedHosts,
+}) {
   final uri = Uri.tryParse(url);
   if (uri == null || !(uri.isScheme('http') || uri.isScheme('https'))) {
     return 'รูปแบบ URL ไม่ถูกต้อง (ต้องขึ้นต้นด้วย http:// หรือ https://)';
   }
-  if (uri.isScheme('https')) return null;
+  if (uri.isScheme('https')) {
+    // release: บังคับ pin ไปโฮสต์ที่อนุมัติเท่านั้น (dev ข้ามได้)
+    if (isRelease) {
+      final allow = allowedHosts ?? productionAllowedHosts();
+      if (allow.isNotEmpty && !allow.contains(uri.host.toLowerCase())) {
+        return 'production ต้องชี้ไปเซิร์ฟเวอร์ที่อนุมัติเท่านั้น '
+            '(${allow.join(', ')})';
+      }
+    }
+    return null;
+  }
   // ถึงตรงนี้ = http://
   if (isRelease) {
     return 'production ต้องใช้ https:// เท่านั้น (http:// ใช้ไม่ได้แม้เป็น LAN)';

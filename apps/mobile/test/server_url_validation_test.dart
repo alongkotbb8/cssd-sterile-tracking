@@ -2,11 +2,21 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:cssd_mobile/features/settings/presentation/pages/settings_page.dart';
 
 // #3 — PWA production HTTPS enforcement (ให้ตรง FIX-06 ฝั่ง Gateway)
+// 2.3 — production API URL pin/allowlist
 void main() {
+  const allow = {'api.example.com', 'cssd-api.onrender.com'};
+
   group('serverUrlValidationError', () {
-    test('https ผ่านเสมอ (ทั้ง release และ dev)', () {
-      expect(serverUrlValidationError('https://api.example.com', isRelease: true), isNull);
+    test('https ผ่านเสมอบน dev (ไม่บังคับ allowlist)', () {
       expect(serverUrlValidationError('https://api.example.com', isRelease: false), isNull);
+      expect(serverUrlValidationError('https://any-host.example.org', isRelease: false), isNull);
+    });
+
+    test('https บน release ผ่านเฉพาะ host ใน allowlist', () {
+      expect(
+          serverUrlValidationError('https://api.example.com',
+              isRelease: true, allowedHosts: allow),
+          isNull);
     });
 
     test('รูปแบบผิด → error', () {
@@ -24,6 +34,37 @@ void main() {
       });
       test('http public → error', () {
         expect(serverUrlValidationError('http://api.example.com', isRelease: true), isNotNull);
+      });
+    });
+
+    // 2.3 — pin/allowlist: release ต้องชี้ไปเฉพาะโฮสต์ที่อนุมัติ (แม้เป็น https)
+    group('release allowlist (pin)', () {
+      test('https host นอก allowlist → error (กัน harvest JWT/ข้อมูล)', () {
+        expect(
+            serverUrlValidationError('https://evil.attacker.com',
+                isRelease: true, allowedHosts: allow),
+            isNotNull);
+      });
+      test('https host ใน allowlist → ok (ตัวพิมพ์ใหญ่/เล็กไม่สำคัญ)', () {
+        expect(
+            serverUrlValidationError('https://API.Example.com',
+                isRelease: true, allowedHosts: allow),
+            isNull);
+        expect(
+            serverUrlValidationError('https://cssd-api.onrender.com',
+                isRelease: true, allowedHosts: allow),
+            isNull);
+      });
+      test('ค่า default allowlist = host ของ kDefaultServerUrl', () {
+        // ไม่ส่ง allowedHosts → ใช้ productionAllowedHosts() (ค่า default)
+        final hosts = productionAllowedHosts();
+        expect(hosts, contains('cssd-api.onrender.com'));
+        expect(
+            serverUrlValidationError('https://cssd-api.onrender.com', isRelease: true),
+            isNull);
+        expect(
+            serverUrlValidationError('https://somewhere-else.example.com', isRelease: true),
+            isNotNull);
       });
     });
 

@@ -96,6 +96,34 @@ class Sterilizer {
       );
 }
 
+/// ป้ายกำกับห่อ (จัดกลุ่ม/กรอง) — มาจาก GET /master-data/tags
+class Tag {
+  final String id;
+  final String name;
+  final String? colorHex; // เช่น "#2563EB" (nullable)
+
+  const Tag({required this.id, required this.name, this.colorHex});
+
+  factory Tag.fromJson(Map<String, dynamic> j) => Tag(
+        id: j['id'] as String,
+        name: j['name'] as String,
+        colorHex: j['colorHex'] as String?,
+      );
+
+  /// แปลง colorHex ("#RRGGBB") → int ARGB สำหรับ Color(); คืน null ถ้าไม่ถูกต้อง
+  int? get colorValue {
+    final h = colorHex;
+    if (h == null || !RegExp(r'^#[0-9a-fA-F]{6}$').hasMatch(h)) return null;
+    return int.parse('FF${h.substring(1)}', radix: 16);
+  }
+
+  @override
+  bool operator ==(Object other) => other is Tag && other.id == id;
+
+  @override
+  int get hashCode => id.hashCode;
+}
+
 class Movement {
   final String type; // IN | OUT | RETURN
   final DateTime? createdAt;

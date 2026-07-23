@@ -12,6 +12,7 @@ import '../../../print_jobs/presentation/widgets/submit_print_job_sheet.dart';
 import '../widgets/create_package_sheet.dart';
 
 final _statusFilterProvider = StateProvider<String?>((ref) => null);
+final _tagFilterProvider = StateProvider<String?>((ref) => null); // 2.7 กรองตาม tag
 final _searchProvider = StateProvider<String>((ref) => '');
 
 // โหมดเลือกหลายห่อเพื่อพิมพ์ label พร้อมกัน
@@ -24,7 +25,9 @@ class PackagesPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final filter = ref.watch(_statusFilterProvider);
-    final packages = ref.watch(packagesProvider(filter));
+    final tagFilter = ref.watch(_tagFilterProvider);
+    final query = (status: filter, tagId: tagFilter);
+    final packages = ref.watch(packagesProvider(query));
     final selectMode = ref.watch(_selectModeProvider);
     final selectedIds = ref.watch(_selectedIdsProvider);
 
@@ -62,13 +65,14 @@ class PackagesPage extends ConsumerWidget {
               foregroundColor: Colors.white,
             ),
       bottomNavigationBar:
-          selectMode ? _PrintSelectedBar(filter: filter) : null,
+          selectMode ? _PrintSelectedBar(query: query) : null,
       body: Column(children: [
         const _SearchBar(),
         const _StatusFilterBar(),
+        const _TagFilterBar(),
         Expanded(
           child: RefreshIndicator(
-            onRefresh: () => ref.refresh(packagesProvider(filter).future),
+            onRefresh: () => ref.refresh(packagesProvider(query).future),
             child: packages.when(
               loading: () => const Center(child: CircularProgressIndicator()),
               error: (e, _) => ListView(children: [
@@ -81,7 +85,7 @@ class PackagesPage extends ConsumerWidget {
                 const SizedBox(height: 12),
                 Center(
                   child: OutlinedButton(
-                    onPressed: () => ref.invalidate(packagesProvider(filter)),
+                    onPressed: () => ref.invalidate(packagesProvider(query)),
                     child: const Text('ลองใหม่'),
                   ),
                 ),
@@ -97,13 +101,13 @@ class PackagesPage extends ConsumerWidget {
 
 /// แถบล่างตอนอยู่โหมดเลือก — ปุ่มพิมพ์ label ของห่อที่เลือกทั้งหมด
 class _PrintSelectedBar extends ConsumerWidget {
-  const _PrintSelectedBar({required this.filter});
-  final String? filter;
+  const _PrintSelectedBar({required this.query});
+  final PackageQuery query;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final selectedIds = ref.watch(_selectedIdsProvider);
-    final packages = ref.watch(packagesProvider(filter)).value ?? const [];
+    final packages = ref.watch(packagesProvider(query)).value ?? const [];
     final count = selectedIds.length;
 
     return SafeArea(
@@ -208,6 +212,85 @@ class _StatusFilterBar extends ConsumerWidget {
             ),
           );
         }).toList(),
+      ),
+    );
+  }
+}
+
+/// แถบกรองตาม tag (2.7) — แสดงเมื่อมี tag อย่างน้อย 1 รายการเท่านั้น
+/// ซ่อนเงียบ ๆ ถ้ายังไม่มี tag / โหลดไม่ได้ (ไม่รบกวนหน้าจอหลัก)
+class _TagFilterBar extends ConsumerWidget {
+  const _TagFilterBar();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final tagsAsync = ref.watch(tagsProvider);
+    final tags = tagsAsync.value ?? const <Tag>[];
+    if (tags.isEmpty) return const SizedBox.shrink();
+
+    final selected = ref.watch(_tagFilterProvider);
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+      child: Row(children: [
+        _TagChip(
+          label: 'ทุกป้าย',
+          selected: selected == null,
+          color: SterelisColors.textMuted,
+          onTap: () => ref.read(_tagFilterProvider.notifier).state = null,
+        ),
+        ...tags.map((t) {
+          final c = t.colorValue != null
+              ? Color(t.colorValue!)
+              : SterelisColors.blue500;
+          return _TagChip(
+            label: t.name,
+            selected: selected == t.id,
+            color: c,
+            onTap: () {
+              // แตะซ้ำที่ tag เดิม = ยกเลิกตัวกรอง
+              ref.read(_tagFilterProvider.notifier).state =
+                  selected == t.id ? null : t.id;
+            },
+          );
+        }),
+      ]),
+    );
+  }
+}
+
+class _TagChip extends StatelessWidget {
+  const _TagChip({
+    required this.label,
+    required this.selected,
+    required this.color,
+    required this.onTap,
+  });
+  final String label;
+  final bool selected;
+  final Color color;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: FilterChip(
+        avatar: CircleAvatar(backgroundColor: color, radius: 6),
+        label: Text(label),
+        selected: selected,
+        showCheckmark: false,
+        onSelected: (_) => onTap(),
+        backgroundColor: SterelisColors.white,
+        selectedColor: color.withValues(alpha: 0.16),
+        labelStyle: TextStyle(
+          color: selected ? SterelisColors.textStrong : SterelisColors.textMuted,
+          fontWeight: FontWeight.w600,
+          fontSize: 13,
+        ),
+        shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
+        side: BorderSide(color: selected ? color : SterelisColors.border),
       ),
     );
   }

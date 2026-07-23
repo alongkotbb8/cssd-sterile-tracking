@@ -14,6 +14,18 @@ import '../../../../core/models/models.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/domain_widgets.dart';
 
+/// ตรวจรูปแบบเลขห่อ (running number) — ใช้ร่วมกันทั้งการสแกน QR และพิมพ์เลขเอง
+///
+/// QR ของระบบเก็บแค่ `package_id` เท่านั้น (CLAUDE.md ข้อ 3) รูปแบบเลขรันคือ
+/// `{SET_CODE}-{YYYYMMDD}-{SEQ4}` (เช่น `DELIV-20260630-0007`) — อักขระที่เป็นไปได้
+/// คือ ตัวอักษร/ตัวเลข/ขีด (-) เท่านั้น การตรวจนี้กันสแกน QR อื่น (ลิงก์/นามบัตร)
+/// หรือกรอกอักขระแปลกปลอมแล้วยิง lookup ไป backend โดยเปล่าประโยชน์ (2.4)
+/// แยกเป็น pure function เพื่อ unit-test ได้ (ดู package_id_validation_test.dart)
+bool isValidPackageId(String id) {
+  if (id.isEmpty || id.length > 60) return false;
+  return RegExp(r'^[A-Za-z0-9-]+$').hasMatch(id);
+}
+
 enum ScanMode { scanIn, scanOut, scanReturn }
 
 extension on ScanMode {
@@ -199,14 +211,37 @@ class _ScanPageState extends ConsumerState<ScanPage> with WidgetsBindingObserver
     }
   }
 
+  // กัน SnackBar เตือน QR ผิดรูปแบบเด้งรัวๆ ระหว่างกล้องอ่าน frame เดิมซ้ำ
+  DateTime _lastInvalidScanNotice = DateTime.fromMillisecondsSinceEpoch(0);
+
   /// เพิ่มห่อเข้ารายการสแกน — ใช้ร่วมกันทั้งจากกล้องและกรอกเลขเอง (manual entry)
   /// กัน id ซ้ำที่มีอยู่แล้วในรายการ (debounce การสแกนเดิมซ้ำ)
   void _addItem(String id, {bool isManual = false}) {
+    // 2.4 — ตรวจรูปแบบเลขห่อก่อนเสมอ (ทั้ง QR และพิมพ์เอง) กันยิง lookup ด้วยค่าขยะ
+    // ฝั่งพิมพ์เอง form validator กันไว้แล้วชั้นหนึ่ง — ตรงนี้กัน QR ที่ไม่ใช่เลขห่อ
+    if (!isValidPackageId(id)) {
+      if (!isManual) _notifyInvalidScan();
+      return;
+    }
     if (_items.any((i) => i.id == id)) return;
     final item = _ScannedItem(id, isManual: isManual);
     setState(() => _items.insert(0, item));
     HapticFeedback.mediumImpact();
     _lookup(item);
+  }
+
+  /// เตือนเมื่อสแกนโดน QR ที่ไม่ใช่เลขห่อของระบบ (throttle 2 วินาที)
+  void _notifyInvalidScan() {
+    final now = DateTime.now();
+    if (now.difference(_lastInvalidScanNotice) < const Duration(seconds: 2)) {
+      return;
+    }
+    _lastInvalidScanNotice = now;
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+      content: Text('QR นี้ไม่ใช่เลขห่อของระบบ'),
+      duration: Duration(seconds: 1),
+    ));
   }
 
   /// Fallback เมื่อกล้องใช้ไม่ได้ (per AI_DEVELOPMENT_GUARDRAILS.md ข้อ 7) —
@@ -235,7 +270,8 @@ class _ScanPageState extends ConsumerState<ScanPage> with WidgetsBindingObserver
               final s = (v ?? '').trim();
               if (s.isEmpty) return 'กรุณากรอกเลขห่อ';
               if (s.length > 60) return 'เลขห่อยาวเกินไป';
-              if (!RegExp(r'^[A-Za-z0-9-]+$').hasMatch(s)) {
+              // ใช้กติกาเดียวกับตอนสแกน QR (isValidPackageId) — charset เดียวกัน
+              if (!isValidPackageId(s)) {
                 return 'ใช้ได้เฉพาะตัวอักษร ตัวเลข และขีด (-)';
               }
               return null;
