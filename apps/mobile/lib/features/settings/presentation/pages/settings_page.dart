@@ -3,7 +3,7 @@ import 'dart:async';
 // (isAndroid, isIOS, ...) throw UnsupportedError ทันที ไม่ใช่แค่คืนค่า false
 import 'dart:io' show Platform;
 
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show kIsWeb, kReleaseMode;
 import 'package:flutter/material.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -15,6 +15,43 @@ import '../../../../core/auth/auth_controller.dart';
 import '../../../../core/printer/printer_provider.dart';
 import '../../../../core/printer/system_print_adapter.dart';
 import '../../../../core/theme/app_theme.dart';
+
+/// ตรวจ server URL — คืน `null` ถ้าใช้ได้ หรือข้อความ error (ไทย) ถ้าไม่ผ่าน
+///
+/// กติกา (ให้ตรง FIX-06 ฝั่ง Gateway): **release/production = https:// เท่านั้น**
+/// (แม้ localhost/LAN ก็ไม่ยอม http — กัน JWT/ข้อมูลรั่ว) ; **debug/dev = http:// ได้
+/// เฉพาะ localhost/LAN** (ทดสอบในตึก) ปลายทางสาธารณะต้อง https เสมอ
+/// แยกเป็น pure function เพื่อ unit-test ได้ (ดู settings_url_validation_test.dart)
+String? serverUrlValidationError(String url, {required bool isRelease}) {
+  final uri = Uri.tryParse(url);
+  if (uri == null || !(uri.isScheme('http') || uri.isScheme('https'))) {
+    return 'รูปแบบ URL ไม่ถูกต้อง (ต้องขึ้นต้นด้วย http:// หรือ https://)';
+  }
+  if (uri.isScheme('https')) return null;
+  // ถึงตรงนี้ = http://
+  if (isRelease) {
+    return 'production ต้องใช้ https:// เท่านั้น (http:// ใช้ไม่ได้แม้เป็น LAN)';
+  }
+  if (!_isPrivateHost(uri.host)) {
+    return 'server ภายนอกต้องใช้ https:// (http:// ใช้ได้เฉพาะ localhost/LAN ตอน dev)';
+  }
+  return null;
+}
+
+/// host ที่ถือว่าเป็นเครือข่ายภายใน — อนุญาต http:// ได้เฉพาะ debug/dev เท่านั้น
+bool _isPrivateHost(String host) {
+  if (host == 'localhost' || host == '127.0.0.1' || host == '10.0.2.2') {
+    return true; // 10.0.2.2 = host loopback ของ Android emulator
+  }
+  final octets = host.split('.').map(int.tryParse).toList();
+  if (octets.length == 4 && octets.every((o) => o != null && o >= 0 && o <= 255)) {
+    final a = octets[0]!, b = octets[1]!;
+    if (a == 10) return true; // 10.0.0.0/8
+    if (a == 192 && b == 168) return true; // 192.168.0.0/16
+    if (a == 172 && b >= 16 && b <= 31) return true; // 172.16.0.0/12
+  }
+  return false;
+}
 
 class SettingsPage extends ConsumerWidget {
   const SettingsPage({super.key});
@@ -113,45 +150,16 @@ class SettingsPage extends ConsumerWidget {
     );
     if (result == null) return;
     final url = result.trim();
-    final uri = Uri.tryParse(url);
-    if (uri == null || !(uri.isScheme('http') || uri.isScheme('https'))) {
+    final err = serverUrlValidationError(url, isRelease: kReleaseMode);
+    if (err != null) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('รูปแบบ URL ไม่ถูกต้อง (ต้องขึ้นต้นด้วย http:// หรือ https://)'),
-          backgroundColor: SterelisColors.danger,
-        ));
-      }
-      return;
-    }
-    // บังคับ HTTPS ยกเว้นเครือข่ายภายใน (localhost/LAN สำหรับ dev/ทดสอบในตึก)
-    // — กันส่ง JWT/ข้อมูลผ่านอินเทอร์เน็ตแบบไม่เข้ารหัส (ผล security audit)
-    if (uri.isScheme('http') && !_isPrivateHost(uri.host)) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text(
-              'server ภายนอกต้องใช้ https:// เท่านั้น (http:// ใช้ได้เฉพาะ '
-              'localhost หรือ IP ภายในองค์กร เช่น 192.168.x.x)'),
-          backgroundColor: SterelisColors.danger,
-        ));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(err), backgroundColor: SterelisColors.danger),
+        );
       }
       return;
     }
     await ref.read(serverUrlProvider.notifier).set(url);
-  }
-
-  /// host ที่ถือว่าเป็นเครือข่ายภายใน — อนุญาต http:// ได้ (dev/LAN เท่านั้น)
-  static bool _isPrivateHost(String host) {
-    if (host == 'localhost' || host == '127.0.0.1' || host == '10.0.2.2') {
-      return true; // 10.0.2.2 = host loopback ของ Android emulator
-    }
-    final octets = host.split('.').map(int.tryParse).toList();
-    if (octets.length == 4 && octets.every((o) => o != null && o >= 0 && o <= 255)) {
-      final a = octets[0]!, b = octets[1]!;
-      if (a == 10) return true; // 10.0.0.0/8
-      if (a == 192 && b == 168) return true; // 192.168.0.0/16
-      if (a == 172 && b >= 16 && b <= 31) return true; // 172.16.0.0/12
-    }
-    return false;
   }
 
   Future<void> _choosePrinter(BuildContext context, WidgetRef ref) async {

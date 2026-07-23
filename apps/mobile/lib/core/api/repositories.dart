@@ -343,10 +343,14 @@ class PrintJobRepository {
   /// สร้างงานพิมพ์ label ของห่อ — backend ตัดสิน isReprint เอง (จาก package.printedAt)
   /// ถ้าห่อเคยพิมพ์แล้ว **ต้อง** ส่ง [reprintReason] (ไม่งั้น backend ตอบ 400)
   /// [requestedPrinterId] = gateway ที่ระบุ (null = เครื่องไหนก็ claim ได้)
+  /// [idempotencyKey] — ผู้เรียก **ต้องส่ง key ที่คงเดิม** ต่อ 1 operation แล้วใช้ซ้ำเมื่อ
+  /// ผู้ใช้กดลองใหม่ (กันสร้าง print job ซ้ำเมื่อ response แรกหาย) ถ้าไม่ส่งจะ gen ใหม่
+  /// (ปลอดภัยเฉพาะ dio auto-retry ภายใน call เดียว ไม่กัน user-retry)
   Future<PrintJob> create(
     String packageId, {
     String? requestedPrinterId,
     String? reprintReason,
+    String? idempotencyKey,
   }) async {
     final res = await _ref.read(dioProvider).post<Map<String, dynamic>>(
       '/print-jobs',
@@ -355,7 +359,7 @@ class PrintJobRepository {
         if (requestedPrinterId != null) 'requestedPrinterId': requestedPrinterId,
         if (reprintReason != null && reprintReason.isNotEmpty) 'reprintReason': reprintReason,
       },
-      options: Options(headers: {'Idempotency-Key': newIdempotencyKey()}),
+      options: Options(headers: {'Idempotency-Key': idempotencyKey ?? newIdempotencyKey()}),
     );
     _ref.invalidate(printJobsProvider);
     return PrintJob.fromJson(res.data!);

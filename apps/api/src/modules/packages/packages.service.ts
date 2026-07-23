@@ -160,21 +160,4 @@ export class PackagesService {
       include: { tag: true },
     });
   }
-
-  /** Reserve an offline ID pool */
-  async reservePool(setTemplateId: string, count: number, deviceId: string, userId: string) {
-    const template = await this.prisma.setTemplate.findUnique({ where: { id: setTemplateId } });
-    if (!template) throw new NotFoundException('ไม่พบ SetTemplate ที่ระบุ');
-
-    const ids = await this.runningNum.reservePool(
-      template.id,
-      template.code,
-      new Date(),
-      count,
-      deviceId,
-      userId,
-    );
-    await this.audit.log(userId, 'POOL_RESERVE', template.id, { count, deviceId });
-    return ids;
-  }
 }

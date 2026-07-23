@@ -14,7 +14,6 @@ import { ApiBearerAuth, ApiTags, ApiOperation, ApiQuery, ApiHeader } from '@nest
 import { PackageStatus } from '@prisma/client';
 import { PackagesService } from './packages.service';
 import { CreatePackageDto } from './dto/create-package.dto';
-import { ReservePoolDto } from './dto/reserve-pool.dto';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { IdempotencyService } from '../../common/idempotency/idempotency.service';
 
@@ -58,11 +57,9 @@ export class PackagesController {
     return this.svc.findOne(id);
   }
 
-  @Post('reserve-pool')
-  @ApiOperation({ summary: 'จองเลขรัน pool สำหรับโหมดออฟไลน์' })
-  reservePool(@Body() body: ReservePoolDto, @CurrentUser() user: { id: string }) {
-    return this.svc.reservePool(body.setTemplateId, body.count, body.deviceId, user.id);
-  }
+  // หมายเหตุ: เดิมมี POST /reserve-pool (จองเลขรัน pool สำหรับ offline) — ตัดออกแล้ว
+  // เพราะระบบเป็น online-only (ออกเลขตอนสร้างจริงเท่านั้น) ไม่มี consumer ฝั่ง client
+  // ตาราง NumberPoolReservation ยังคงไว้ใน schema (ไม่ลบแบบ destructive) แต่ไม่มีอะไรเขียนแล้ว
 
   // หมายเหตุ: เดิมมี POST /:id/printed ให้ client เรียกเองหลังพิมพ์สำเร็จ — ตัด
   // ออกแล้วเพราะขัด AI_DEVELOPMENT_GUARDRAILS.md ข้อ 2 ("ห้ามให้ PWA ตั้งสถานะ

@@ -57,31 +57,8 @@ export class RunningNumberService {
     return this.format(setTemplateCode, dateStr, row.lastSeq);
   }
 
-  /** Reserve a pool of IDs for offline use */
-  async reservePool(
-    setTemplateId: string,
-    setTemplateCode: string,
-    date: Date,
-    count: number,
-    deviceId: string,
-    userId: string,
-  ): Promise<string[]> {
-    const dateStr = this.toDateStr(date);
-    const row = await this.incrementSeq(this.prisma, setTemplateId, dateStr, count);
-
-    const from = row.lastSeq - count + 1;
-    const to = row.lastSeq;
-
-    await this.prisma.numberPoolReservation.create({
-      data: { setTemplateId, date: dateStr, fromSeq: from, toSeq: to, deviceId, userId },
-    });
-
-    const ids: string[] = [];
-    for (let i = from; i <= to; i++) {
-      ids.push(this.format(setTemplateCode, dateStr, i));
-    }
-    return ids;
-  }
+  // หมายเหตุ: เดิมมี reservePool() สำหรับจองเลข offline pool — ตัดออกแล้ว (online-only)
+  // ตาราง NumberPoolReservation ยังคงไว้ใน schema (ไม่ลบ destructive) แต่ไม่มีอะไรเขียนแล้ว
 
   private format(code: string, dateStr: string, seq: number): string {
     return `${code}-${dateStr}-${String(seq).padStart(4, '0')}`;

@@ -43,6 +43,12 @@ class _SubmitPrintJobSheetState extends ConsumerState<_SubmitPrintJobSheet> {
   bool _submitting = false;
   int _done = 0;
 
+  // Idempotency-Key คงที่ต่อ 1 ห่อ ต่อการเปิด sheet นี้ — ใช้ซ้ำทุกครั้งที่กดลองใหม่
+  // (ถ้า response แรกหายแล้วผู้ใช้กดซ้ำ backend จะ replay งานเดิม ไม่สร้าง print job ซ้ำ)
+  late final Map<String, String> _idemKeys = {
+    for (final p in widget.pkgs) p.id: newIdempotencyKey(),
+  };
+
   bool get _hasReprint => widget.pkgs.any((p) => p.printedAt != null);
 
   @override
@@ -72,6 +78,7 @@ class _SubmitPrintJobSheetState extends ConsumerState<_SubmitPrintJobSheet> {
           pkg.id,
           requestedPrinterId: _gatewayId,
           reprintReason: reason.isEmpty ? null : reason,
+          idempotencyKey: _idemKeys[pkg.id], // คงเดิมเมื่อกดลองใหม่ → ไม่พิมพ์ซ้ำ
         );
         created.add(job);
         if (mounted) setState(() => _done = created.length);
