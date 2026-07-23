@@ -23,7 +23,11 @@ test.describe('QR scanner (WebKit compat + manual fallback)', () => {
     await login(page, 'ADMIN001', 'Admin@1234');
     await openTab(page, 'สแกน');
 
-    // ปุ่มพิมพ์เลขเองต้องมีเสมอ (fallback เมื่อกล้องใช้ไม่ได้บน Safari — §4B.1.9)
+    // CI headless ไม่มีกล้อง (เทียบเท่า permission denied/unavailable §2B) —
+    // ต้องเห็น error UI ที่กู้คืนได้ (ปุ่มลองใหม่) ไม่ใช่จอดำ/ค้าง (§4B.1.6)
+    await expect(byLabel(page, 'ลองใหม่').first()).toBeVisible({ timeout: 25_000 });
+
+    // ปุ่มพิมพ์เลขเองต้องมีเสมอแม้กล้อง error (fallback — §4B.1.9)
     const manualBtn = byLabel(page, 'พิมพ์เลขห่อเอง').first();
     await expect(manualBtn).toBeVisible({ timeout: 20_000 });
     await manualBtn.click();

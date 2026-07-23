@@ -1,4 +1,4 @@
-import { PrismaClient, UserRole, WrapType } from '@prisma/client';
+import { PackageStatus, PrismaClient, UserRole, WrapType } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 
 const prisma = new PrismaClient();
@@ -134,8 +134,46 @@ async function main() {
         role: UserRole.CSSD,
       },
     }),
+    // บัญชีสำหรับ E2E ทดสอบ account lockout เท่านั้น (ใส่รหัสผิดซ้ำจนถูกล็อก) —
+    // แยกจากบัญชีอื่นเพื่อไม่ให้สถานะล็อกไปรบกวนเทสอื่น (dev/e2e seed เท่านั้น)
+    prisma.user.upsert({
+      where: { employeeCode: 'LOCK001' },
+      update: {},
+      create: {
+        employeeCode: 'LOCK001',
+        name: 'บัญชีทดสอบการล็อก (E2E)',
+        email: 'lock-e2e@cssd.local',
+        passwordHash: await hash(seedPassword('SEED_STAFF_PASSWORD', 'Staff@1234')),
+        role: UserRole.CSSD,
+      },
+    }),
   ]);
   console.log(`✅ Users: ${users.length}`);
+
+  // ── ข้อมูลสำหรับ E2E เท่านั้น ──
+  // ห่อหมดอายุ: expiry ต้องคำนวณโดย backend ตอนนึ่งจริง แต่ e2e ย้อนเวลาไม่ได้
+  // จึง seed ห่อ CLOTH ที่นึ่งไป 10 วันก่อน (อายุ 7 วัน → หมดอายุแล้ว 3 วัน)
+  // ใช้ทดสอบว่า scan out ถูกบล็อกแบบ fail-closed (directive §2B "Expired package ถูกบล็อก")
+  const day = 24 * 60 * 60 * 1000;
+  await prisma.package.upsert({
+    where: { id: 'DRESS-20260101-9999' },
+    update: {
+      status: PackageStatus.STERILE,
+      sterilizeDate: new Date(Date.now() - 10 * day),
+      expiryDate: new Date(Date.now() - 3 * day),
+    },
+    create: {
+      id: 'DRESS-20260101-9999',
+      setTemplateId: templates[2].id, // DRESS (CLOTH · 7 วัน)
+      wrapType: WrapType.CLOTH,
+      status: PackageStatus.STERILE,
+      sterilizeDate: new Date(Date.now() - 10 * day),
+      expiryDate: new Date(Date.now() - 3 * day),
+      notes: 'E2E: expired package (seeded)',
+      createdById: users[0].id,
+    },
+  });
+  console.log('✅ E2E fixtures: expired package DRESS-20260101-9999');
 }
 
 main()
