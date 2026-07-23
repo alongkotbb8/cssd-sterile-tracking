@@ -35,9 +35,18 @@ enum MovementType {
 }
 
 enum BatchStatus {
-  PENDING // Sterilisation in progress
-  PASSED  // CI + BI indicators passed
-  FAILED  // Indicators failed → trigger recall
+  PENDING    // Sterilisation in progress (ยังไม่บันทึกผล)
+  PENDING_BI // CI ผ่าน → ปล่อยห่อเป็น STERILE แล้ว (early release) รอผล BI ยืนยัน
+  PASSED     // CI + BI ผ่านครบ
+  FAILED     // CI หรือ BI ไม่ผ่าน → recall
+}
+
+// ประวัติการผูกห่อเข้ารอบนึ่ง (เก็บถาวรเพื่อ traceability — ไม่หายแม้ห่อถูกปลด/เข้ารอบใหม่)
+enum BatchAttemptResult {
+  PENDING  // ผูกเข้ารอบแล้ว ยังไม่มีผลตรวจ (รวมช่วง early-release PENDING_BI)
+  PASSED   // รอบผ่าน (CI+BI)
+  FAILED   // รอบไม่ผ่าน
+  RECALLED // ถูก recall (เช่น BI มาทีหลังแล้วไม่ผ่าน)
 }
 
 enum UserRole {
@@ -111,11 +120,29 @@ model SterilizationBatch {
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
 
-  packages Package[]
+  packages       Package[]
+  batchAttempts  PackageBatchAttempt[]
 
   // batch code: AUTO-1/2026-06-30/003
   @@unique([sterilizerId, runDate, roundNo])
   @@map("sterilization_batches")
+}
+
+// บันทึก 1 แถวต่อ 1 ครั้งที่ห่อถูกผูกเข้ารอบนึ่ง — เก็บถาวร (Package.batchId เป็นแค่
+// รอบ "ปัจจุบัน" ซึ่ง null ได้ตอน fail/reprocess แต่ประวัติที่นี่ไม่หาย → traceability เต็ม)
+model PackageBatchAttempt {
+  id         String             @id @default(cuid())
+  packageId  String
+  package    Package            @relation(fields: [packageId], references: [id])
+  batchId    String
+  batch      SterilizationBatch @relation(fields: [batchId], references: [id])
+  result     BatchAttemptResult @default(PENDING)
+  boundAt    DateTime           @default(now())
+  resolvedAt DateTime?
+
+  @@index([packageId])
+  @@index([batchId])
+  @@map("package_batch_attempts")
 }
 
 model Package {
@@ -138,9 +165,10 @@ model Package {
   createdById   String
   createdBy     User          @relation("PackageCreator", fields: [createdById], references: [id])
 
-  movements Movement[]
-  tags      PackageTag[]
-  printJobs PrintJob[]
+  movements     Movement[]
+  tags          PackageTag[]
+  printJobs     PrintJob[]
+  batchAttempts PackageBatchAttempt[]
 
   @@index([status])
   @@index([expiryDate])

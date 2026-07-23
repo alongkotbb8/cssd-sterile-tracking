@@ -82,6 +82,8 @@ export class ScanService {
         results.push({ packageId: id, success: false, error: 'ห่อนี้ถูกสแกนไปพร้อมกันจากที่อื่นแล้ว' });
         continue;
       }
+      // บันทึกประวัติการผูกห่อ–รอบ (เก็บถาวร แม้ภายหลังห่อถูกปลด/เข้ารอบใหม่)
+      await tx.packageBatchAttempt.create({ data: { packageId: id, batchId } });
       await this.audit.logTx(tx, userId, 'SCAN_IN_BATCH', id, {
         batchId,
         ...(manualEntry ? { manualEntry: true } : {}),
@@ -132,6 +134,17 @@ export class ScanService {
       const fromStatus = pkg.status;
       const toStatus =
         fromStatus === PackageStatus.STERILE ? PackageStatus.ISSUED : PackageStatus.PACKED_OUT;
+
+      // ส่งออกทั้งที่ยังไม่ฆ่าเชื้อ (PACKED → PACKED_OUT) ต้องเป็นปลายทางชนิด external
+      // เท่านั้น (เช่นส่ง รพ.อื่น) กันเผลอเบิกของยังไม่ปลอดเชื้อไปแผนกในโรงพยาบาล
+      if (toStatus === PackageStatus.PACKED_OUT && dept.type !== 'external') {
+        results.push({
+          packageId: id,
+          success: false,
+          error: 'ห่อนี้ยังไม่ผ่านการฆ่าเชื้อ — ส่งออกได้เฉพาะปลายทางภายนอก (external) เท่านั้น',
+        });
+        continue;
+      }
 
       // status ใน where เป็น compare-and-swap อะตอมมิก กันสแกนซ้ำพร้อมกันจาก 2 เครื่อง
       const { count } = await tx.package.updateMany({
@@ -204,6 +217,43 @@ export class ScanService {
       await this.audit.logTx(tx, userId, 'SCAN_RETURN', id, {
         departmentId,
         ...(fromStatus === PackageStatus.PACKED_OUT ? { unsterile: true } : {}),
+        ...(manualEntry ? { manualEntry: true } : {}),
+      });
+      results.push({ packageId: id, success: true });
+    }
+    return results;
+  }
+
+  /**
+   * Reprocess: ห่อที่ส่งคืน (RETURNED) → กลับเป็น PACKED เพื่อเตรียมแพ็ก/เข้ารอบนึ่งใหม่
+   * (ปิดวงจร reprocess) — เคลียร์ batchId ปัจจุบันให้เข้ารอบใหม่ได้ (ประวัติเดิมยังอยู่ใน
+   * PackageBatchAttempt) ไม่มี Movement (เป็นการเปลี่ยนสถานะภายในคลัง) — audit REPROCESS
+   */
+  async scanReprocess(
+    packageIds: string[],
+    userId: string,
+    manualEntry: boolean,
+    tx: Prisma.TransactionClient,
+  ): Promise<ScanResult[]> {
+    const results: ScanResult[] = [];
+    for (const id of packageIds) {
+      const pkg = await tx.package.findUnique({ where: { id } });
+      if (!pkg) { results.push({ packageId: id, success: false, error: 'ไม่พบห่อ' }); continue; }
+      if (pkg.status !== PackageStatus.RETURNED) {
+        results.push({ packageId: id, success: false, error: `สถานะปัจจุบัน: ${pkg.status} (reprocess ได้เฉพาะห่อที่ส่งคืนแล้ว)` });
+        continue;
+      }
+      // CAS: ต้องยัง RETURNED — กันชนกับการดำเนินการพร้อมกัน
+      const { count } = await tx.package.updateMany({
+        where: { id, status: PackageStatus.RETURNED },
+        data: { status: PackageStatus.PACKED, batchId: null },
+      });
+      if (count === 0) {
+        results.push({ packageId: id, success: false, error: 'ห่อนี้ถูกดำเนินการไปพร้อมกันจากที่อื่นแล้ว' });
+        continue;
+      }
+      await this.audit.logTx(tx, userId, 'REPROCESS', id, {
+        previousStatus: pkg.status,
         ...(manualEntry ? { manualEntry: true } : {}),
       });
       results.push({ packageId: id, success: true });

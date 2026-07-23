@@ -34,6 +34,11 @@ class ScanReturnDto {
   @IsOptional() @IsBoolean() manualEntry?: boolean;
 }
 
+class ReprocessDto {
+  @IsArray() @ArrayNotEmpty() @ArrayMaxSize(200) @IsString({ each: true }) packageIds: string[];
+  @IsOptional() @IsBoolean() manualEntry?: boolean;
+}
+
 @ApiTags('scan')
 @ApiBearerAuth()
 @UseGuards(AuthGuard('jwt'))
@@ -85,6 +90,18 @@ export class ScanController {
   ) {
     return this.idem.run(idemKey, user.id, 'scan/return', 'POST', dto, (tx) =>
       this.svc.scanReturn(dto.packageIds, dto.departmentId, user.id, !!dto.manualEntry, tx), { required: true });
+  }
+
+  @Post('reprocess')
+  @ApiOperation({ summary: 'Reprocess: ห่อที่ส่งคืน (RETURNED) → PACKED เพื่อเข้ารอบนึ่งใหม่' })
+  @ApiHeader({ name: 'Idempotency-Key', required: true, description: 'บังคับ — กันยิงซ้ำ' })
+  reprocess(
+    @Body() dto: ReprocessDto,
+    @CurrentUser() user: { id: string },
+    @Headers('idempotency-key') idemKey?: string,
+  ) {
+    return this.idem.run(idemKey, user.id, 'scan/reprocess', 'POST', dto, (tx) =>
+      this.svc.scanReprocess(dto.packageIds, user.id, !!dto.manualEntry, tx), { required: true });
   }
 
   @Get('lookup/:id')

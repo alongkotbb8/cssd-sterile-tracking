@@ -40,15 +40,17 @@ export class PackagesController {
   }
 
   @Get()
-  @ApiOperation({ summary: 'รายการห่อทั้งหมด (กรองตาม status / template)' })
+  @ApiOperation({ summary: 'รายการห่อทั้งหมด (กรองตาม status / template / tag)' })
   @ApiQuery({ name: 'status', enum: PackageStatus, required: false })
   @ApiQuery({ name: 'templateId', required: false })
+  @ApiQuery({ name: 'tagId', required: false })
   findAll(
     @Query('status', new ParseEnumPipe(PackageStatus, { optional: true }))
     status?: PackageStatus,
     @Query('templateId') templateId?: string,
+    @Query('tagId') tagId?: string,
   ) {
-    return this.svc.findAll(status, templateId);
+    return this.svc.findAll(status, templateId, tagId);
   }
 
   @Get(':id')

@@ -17,8 +17,9 @@ export class NotificationsService {
     });
   }
 
-  async unregisterToken(token: string) {
-    await this.prisma.fcmToken.deleteMany({ where: { token } });
+  /** ลบเฉพาะ token ของเจ้าของเอง (กันผู้ใช้อื่นลบ token คนอื่น — owner-bound) */
+  async unregisterToken(userId: string, token: string) {
+    await this.prisma.fcmToken.deleteMany({ where: { token, userId } });
   }
 
   /** Push to every active user's registered devices, pruning tokens Firebase reports as dead. */

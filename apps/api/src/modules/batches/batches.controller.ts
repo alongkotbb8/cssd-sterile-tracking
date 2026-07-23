@@ -5,6 +5,7 @@ import { BatchStatus, UserRole } from '@prisma/client';
 import { BatchesService } from './batches.service';
 import { CreateBatchDto } from './dto/create-batch.dto';
 import { RecordResultDto } from './dto/record-result.dto';
+import { RecordBiResultDto } from './dto/record-bi-result.dto';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { RolesGuard } from '../../common/guards/roles.guard';
@@ -61,6 +62,24 @@ export class BatchesController {
   ) {
     return this.idem.run(idemKey, user.id, `batches/${id}/result`, 'POST', dto, (tx) =>
       this.svc.recordResult(id, dto.ciResult, dto.biResult ?? null, user.id, tx), { required: true });
+  }
+
+  @Post(':id/bi-result')
+  @Roles(UserRole.SUPERVISOR, UserRole.ADMIN)
+  @ApiOperation({
+    summary:
+      'บันทึกผล BI ที่มาทีหลัง (เฉพาะรอบ PENDING_BI ที่ early-release แล้ว) — ผ่าน: PASSED, ' +
+      'ไม่ผ่าน: FAILED + recall ห่อที่ปล่อยไปแล้ว (SUPERVISOR/ADMIN)',
+  })
+  @ApiHeader({ name: 'Idempotency-Key', required: true, description: 'บังคับ — กันบันทึกผลซ้ำ' })
+  recordBiResult(
+    @Param('id') id: string,
+    @Body() dto: RecordBiResultDto,
+    @CurrentUser() user: { id: string },
+    @Headers('idempotency-key') idemKey?: string,
+  ) {
+    return this.idem.run(idemKey, user.id, `batches/${id}/bi-result`, 'POST', dto, (tx) =>
+      this.svc.recordBiResult(id, dto.biResult, user.id, tx), { required: true });
   }
 
   @Post(':id/recall')

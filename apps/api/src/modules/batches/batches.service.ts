@@ -4,7 +4,7 @@ import {
   ConflictException,
   NotFoundException,
 } from '@nestjs/common';
-import { BatchStatus, PackageStatus, Prisma } from '@prisma/client';
+import { BatchAttemptResult, BatchStatus, PackageStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { AuditService } from '../../common/audit/audit.service';
 import { CreateBatchDto } from './dto/create-batch.dto';
@@ -55,13 +55,14 @@ export class BatchesService {
   }
 
   /**
-   * Record CI/BI results and auto-set batch status.
+   * บันทึกผล CI (± BI) — โมเดล **early release** (ยืนยันแล้ว):
+   * - CI ไม่ผ่าน → FAILED + recall (ห่อไม่ถูกปล่อย)
+   * - CI ผ่าน + BI ผ่าน → PASSED (สมบูรณ์) → ห่อ PACKED ในรอบ → STERILE
+   * - CI ผ่าน + BI ไม่ผ่าน → FAILED + recall
+   * - CI ผ่าน + ยังไม่มีผล BI (null) → **PENDING_BI**: ปล่อยห่อเป็น STERILE ทันที
+   *   (early release) รอบันทึกผล BI ทีหลังผ่าน recordBiResult()
    *
-   * ลำดับที่ถูกหลัก traceability: ห่อถูกผูกเข้ารอบ (PENDING) ก่อนนึ่ง แล้วผล
-   * ตรวจเป็นตัวตัดสิน —
-   * - PASSED: ห่อ PACKED ทุกใบในรอบ → STERILE + คำนวณวันหมดอายุ + Movement IN
-   *   (ทั้งหมดใน transaction เดียว — ห้ามมีห่อครึ่งๆ กลางๆ)
-   * - FAILED: ห่อคง PACKED และถูกปลดออกจากรอบ (ต้องเข้ารอบนึ่งใหม่)
+   * การผูกห่อ–รอบเก็บถาวรใน PackageBatchAttempt (Package.batchId เป็นแค่รอบปัจจุบัน)
    */
   async recordResult(
     id: string,
@@ -72,10 +73,17 @@ export class BatchesService {
   ) {
     const batch = await tx.sterilizationBatch.findUnique({ where: { id } });
     if (!batch) throw new NotFoundException('ไม่พบรอบนึ่ง');
-    if (batch.status !== BatchStatus.PENDING) throw new BadRequestException('รอบนึ่งนี้บันทึกผลแล้ว');
+    if (batch.status !== BatchStatus.PENDING) {
+      throw new BadRequestException('รอบนึ่งนี้บันทึกผลไปแล้ว (บันทึกผล CI ได้ครั้งเดียว)');
+    }
 
-    const status: BatchStatus =
-      ciResult && (biResult === null || biResult) ? BatchStatus.PASSED : BatchStatus.FAILED;
+    // release = ห่อพร้อมใช้ (STERILE) — เมื่อ CI ผ่าน และ BI ไม่ได้ระบุว่า "ไม่ผ่าน"
+    const release = ciResult && biResult !== false;
+    const status: BatchStatus = !release
+      ? BatchStatus.FAILED
+      : biResult === true
+        ? BatchStatus.PASSED
+        : BatchStatus.PENDING_BI;
     const finishedAt = new Date();
 
     const b = await tx.sterilizationBatch.update({
@@ -88,7 +96,7 @@ export class BatchesService {
       select: { id: true, wrapType: true },
     });
 
-    if (status === BatchStatus.PASSED) {
+    if (release) {
       // Domain rule: SEAL = +180 days, CLOTH = +7 days — computed server-side only.
       for (const pkg of bound) {
         const expiryDate = new Date(finishedAt);
@@ -101,26 +109,31 @@ export class BatchesService {
           data: { packageId: pkg.id, type: 'IN', performedById: userId },
         });
       }
+      // PASSED → attempt PASSED, PENDING_BI → คง PENDING (รอ BI)
+      await this.setAttemptResult(
+        tx, id,
+        status === BatchStatus.PASSED ? BatchAttemptResult.PASSED : BatchAttemptResult.PENDING,
+      );
     } else {
-      // ไม่ผ่าน: ห่อยังไม่เคยปลอดเชื้อ → คง PACKED, ปลดจากรอบเพื่อเข้ารอบใหม่
+      // ไม่ผ่าน: ห่อยังไม่เคยปลอดเชื้อ → คง PACKED, ปลด batchId ปัจจุบัน (เข้ารอบใหม่ได้)
+      // ประวัติยังอยู่ใน PackageBatchAttempt (ไม่หาย)
       await tx.package.updateMany({
         where: { batchId: id, status: PackageStatus.PACKED },
         data: { batchId: null },
       });
+      await this.setAttemptResult(tx, id, BatchAttemptResult.FAILED);
     }
 
     await this.audit.logTx(tx, userId, 'BATCH_RESULT', id, {
       ciResult,
       biResult,
       status,
-      promotedPackages: status === BatchStatus.PASSED ? bound.map(p => p.id) : [],
-      unboundPackages: status === BatchStatus.FAILED ? bound.map(p => p.id) : [],
+      releasedPackages: release ? bound.map(p => p.id) : [],
+      unboundPackages: release ? [] : bound.map(p => p.id),
     });
 
     if (status === BatchStatus.FAILED) {
-      // recall ห่อจากรอบเดิม (flow เก่า) ที่เป็น STERILE/ISSUED อยู่แล้ว — รันใน
-      // ทรานแซกชันเดียวกัน (FIX-02 แนวทาง A) ห้ามแยกทรานแซกชันเพื่อไม่ให้ recall
-      // สำเร็จแต่ผลตรวจ rollback (หรือกลับกัน)
+      // recall ห่อรอบเดิมที่เป็น STERILE/ISSUED อยู่แล้ว — ในทรานแซกชันเดียวกัน
       await this.recallTx(tx, id, userId);
     }
 
@@ -128,17 +141,61 @@ export class BatchesService {
   }
 
   /**
-   * FR-5: Recall — pull back every package in a failed batch.
-   * Covers packages still in the sterile store (STERILE) AND packages already
-   * issued to departments (ISSUED) — both become RETURNED (awaiting reprocess).
-   * Returns each affected package with its last movement = current location.
+   * บันทึกผล BI ที่มาทีหลัง (สำหรับรอบที่ early-release อยู่ที่ PENDING_BI):
+   * - BI ผ่าน → PASSED (ห่อเป็น STERILE อยู่แล้ว ไม่ต้องแก้)
+   * - BI ไม่ผ่าน → FAILED + **recall** ห่อทุกใบในรอบ (อาจ STERILE/ISSUED ไปแล้ว)
    */
+  async recordBiResult(
+    id: string,
+    biResult: boolean,
+    userId: string,
+    tx: Prisma.TransactionClient,
+  ) {
+    const batch = await tx.sterilizationBatch.findUnique({ where: { id } });
+    if (!batch) throw new NotFoundException('ไม่พบรอบนึ่ง');
+    if (batch.status !== BatchStatus.PENDING_BI) {
+      throw new BadRequestException(
+        `บันทึกผล BI ได้เฉพาะรอบที่ยังรอผล BI (PENDING_BI) — ปัจจุบัน: ${batch.status}`,
+      );
+    }
+
+    const status = biResult ? BatchStatus.PASSED : BatchStatus.FAILED;
+    const b = await tx.sterilizationBatch.update({
+      where: { id },
+      data: { biResult, status },
+    });
+
+    if (biResult) {
+      await this.setAttemptResult(tx, id, BatchAttemptResult.PASSED, BatchAttemptResult.PENDING);
+      await this.audit.logTx(tx, userId, 'BATCH_BI_RESULT', id, { biResult, status });
+    } else {
+      // BI ไม่ผ่านหลัง early release → ต้อง recall ห่อที่ปล่อยไปแล้วทันที
+      await this.audit.logTx(tx, userId, 'BATCH_BI_RESULT', id, { biResult, status });
+      await this.recallTx(tx, id, userId);
+      await this.setAttemptResult(tx, id, BatchAttemptResult.RECALLED, BatchAttemptResult.PENDING);
+    }
+    return b;
+  }
+
+  /** ตั้งผลของ attempt ของรอบนี้ (option: เฉพาะที่ยังเป็น [onlyFrom]) */
+  private async setAttemptResult(
+    tx: Prisma.TransactionClient,
+    batchId: string,
+    result: BatchAttemptResult,
+    onlyFrom?: BatchAttemptResult,
+  ) {
+    await tx.packageBatchAttempt.updateMany({
+      where: { batchId, ...(onlyFrom ? { result: onlyFrom } : {}) },
+      data: { result, resolvedAt: new Date() },
+    });
+  }
+
   async recall(batchId: string, userId: string) {
     const packages = await this.prisma.$transaction((tx) => this.recallTx(tx, batchId, userId));
     return { recalled: packages.length, packages };
   }
 
-  /** แกนกลางของ recall — รับ tx เพื่อให้ recordResult เรียกในทรานแซกชันเดียวกันได้ */
+  /** แกนกลางของ recall — รับ tx เพื่อให้ recordResult/recordBiResult เรียกในทรานแซกชันเดียวกันได้ */
   private async recallTx(tx: Prisma.TransactionClient, batchId: string, userId: string) {
     const batch = await tx.sterilizationBatch.findUnique({ where: { id: batchId } });
     if (!batch) throw new NotFoundException('ไม่พบรอบนึ่ง');

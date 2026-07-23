@@ -5,6 +5,8 @@ import { IdempotencyService } from '../../src/common/idempotency/idempotency.ser
 import { PackagesService } from '../../src/modules/packages/packages.service';
 import { RunningNumberService } from '../../src/modules/packages/running-number.service';
 import { PrintJobsService } from '../../src/modules/print-jobs/print-jobs.service';
+import { BatchesService } from '../../src/modules/batches/batches.service';
+import { ScanService } from '../../src/modules/scan/scan.service';
 
 export function makeClient(): PrismaClient {
   return new PrismaClient({ datasources: { db: { url: TEST_DATABASE_URL } } });
@@ -16,20 +18,23 @@ export function services(prisma: PrismaClient) {
   const packages = new PackagesService(prisma as any, running, audit);
   const idem = new IdempotencyService(prisma as any);
   const printJobs = new PrintJobsService(prisma as any, audit);
-  return { audit, running, packages, idem, printJobs };
+  const batches = new BatchesService(prisma as any, audit);
+  const scan = new ScanService(prisma as any, audit);
+  return { audit, running, packages, idem, printJobs, batches, scan };
 }
 
 export interface SeedIds {
   userId: string;
   setTemplateId: string;
   gatewayRealId: string; // canConfirmRealPrint = true
+  sterilizerId: string;
 }
 
 /** รีเซ็ตทุกตาราง (รวม base) แล้วสร้างข้อมูลตั้งต้นใหม่ — เรียกใน beforeAll ของแต่ละ
  *  spec file ได้อย่างปลอดภัย (ไฟล์รันเรียงกันบน DB เดียว ต้องไม่ชน unique) */
 export async function seedBase(prisma: PrismaClient): Promise<SeedIds> {
   await prisma.$executeRawUnsafe(
-    'TRUNCATE "print_jobs","idempotent_requests","movements","audit_logs","packages","running_number_sequences","printer_devices","set_templates","users" RESTART IDENTITY CASCADE',
+    'TRUNCATE "package_batch_attempts","sterilization_batches","sterilizers","print_jobs","idempotent_requests","movements","audit_logs","packages","running_number_sequences","printer_devices","set_templates","users" RESTART IDENTITY CASCADE',
   );
   const user = await prisma.user.create({
     data: { employeeCode: 'INT001', name: 'Integration Tester', passwordHash: 'x', role: 'ADMIN' },
@@ -44,14 +49,41 @@ export async function seedBase(prisma: PrismaClient): Promise<SeedIds> {
       environment: 'PRODUCTION', transportMode: 'SERIAL', canConfirmRealPrint: true,
     },
   });
-  return { userId: user.id, setTemplateId: template.id, gatewayRealId: gateway.id };
+  const sterilizer = await prisma.sterilizer.create({
+    data: { code: 'AUTO-1', name: 'เครื่องนึ่งทดสอบ' },
+  });
+  return {
+    userId: user.id,
+    setTemplateId: template.id,
+    gatewayRealId: gateway.id,
+    sterilizerId: sterilizer.id,
+  };
 }
 
-/** ล้างข้อมูล transactional ระหว่างเทส (คง user/template/gateway ไว้) */
+/** ล้างข้อมูล transactional ระหว่างเทส (คง user/template/gateway/sterilizer ไว้) */
 export async function truncateTx(prisma: PrismaClient): Promise<void> {
   await prisma.$executeRawUnsafe(
-    'TRUNCATE "print_jobs","idempotent_requests","movements","audit_logs","packages","running_number_sequences" RESTART IDENTITY CASCADE',
+    'TRUNCATE "package_batch_attempts","sterilization_batches","print_jobs","idempotent_requests","movements","audit_logs","packages","running_number_sequences" RESTART IDENTITY CASCADE',
   );
+}
+
+/** สร้างรอบนึ่ง PENDING (ตรงเข้า DB) */
+export async function makeBatch(
+  prisma: PrismaClient,
+  seed: SeedIds,
+  roundNo: number,
+): Promise<string> {
+  const now = new Date('2026-07-23T02:00:00.000Z');
+  const b = await prisma.sterilizationBatch.create({
+    data: {
+      sterilizerId: seed.sterilizerId,
+      roundNo,
+      runDate: now,
+      startedAt: now,
+      status: 'PENDING',
+    },
+  });
+  return b.id;
 }
 
 export async function makePackage(

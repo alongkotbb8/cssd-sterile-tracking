@@ -41,15 +41,20 @@ export class MasterDataService {
     const existing = await this.prisma.setTemplate.findUnique({ where: { code: dto.code } });
     if (existing) throw new ConflictException('รหัสชุดอุปกรณ์นี้มีอยู่แล้ว');
 
-    const created = await this.prisma.setTemplate.create({
-      data: {
-        code: dto.code,
-        name: dto.name,
-        itemList: dto.itemList,
-        defaultWrapType: dto.defaultWrapType ?? undefined,
-      },
+    return this.prisma.$transaction(async (tx) => {
+      const created = await tx.setTemplate.create({
+        data: {
+          code: dto.code,
+          name: dto.name,
+          itemList: dto.itemList,
+          defaultWrapType: dto.defaultWrapType ?? undefined,
+        },
+      });
+      await this.audit.logTx(tx, userId, 'TEMPLATE_CREATE', created.id, {
+        code: created.code,
+        name: created.name,
+      });
+      return created;
     });
-    await this.audit.log(userId, 'TEMPLATE_CREATE', created.id, { code: created.code, name: created.name });
-    return created;
   }
 }

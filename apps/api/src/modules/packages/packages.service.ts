@@ -6,18 +6,6 @@ import { AuditService } from '../../common/audit/audit.service';
 import { isExpired } from '../../common/expiry';
 import { CreatePackageDto } from './dto/create-package.dto';
 
-const SHELF_LIFE: Record<WrapType, number> = {
-  SEAL: 180,
-  CLOTH: 7,
-};
-
-function addDays(date: Date, days: number): Date {
-  // UTC-based so expiry does not depend on server timezone.
-  const d = new Date(date);
-  d.setUTCDate(d.getUTCDate() + days);
-  return d;
-}
-
 @Injectable()
 export class PackagesService {
   constructor(
@@ -78,12 +66,13 @@ export class PackagesService {
     return { ...pkg, isExpired: expired };
   }
 
-  async findAll(status?: PackageStatus, templateId?: string) {
+  async findAll(status?: PackageStatus, templateId?: string, tagId?: string) {
     const now = new Date();
     return this.prisma.package.findMany({
       where: {
         ...(status ? { status } : {}),
         ...(templateId ? { setTemplateId: templateId } : {}),
+        ...(tagId ? { tags: { some: { tagId } } } : {}), // กรองตาม tag
       },
       include: {
         setTemplate: true,
@@ -107,24 +96,10 @@ export class PackagesService {
     );
   }
 
-  /** Mark sterilised — called when batch is confirmed PASSED */
-  async markSterile(id: string, batchId: string, sterilizeDate: Date, userId: string) {
-    const pkg = await this.prisma.package.findUniqueOrThrow({ where: { id } });
-    if (pkg.status !== PackageStatus.PACKED) {
-      throw new BadRequestException(`ห่อ ${id} ไม่ได้อยู่ในสถานะ PACKED`);
-    }
+  // หมายเหตุ: markSterile() เดิมถูกตัดออก — การเปลี่ยนห่อเป็น STERILE ทำใน
+  // BatchesService.recordResult (promote ทั้งรอบใน transaction เดียว) แทน
 
-    const expiryDate = addDays(sterilizeDate, SHELF_LIFE[pkg.wrapType]);
-    const updated = await this.prisma.package.update({
-      where: { id },
-      data: { status: PackageStatus.STERILE, batchId, sterilizeDate, expiryDate },
-    });
-
-    await this.audit.log(userId, 'PACKAGE_STERILE', id, { batchId, expiryDate });
-    return updated;
-  }
-
-  /** Any status → DISCARDED (except already discarded) */
+  /** Any status → DISCARDED (except already discarded) — mutation + AuditLog ใน tx เดียว */
   async discard(id: string, userId: string, notes?: string) {
     const pkg = await this.prisma.package.findUnique({ where: { id } });
     if (!pkg) throw new NotFoundException(`ไม่พบห่อ ${id}`);
@@ -132,11 +107,13 @@ export class PackagesService {
       throw new BadRequestException(`ห่อ ${id} ถูกทิ้งไปแล้ว`);
     }
 
-    await this.prisma.package.update({
-      where: { id },
-      data: { status: PackageStatus.DISCARDED, notes },
+    await this.prisma.$transaction(async (tx) => {
+      await tx.package.update({
+        where: { id },
+        data: { status: PackageStatus.DISCARDED, notes },
+      });
+      await this.audit.logTx(tx, userId, 'PACKAGE_DISCARD', id, { previousStatus: pkg.status });
     });
-    await this.audit.log(userId, 'PACKAGE_DISCARD', id, { previousStatus: pkg.status });
   }
 
   /** ตั้ง tag ของห่อ (แทนที่ทั้งชุด) — ใช้ติด/ถอด tag จากหน้ารายละเอียด */

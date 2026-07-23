@@ -235,14 +235,18 @@ export class ReportsService {
     return failed;
   }
 
-  /** รายงานประวัติพิมพ์ label (จาก AuditLog action PRINT_LABEL) */
+  /**
+   * รายงานประวัติการพิมพ์ label ที่ **สำเร็จจริง** — ใช้ action ที่ระบบเขียนจริงตอนนี้:
+   * `PRINT_SUCCESS` (Gateway ACK พิมพ์จริง) เท่านั้น
+   * (ไม่รวม PRINT_SIMULATED = โหมดทดสอบ, ไม่ใช่ 'PRINT_LABEL' เดิมที่เลิกใช้แล้ว)
+   */
   async printHistory(from: string, to: string) {
     const fromDate = parseDateOrThrow(from, 'from');
     const toDate = parseDateOrThrow(to, 'to');
     if (/^\d{4}-\d{2}-\d{2}$/.test(to)) toDate.setUTCHours(23, 59, 59, 999);
 
     return this.prisma.auditLog.findMany({
-      where: { action: 'PRINT_LABEL', createdAt: { gte: fromDate, lte: toDate } },
+      where: { action: 'PRINT_SUCCESS', createdAt: { gte: fromDate, lte: toDate } },
       include: { user: { select: { name: true, employeeCode: true } } },
       orderBy: { createdAt: 'desc' },
       take: 500,
@@ -304,42 +308,32 @@ export class ReportsService {
       throw new BadRequestException('วันที่ตัดข้อมูลต้องเป็นอดีตเท่านั้น');
     }
 
-    const result = await this.prisma.$transaction(async (tx) => {
-      const discarded = await tx.package.findMany({
-        where: { status: PackageStatus.DISCARDED, updatedAt: { lt: before } },
-        select: { id: true },
-      });
-      const discardedIds = discarded.map((p) => p.id);
-
-      const movements = await tx.movement.deleteMany({
-        where: {
-          OR: [
-            { createdAt: { lt: before } },
-            ...(discardedIds.length
-              ? [{ packageId: { in: discardedIds } }]
-              : []),
-          ],
-        },
-      });
-
-      const packages = discardedIds.length
-        ? await tx.package.deleteMany({ where: { id: { in: discardedIds } } })
-        : { count: 0 };
-
-      const summary = {
-        deletedMovements: movements.count,
-        deletedPackages: packages.count,
-      };
-
-      // บันทึกการล้างข้อมูลใน transaction เดียวกัน — เป็นหลักฐานถาวร
-      await this.audit.logTx(tx, userId, 'DATA_CLEANUP', undefined, {
-        before: before.toISOString(),
-        ...summary,
-      });
-
-      return summary;
+    // ⚠️ **ปิดการลบแบบทำลายข้อมูลแล้ว** — Movement คือ traceability history รายห่อ
+    // (หัวใจความปลอดภัยผู้ป่วย) การลบทำลายการตามรอยถาวร; Package ที่ถูกทิ้งก็ต้องคง
+    // ประวัติ movement ไว้ ต้องมี archive/retention policy อย่างเป็นทางการก่อนจึงจะ
+    // ลบ/ย้ายออกได้ (AI_DEVELOPMENT_GUARDRAILS.md §9 Data) — ตอนนี้ endpoint นี้แค่
+    // "รายงานจำนวนที่เข้าเกณฑ์" ไม่ลบอะไรจริง
+    const eligibleMovements = await this.prisma.movement.count({
+      where: { createdAt: { lt: before } },
+    });
+    const eligibleDiscarded = await this.prisma.package.count({
+      where: { status: PackageStatus.DISCARDED, updatedAt: { lt: before } },
     });
 
-    return { before: before.toISOString(), ...result };
+    await this.audit.log(userId, 'DATA_CLEANUP_SKIPPED', undefined, {
+      before: before.toISOString(),
+      eligibleMovements,
+      eligibleDiscarded,
+      deleted: 0,
+    });
+
+    return {
+      before: before.toISOString(),
+      deletedMovements: 0,
+      deletedPackages: 0,
+      eligibleMovements,
+      eligibleDiscarded,
+      note: 'ปิดการลบข้อมูลแบบทำลายแล้ว — Movement/Package เก็บถาวรเพื่อ traceability (ต้องมี archive/retention policy ก่อนจึงจะลบได้)',
+    };
   }
 }
