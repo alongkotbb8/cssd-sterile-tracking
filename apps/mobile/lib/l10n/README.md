@@ -14,11 +14,12 @@
    Text(l10n.settingsTitle);
    ```
 
-## สถานะ (migration แบบค่อยเป็นค่อยไป)
+## สถานะ
 
 - ✅ โครงสร้าง gen-l10n + wiring ใน `main.dart` (delegate + supportedLocales)
-- ✅ หน้า **ตั้งค่า (settings)** แปลงเป็น l10n แล้ว = หน้าอ้างอิง (reference) ของ pattern
-- ⏳ หน้าที่เหลือ (scan, packages, batches, reports, print jobs ฯลฯ) ยัง hard-code ไทยอยู่
-  ทยอยย้ายเข้ามาทีละหน้าโดยใช้ pattern เดียวกัน (ดู task ต่อเนื่องใน PROGRESS.md)
+- ✅ แปลงครบทุกหน้าหลัก user-facing: **settings, packages, scan, batches,
+  departments, reports, print jobs** (th = template, en = fallback, default ไทย)
+- ถ้ามีหน้า/ข้อความใหม่ ให้เพิ่ม key ใน ARB แล้วใช้ `AppLocalizations.of(context)`
+  ตาม pattern เดิม (อย่า hard-code ไทยในโค้ด)
 
 > ไฟล์ `app_localizations*.dart` เป็น generated — แก้ ARB แล้ว gen ใหม่ ไม่แก้ไฟล์ .dart มือ
