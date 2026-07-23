@@ -70,8 +70,10 @@ Stack: Flutter (มือถือ + Chrome PWA) · NestJS + Prisma + PostgreSQL
 
 ## 5. สิ่งที่เหลือก่อน Pilot (เป็นงานทีม/ฮาร์ดแวร์ — AI ทำแทนไม่ได้)
 
-1. **FIX-08 Xprinter จริง** — ยืนยันรุ่น/dialect (TSPL vs ESC/POS)/การเชื่อมต่อ (Serial vs USB-class vs network) ก่อน แล้ว soak test ตาม `HARDWARE_VERIFICATION.md`
-   - ⚠️ ถ้า Xprinter ไม่ได้ต่อแบบ Serial ต้องเพิ่ม transport ใหม่ (implement `PrinterTransport` — NOT_SENT/MAYBE_SENT/SENT ให้ครบ)
+1. **FIX-08 Xprinter XP-420B จริง** (USB, 203 DPI, TSPL) — soak test ตาม `HARDWARE_VERIFICATION.md`
+   - ⚠️ XP-420B USB มักเป็น **printer-class ไม่ใช่ COM/serial** → `SerialTransport` ปัจจุบันอาจผูกไม่ได้
+     ต้องเลือก/สร้าง transport ตาม host OS (Windows spooler / Linux `/dev/usb/lp0` / mac CUPS) —
+     **ต้องรู้ host OS + วิธีที่เครื่องปรากฏก่อน** ถึงจะเขียน transport ที่ถูกได้ (NOT_SENT/MAYBE_SENT/SENT ครบ)
 2. **E2E ทั้งชุด** — รัน API + Gateway + PWA + เครื่องพิมพ์จริง แล้วเดินครบ flow แพ็ก→พิมพ์→นึ่ง→สแกนเข้า→เบิก→คืน + recall
 3. **Browser test** ตาม `PWA_BROWSER_TESTING.md` (Android Chrome หลัก + iOS WebKit แยก)
 4. **Ops** ตาม `OPERATIONAL_READINESS.md` — backup/restore drill, monitoring alerts, SOP เป็นคู่มือ, ตัดสิน global rate limit + deployment topology

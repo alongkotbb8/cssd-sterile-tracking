@@ -18,11 +18,22 @@
 
 ## 0.1 ยืนยันรุ่น/โปรโตคอล Xprinter ก่อน (สำคัญ — ต่างจาก A318BT เดิม)
 
-- **รุ่นเครื่อง Xprinter:** __________ (เช่น XP-370B / XP-420B / XP-460B ฯลฯ)
-- **command dialect:** เป็น **TSPL/TSPL2** หรือไม่? (ถ้าเป็น ESC/POS ล้วน ต้องเพิ่ม transport/renderer ใหม่)
-- **การเชื่อมต่อ:** USB-Serial (COM), USB-printer-class, Bluetooth, หรือ Network/LAN?
-  - ถ้าไม่ใช่ Serial (เช่น USB printer-class หรือ network) → `SerialTransport` ใช้ตรง ๆ ไม่ได้ ต้องเพิ่ม transport ใหม่ (implement `PrinterTransport` เดิม — NOT_SENT/MAYBE_SENT/SENT ต้องครบ)
-- **baud rate / DPI / ความกว้าง label:** ตรงกับที่ตั้งไว้ (203 DPI, 60×40mm) หรือไม่? ปรับ config ถ้าต่าง
+**รุ่นที่ใช้จริง: Xprinter XP-420B (USB, direct thermal label)** — ยืนยันสเปคกับคู่มือ/หน้าทดสอบ:
+
+- **command dialect:** ตระกูล XP-4xx รองรับ **TSPL/TSPL2** (บางเฟิร์มแวร์มี EPL/ZPL ด้วย) →
+  renderer bitmap + TSPL ของเราเข้ากันได้ **ยืนยันด้วยการพิมพ์ทดสอบ 1 ใบก่อน** (ถ้าไม่ตอบ TSPL ต้องเพิ่ม renderer)
+- **DPI/ความกว้าง:** XP-420B = **203 DPI**, กว้างสูงสุด ~104mm (4") — label 60×40mm ของเราพิมพ์ได้
+  ผ่านคำสั่ง `SIZE 60 mm,40 mm` + **calibrate gap/media** ที่เครื่องก่อน (ปุ่ม feed/auto-calibrate)
+- **การเชื่อมต่อ = USB** — ⚠️ **จุดสำคัญ:** XP-420B ต่อ USB มักปรากฏเป็น **USB printer-class**
+  (ผ่าน Windows/CD driver → spooler, Linux → `/dev/usb/lp0`, mac → CUPS) **ไม่ใช่ virtual COM/serial เสมอไป**
+  - ถ้า**ไม่**เป็น COM port → `SerialTransport` ปัจจุบันผูกกับเครื่องไม่ได้ ต้องเพิ่ม transport ใหม่
+    (implement `PrinterTransport` เดิม — NOT_SENT/MAYBE_SENT/SENT ให้ครบ) โดยเลือกวิธีตาม host OS:
+    - **Windows** (น่าจะกรณีนี้ ใช้ driver จาก CD): ส่ง raw TSPL เข้า print spooler (RAW queue)
+    - **Linux/Raspberry Pi**: เขียน raw ไป `/dev/usb/lp0` (usblp) หรือใช้ `usb`/libusb เขียน bulk endpoint
+    - **mac**: CUPS raw queue
+  - ถ้า driver **สร้าง virtual COM ให้** → `SerialTransport` ใช้ได้ (ยืนยัน path + baud)
+- **ต้องตัดสินก่อน (blocker ของ transport):** host OS ที่รัน Print Gateway + วิธีที่ XP-420B ปรากฏ
+  (COM / USB printer-class / CUPS) → เลือก/สร้าง transport ให้ตรง
 - พิมพ์ label ทดสอบ 1 ใบ ยืนยัน bitmap + QR + ไทย ออกถูกต้องก่อนทำ soak test เต็ม
 
 ## 1. รายการที่ต้องทดสอบ (checklist)
