@@ -14,6 +14,7 @@ import '../../../../core/models/models.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/domain_widgets.dart';
 import '../../../../l10n/app_localizations.dart';
+import '../scanner_camera.dart';
 
 /// ตรวจรูปแบบเลขห่อ (running number) — ใช้ร่วมกันทั้งการสแกน QR และพิมพ์เลขเอง
 ///
@@ -96,6 +97,9 @@ class _ScanPageState extends ConsumerState<ScanPage> with WidgetsBindingObserver
       MobileScannerController(autoStart: false, facing: CameraFacing.back);
   StreamSubscription<BarcodeCapture>? _detectSub;
 
+  /// cooldown กัน frame QR เดิมยิง lookup ซ้ำ (§4B.1.11) — เสริมจาก dedup ในรายการ
+  final ScanCooldown _cooldown = ScanCooldown();
+
   /// null = ยังไม่ตรวจ, true = อนุญาตแล้ว, false = ถูกปฏิเสธ
   bool? _cameraGranted;
   bool _permanentlyDenied = false;
@@ -164,7 +168,7 @@ class _ScanPageState extends ConsumerState<ScanPage> with WidgetsBindingObserver
     await _initCamera();
   }
 
-  /// สลับกล้องหน้า/หลัง — บนเว็บที่มีกล้องเดียวอาจสลับไม่ได้ (จับ error ไว้เงียบ ๆ)
+  /// สลับกล้องหน้า/หลัง — Safari/เว็บที่มีกล้องเดียวอาจสลับไม่ได้ (await+catch กัน crash §4B.1.8)
   Future<void> _switchCamera() async {
     try {
       await _cam.switchCamera();
@@ -173,6 +177,21 @@ class _ScanPageState extends ConsumerState<ScanPage> with WidgetsBindingObserver
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text(AppLocalizations.of(context).scanSwitchCameraFailed),
+        ));
+      }
+    }
+  }
+
+  /// เปิด/ปิดไฟฉาย — Safari ไม่รองรับ torch ต้อง await+catch ไม่ให้เกิด unhandled
+  /// exception (§4B.1.8) — สถานะไฟฉายอ่านจาก controller value จริง
+  Future<void> _safeToggleTorch() async {
+    try {
+      await _cam.toggleTorch();
+      if (mounted) setState(() => _torchOn = _cam.value.torchState == TorchState.on);
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(AppLocalizations.of(context).scanTorchFailed),
         ));
       }
     }
@@ -211,7 +230,9 @@ class _ScanPageState extends ConsumerState<ScanPage> with WidgetsBindingObserver
     for (final b in capture.barcodes) {
       final raw = b.rawValue?.trim();
       if (raw == null || raw.isEmpty) continue;
-      _addItem(raw); // debounce ของเดิมในรายการ ทำอยู่แล้วใน _addItem
+      // §4B.1.11 — กัน frame เดิมยิงซ้ำภายในช่วง cooldown (เสริม dedup ในรายการ)
+      if (!_cooldown.shouldProcess(raw, DateTime.now())) continue;
+      _addItem(raw);
     }
   }
 
@@ -539,6 +560,7 @@ class _ScanPageState extends ConsumerState<ScanPage> with WidgetsBindingObserver
   }
 
   void _switchMode(ScanMode m) {
+    _cooldown.reset(); // เปลี่ยนโหมด → เริ่มนับ cooldown ใหม่ (สแกนห่อเดิมซ้ำได้)
     setState(() {
       _mode = m;
       _items.clear();
@@ -571,7 +593,10 @@ class _ScanPageState extends ConsumerState<ScanPage> with WidgetsBindingObserver
         ],
       ),
     );
-    if (ok == true) setState(_items.clear);
+    if (ok == true) {
+      _cooldown.reset(); // ล้างรายการแล้วให้สแกนห่อเดิมซ้ำได้ทันที
+      setState(_items.clear);
+    }
   }
 
   @override
@@ -586,23 +611,34 @@ class _ScanPageState extends ConsumerState<ScanPage> with WidgetsBindingObserver
             tooltip: l10n.scanManualTooltip,
             onPressed: _showManualEntryDialog,
           ),
-          if (_cameraGranted == true) ...[
-            IconButton(
-              icon: const Icon(Icons.cameraswitch_outlined),
-              tooltip: l10n.scanSwitchCameraTooltip,
-              onPressed: _switchCamera,
-            ),
-            IconButton(
-              icon: Icon(_torchOn
-                  ? Icons.flashlight_off_outlined
-                  : Icons.flashlight_on_outlined),
-              tooltip: l10n.scanTorchTooltip,
-              onPressed: () {
-                setState(() => _torchOn = !_torchOn);
-                _cam.toggleTorch();
+          // §4B.1.7 — โชว์ปุ่มสลับกล้อง/ไฟฉายตาม capability จริงของอุปกรณ์ (จาก controller
+          // value) ไม่เดาจาก user-agent — Safari ที่ไม่รองรับ torch/สลับกล้องจะไม่เห็นปุ่ม
+          if (_cameraGranted == true)
+            ValueListenableBuilder<MobileScannerState>(
+              valueListenable: _cam,
+              builder: (context, state, _) {
+                final canSwitch =
+                    state.isRunning && (state.availableCameras ?? 0) >= 2;
+                final hasTorch = state.isRunning &&
+                    state.torchState != TorchState.unavailable;
+                return Row(mainAxisSize: MainAxisSize.min, children: [
+                  if (canSwitch)
+                    IconButton(
+                      icon: const Icon(Icons.cameraswitch_outlined),
+                      tooltip: l10n.scanSwitchCameraTooltip,
+                      onPressed: _switchCamera,
+                    ),
+                  if (hasTorch)
+                    IconButton(
+                      icon: Icon(state.torchState == TorchState.on
+                          ? Icons.flashlight_off_outlined
+                          : Icons.flashlight_on_outlined),
+                      tooltip: l10n.scanTorchTooltip,
+                      onPressed: _safeToggleTorch,
+                    ),
+                ]);
               },
             ),
-          ],
         ],
       ),
       body: Column(children: [
@@ -671,9 +707,17 @@ class _ScanPageState extends ConsumerState<ScanPage> with WidgetsBindingObserver
 
   Widget _buildCameraArea() {
     final l10n = AppLocalizations.of(context);
-    // ยังไม่ตรวจสิทธิ์ → กำลังโหลด
+    // ยังไม่ตรวจสิทธิ์ → กำลังเปิดกล้อง (state: initializing §4B.1.6)
     if (_cameraGranted == null) {
-      return const Center(child: CircularProgressIndicator(color: Colors.white));
+      return Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const CircularProgressIndicator(color: Colors.white),
+          const SizedBox(height: 14),
+          Text(l10n.scanStateInitializing,
+              style: const TextStyle(color: Colors.white70, fontSize: 13)),
+        ],
+      );
     }
     // ถูกปฏิเสธ → แสดงเหตุผล + ปุ่มดำเนินการ (ไม่ปล่อยให้จอดำเฉย ๆ)
     // เว็บ/PWA เปิดสิทธิ์ต่างจากมือถือ (ที่ไอคอนแม่กุญแจบนแถบที่อยู่ ไม่ใช่ตั้งค่าเครื่อง)
@@ -690,17 +734,20 @@ class _ScanPageState extends ConsumerState<ScanPage> with WidgetsBindingObserver
         onAction: (!kIsWeb && _permanentlyDenied) ? openAppSettings : _retry,
       );
     }
-    // ได้สิทธิ์แล้ว → แสดงกล้อง พร้อม errorBuilder ให้ลองใหม่ถ้ากล้องเปิดไม่ได้
+    // ได้สิทธิ์แล้ว → แสดงกล้อง; errorBuilder จำแนกชนิด error (§4B.1.4) แล้วแสดง
+    // ข้อความ + ปุ่มที่ถูกต้อง (สิทธิ์ถูกเพิกถอน → เปิดตั้งค่า; อื่น ๆ → ลองใหม่)
     return MobileScanner(
       controller: _cam,
-      errorBuilder: (context, error, child) => _CameraMessage(
-        icon: Icons.no_photography_outlined,
-        message: kIsWeb
-            ? l10n.scanCameraWebError
-            : l10n.scanCameraError(error.errorCode.name),
-        actionLabel: l10n.commonRetry,
-        onAction: _retry,
-      ),
+      errorBuilder: (context, error, child) {
+        final kind = classifyScannerError(error, wasGranted: true);
+        final needsPerm = !kIsWeb && scannerNeedsPermissionAction(kind);
+        return _CameraMessage(
+          icon: Icons.no_photography_outlined,
+          message: scannerErrorMessage(l10n, kind),
+          actionLabel: needsPerm ? l10n.scanOpenSettings : l10n.commonRetry,
+          onAction: needsPerm ? openAppSettings : _retry,
+        );
+      },
     );
   }
 }

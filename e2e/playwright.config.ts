@@ -26,5 +26,9 @@ export default defineConfig({
     { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
     // มือถือ (PWA เป้าหมายหลัก) — เปิดใช้เมื่อ smoke desktop ผ่านแล้ว
     { name: 'mobile-chrome', use: { ...devices['Pixel 7'] } },
+    // Safari/WebKit (master directive §2D/§4B.1.15) — ตรวจ compatibility ของ Safari
+    // (UI/error/fallback) เท่านั้น; กล้องจริงบน iPhone/iPad ตรวจใน Gate 4 บนอุปกรณ์จริง
+    { name: 'webkit', use: { ...devices['Desktop Safari'] } },
+    { name: 'mobile-safari', use: { ...devices['iPhone 14'] } },
   ],
 });

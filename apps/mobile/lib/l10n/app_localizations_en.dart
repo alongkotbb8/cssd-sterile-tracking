@@ -650,6 +650,40 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get scanErrPermissionDenied =>
+      'Camera permission is required to scan QR — allow it when the browser asks, then retry';
+
+  @override
+  String get scanErrPermissionRevoked =>
+      'Camera permission was turned off while in use — re-enable the camera (camera/lock icon in Safari\'s address bar), then retry';
+
+  @override
+  String get scanErrInsecureContext =>
+      'The camera only works over https — open this page via https and retry';
+
+  @override
+  String get scanErrNoCamera =>
+      'No camera found on this device — you can type the package number manually instead';
+
+  @override
+  String get scanErrCameraInUse =>
+      'The camera is being used by another app — close it, then retry';
+
+  @override
+  String get scanErrUnsupportedConstraint =>
+      'This device doesn\'t support the requested camera settings — try switching cameras or type the package number';
+
+  @override
+  String get scanErrGeneric =>
+      'Can\'t open the camera — retry, or type the package number manually';
+
+  @override
+  String get scanStateInitializing => 'Opening camera…';
+
+  @override
+  String get scanTorchFailed => 'Can\'t toggle the flashlight on this device';
+
+  @override
   String scanCountLabel(int count) {
     return 'Scanned $count packages';
   }

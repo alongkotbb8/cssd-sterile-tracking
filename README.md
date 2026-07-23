@@ -1,6 +1,6 @@
 # CSSD Sterile Instrument Tracking System
 
-ระบบตามรอยอุปกรณ์หัตถการปลอดเชื้อ | Chrome PWA (Flutter Web, online-only) + NestJS + PostgreSQL + Print Gateway → Xprinter XP-420B
+ระบบตามรอยอุปกรณ์หัตถการปลอดเชื้อ | PWA (Flutter Web, online-only — Chrome + Safari iOS) + NestJS + PostgreSQL + Print Gateway → Xprinter XP-420B
 
 > ⚠️ **Single source of truth = [CSSD_MASTER_EXECUTION_DIRECTIVE.md](./CSSD_MASTER_EXECUTION_DIRECTIVE.md)** — online-only, ไม่มี offline/Bluetooth/Zebra ใน scope
 > ดูสถานะความคืบหน้าล่าสุด/checklist เฟส 1-3 ที่ [PROGRESS.md](./PROGRESS.md) — อัปเดตทุกครั้งที่มีการแก้ไข

@@ -5,7 +5,7 @@
 
 > ⚠️ **SINGLE SOURCE OF TRUTH = [`CSSD_MASTER_EXECUTION_DIRECTIVE.md`](CSSD_MASTER_EXECUTION_DIRECTIVE.md)** (2026-07-23)
 > เอกสารนั้นมีอำนาจเหนือไฟล์นี้และแผนเก่าเมื่อขัดแย้งกัน. Baseline ที่ล็อกแล้ว:
-> **ระบบเป็น online-only Chrome PWA เป็นเป้าหมายหลัก** (ไม่ใช่ mobile app), backend เป็นแหล่งความจริงเดียว,
+> **ระบบเป็น online-only PWA — Chrome + Safari บน iPhone/iPad (สแกน QR + workflow หลัก) เป็นเป้าหมายหลัก** (ไม่ใช่ mobile app), backend เป็นแหล่งความจริงเดียว,
 > พิมพ์ผ่าน **Print Gateway → Linux/CUPS → Xprinter XP-420B (`usb_spool`)** เท่านั้น.
 > **ยกเลิกจาก scope: offline mutation/queue/number-pool, drift/SQLite, Bluetooth direct-print เป็นช่องทาง Pilot,
 > FlashLabel A318BT, Zebra, mobile-first.** โค้ด legacy คงไว้ได้เฉพาะหลัง feature flag (default off) และผู้ใช้ปกติเข้าไม่ถึง.
@@ -14,7 +14,7 @@
 
 ## 1. โปรเจกต์นี้คืออะไร
 
-ระบบ CSSD / Sterile Supply Tracking ที่ทำงานหลักบน **Chrome PWA แบบ online-only** (Flutter Web)
+ระบบ CSSD / Sterile Supply Tracking ที่ทำงานหลักบน **PWA แบบ online-only** (Flutter Web — Chrome + Safari บน iPhone/iPad)
 — build มือถือ (Android/iOS) ยังทำได้จากโค้ดเดียวกันแต่ **ไม่ใช่ช่องทางหลักของ Pilot** —
 ติดตามชุดอุปกรณ์หัตถการ (ทำฟัน ทำคลอด ทำแผล ฯลฯ) ตลอดวงจร:
 แพ็ก → นึ่งฆ่าเชื้อ → คลังปลอดเชื้อ → เบิกออกไปแผนกปลายทาง → ส่งคืน → reprocess

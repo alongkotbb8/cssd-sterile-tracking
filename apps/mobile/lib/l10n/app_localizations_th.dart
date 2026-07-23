@@ -648,6 +648,39 @@ class AppLocalizationsTh extends AppLocalizations {
   }
 
   @override
+  String get scanErrPermissionDenied =>
+      'ต้องอนุญาตสิทธิ์กล้องเพื่อสแกน QR — กดอนุญาตเมื่อเบราว์เซอร์ถาม แล้วลองใหม่';
+
+  @override
+  String get scanErrPermissionRevoked =>
+      'สิทธิ์กล้องถูกปิดระหว่างใช้งาน — เปิดสิทธิ์กล้องอีกครั้ง (ไอคอนกล้อง/แม่กุญแจบนแถบที่อยู่บน Safari) แล้วลองใหม่';
+
+  @override
+  String get scanErrInsecureContext =>
+      'กล้องใช้ได้เฉพาะเมื่อเปิดผ่าน https เท่านั้น — เปิดหน้าเว็บผ่าน https แล้วลองใหม่';
+
+  @override
+  String get scanErrNoCamera =>
+      'ไม่พบกล้องบนอุปกรณ์นี้ — ใช้การพิมพ์เลขห่อเองแทนได้';
+
+  @override
+  String get scanErrCameraInUse =>
+      'กล้องถูกแอปอื่นใช้งานอยู่ — ปิดแอปที่ใช้กล้อง แล้วลองใหม่';
+
+  @override
+  String get scanErrUnsupportedConstraint =>
+      'อุปกรณ์นี้ไม่รองรับค่ากล้องที่ตั้งไว้ — ลองสลับกล้อง หรือพิมพ์เลขห่อเอง';
+
+  @override
+  String get scanErrGeneric => 'เปิดกล้องไม่ได้ — ลองใหม่ หรือพิมพ์เลขห่อเอง';
+
+  @override
+  String get scanStateInitializing => 'กำลังเปิดกล้อง…';
+
+  @override
+  String get scanTorchFailed => 'เปิด/ปิดไฟฉายไม่ได้บนอุปกรณ์นี้';
+
+  @override
   String scanCountLabel(int count) {
     return 'สแกนแล้ว $count ห่อ';
   }

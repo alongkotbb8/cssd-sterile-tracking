@@ -1220,6 +1220,60 @@ abstract class AppLocalizations {
   /// **'เปิดกล้องไม่ได้: {code}'**
   String scanCameraError(String code);
 
+  /// No description provided for @scanErrPermissionDenied.
+  ///
+  /// In th, this message translates to:
+  /// **'ต้องอนุญาตสิทธิ์กล้องเพื่อสแกน QR — กดอนุญาตเมื่อเบราว์เซอร์ถาม แล้วลองใหม่'**
+  String get scanErrPermissionDenied;
+
+  /// No description provided for @scanErrPermissionRevoked.
+  ///
+  /// In th, this message translates to:
+  /// **'สิทธิ์กล้องถูกปิดระหว่างใช้งาน — เปิดสิทธิ์กล้องอีกครั้ง (ไอคอนกล้อง/แม่กุญแจบนแถบที่อยู่บน Safari) แล้วลองใหม่'**
+  String get scanErrPermissionRevoked;
+
+  /// No description provided for @scanErrInsecureContext.
+  ///
+  /// In th, this message translates to:
+  /// **'กล้องใช้ได้เฉพาะเมื่อเปิดผ่าน https เท่านั้น — เปิดหน้าเว็บผ่าน https แล้วลองใหม่'**
+  String get scanErrInsecureContext;
+
+  /// No description provided for @scanErrNoCamera.
+  ///
+  /// In th, this message translates to:
+  /// **'ไม่พบกล้องบนอุปกรณ์นี้ — ใช้การพิมพ์เลขห่อเองแทนได้'**
+  String get scanErrNoCamera;
+
+  /// No description provided for @scanErrCameraInUse.
+  ///
+  /// In th, this message translates to:
+  /// **'กล้องถูกแอปอื่นใช้งานอยู่ — ปิดแอปที่ใช้กล้อง แล้วลองใหม่'**
+  String get scanErrCameraInUse;
+
+  /// No description provided for @scanErrUnsupportedConstraint.
+  ///
+  /// In th, this message translates to:
+  /// **'อุปกรณ์นี้ไม่รองรับค่ากล้องที่ตั้งไว้ — ลองสลับกล้อง หรือพิมพ์เลขห่อเอง'**
+  String get scanErrUnsupportedConstraint;
+
+  /// No description provided for @scanErrGeneric.
+  ///
+  /// In th, this message translates to:
+  /// **'เปิดกล้องไม่ได้ — ลองใหม่ หรือพิมพ์เลขห่อเอง'**
+  String get scanErrGeneric;
+
+  /// No description provided for @scanStateInitializing.
+  ///
+  /// In th, this message translates to:
+  /// **'กำลังเปิดกล้อง…'**
+  String get scanStateInitializing;
+
+  /// No description provided for @scanTorchFailed.
+  ///
+  /// In th, this message translates to:
+  /// **'เปิด/ปิดไฟฉายไม่ได้บนอุปกรณ์นี้'**
+  String get scanTorchFailed;
+
   /// No description provided for @scanCountLabel.
   ///
   /// In th, this message translates to:

@@ -18,15 +18,22 @@ bash scripts/e2e-stack.sh down   # หยุด + ลบ container
 ```bash
 cd e2e
 npm install
-npm run install:browsers                              # ติดตั้ง Chromium
+npm run install:browsers                              # ติดตั้ง Chromium + WebKit
 
-E2E_BASE_URL=http://localhost:8080 npm test           # smoke (default)
+E2E_BASE_URL=http://localhost:8080 npm test           # smoke (default) ทุก project
 E2E_BASE_URL=http://localhost:8080 E2E_FLOW=1 npm test # smoke + full flow
+E2E_BASE_URL=http://localhost:8080 npm run test:webkit # เฉพาะ Safari/WebKit
 E2E_BASE_URL=http://localhost:8080 npm run test:headed
 npm run report                                        # เปิดรายงานล่าสุด
 ```
 
 > PWA ต้องรันผ่าน `localhost`/https (secure context) — localhost ใช้ได้
+
+**Projects (Playwright):** `chromium` (Desktop Chrome), `mobile-chrome` (Pixel 7),
+`webkit` (Desktop Safari), `mobile-safari` (iPhone 14) — ตาม master directive §2D/§4B.1.15.
+WebKit ตรวจ compatibility ของ Safari (UI/error/fallback) เท่านั้น; **กล้อง QR จริงบน iPhone/iPad
+ต้องทดสอบบนอุปกรณ์ Apple จริงใน Gate 4** (§4A/§4B.1.18 — browser automation ไม่พิสูจน์ permission/
+camera driver/lifecycle ของอุปกรณ์จริง)
 
 ## ครอบอะไรบ้าง
 
