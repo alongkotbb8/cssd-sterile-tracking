@@ -57,3 +57,30 @@ jobs:
       # รายงาน dependency ที่ล้าสมัย/มีข้อจำกัด (ไม่ fail — Dart ยังไม่มี audit CVE ในตัว)
       - name: flutter pub outdated (report)
         run: flutter pub outdated || true
+
+  # ── SBOM (CycloneDX) สำหรับ API + Print Gateway (master directive §3B) ──
+  # ใช้ @cyclonedx/cyclonedx-npm + --ignore-npm-errors เพราะ npm overrides (แก้ CVE
+  # ของ transitive deps) ทำให้ npm ls รายงาน "invalid" โดยธรรมชาติของกลไก override —
+  # ไม่ใช่การ silence ผล scan; SBOM ยังครบทุก component
+  sbom:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: generate CycloneDX SBOM (api + print-gateway)
+        run: |
+          mkdir -p sbom
+          npx --yes @cyclonedx/cyclonedx-npm --omit dev --ignore-npm-errors \
+            --workspace apps/api --output-file sbom/api.cdx.json
+          npx --yes @cyclonedx/cyclonedx-npm --omit dev --ignore-npm-errors \
+            --workspace apps/print-gateway --output-file sbom/print-gateway.cdx.json
+          ls -la sbom/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sbom
+          path: sbom/
+          retention-days: 30
