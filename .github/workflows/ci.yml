@@ -1,0 +1,45 @@
+name: ci
+
+# Build + test — api / print-gateway / mobile (Flutter)
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  api-gateway:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: prisma generate
+        run: npx prisma generate --schema apps/api/prisma/schema.prisma
+      - name: build (api + gateway + shared)
+        run: npm run -ws --if-present build
+      - name: unit tests (api)
+        run: npm run -w apps/api test
+      - name: unit tests (print-gateway)
+        run: npm run -w apps/print-gateway test
+      # หมายเหตุ: integration tests (Postgres จริง) รันแยกด้วย `npm run -w apps/api test:integration`
+      # ต้องมี service Postgres — ยังไม่ผูกใน CI นี้ (รันในเครื่อง/ก่อน release)
+
+  mobile:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - run: flutter pub get
+      - run: flutter analyze
+      - run: flutter test

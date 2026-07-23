@@ -1,0 +1,59 @@
+name: security-scan
+
+# สแกนความปลอดภัย: dependency vulnerabilities + secret leak
+# รันทุก push/PR เข้า main และรายสัปดาห์ (จับ CVE ใหม่ของ dependency เดิม)
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: '0 2 * * 1' # ทุกวันจันทร์ 02:00 UTC
+
+permissions:
+  contents: read
+
+jobs:
+  # ── Secret scan (blocking) — กัน .env/คีย์/ความลับหลุดเข้า git ──
+  secret-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # gitleaks ต้องเห็นทั้ง history
+      - name: gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ── Node dependency audit (api / print-gateway / shared) ──
+  npm-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      # audit ทั้ง workspace — ระดับ high ขึ้นไปถือว่าต้องแก้ (fail); ต่ำกว่านั้นรายงานเฉย ๆ
+      - name: npm audit (high+, blocking)
+        run: npm audit --audit-level=high
+      - name: npm audit (full report, non-blocking)
+        if: always()
+        run: npm audit || true
+
+  # ── Flutter dependency check (apps/mobile) ──
+  flutter-audit:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - run: flutter pub get
+      # รายงาน dependency ที่ล้าสมัย/มีข้อจำกัด (ไม่ fail — Dart ยังไม่มี audit CVE ในตัว)
+      - name: flutter pub outdated (report)
+        run: flutter pub outdated || true
