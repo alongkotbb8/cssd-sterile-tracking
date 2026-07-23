@@ -1,8 +1,9 @@
 import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
-import { WrapType, PackageStatus } from '@prisma/client';
+import { WrapType, PackageStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { RunningNumberService } from './running-number.service';
 import { AuditService } from '../../common/audit/audit.service';
+import { isExpired } from '../../common/expiry';
 import { CreatePackageDto } from './dto/create-package.dto';
 
 const SHELF_LIFE: Record<WrapType, number> = {
@@ -25,16 +26,22 @@ export class PackagesService {
     private audit: AuditService,
   ) {}
 
-  async create(dto: CreatePackageDto, userId: string) {
-    const template = await this.prisma.setTemplate.findUnique({
+  /**
+   * สร้างห่อใหม่ + ออกเลขรัน — รันในทรานแซกชันที่ idempotency ส่งเข้ามา (FIX-02
+   * แนวทาง A): การออกเลขรัน + package.create + AuditLog + การเก็บ response ของ
+   * idempotency อยู่ในทรานแซกชันเดียวกัน crash กลางคัน = rollback ทั้งหมด ไม่มี
+   * ห่อซ้ำและเลขรันไม่กระโดด
+   */
+  async create(dto: CreatePackageDto, userId: string, tx: Prisma.TransactionClient) {
+    const template = await tx.setTemplate.findUnique({
       where: { id: dto.setTemplateId },
     });
     if (!template) throw new NotFoundException('ไม่พบ SetTemplate ที่ระบุ');
 
     const wrapType: WrapType = dto.wrapType ?? template.defaultWrapType;
-    const id = await this.runningNum.nextId(template.code, template.id, new Date());
+    const id = await this.runningNum.nextId(template.code, template.id, new Date(), tx);
 
-    const pkg = await this.prisma.package.create({
+    const created = await tx.package.create({
       data: {
         id,
         setTemplateId: dto.setTemplateId,
@@ -45,9 +52,8 @@ export class PackagesService {
       },
       include: { setTemplate: true },
     });
-
-    await this.audit.log(userId, 'PACKAGE_CREATE', id, { wrapType });
-    return pkg;
+    await this.audit.logTx(tx, userId, 'PACKAGE_CREATE', id, { wrapType });
+    return created;
   }
 
   async findOne(id: string) {
@@ -56,6 +62,7 @@ export class PackagesService {
       include: {
         setTemplate: true,
         batch: true,
+        tags: { include: { tag: true } },
         movements: {
           include: {
             department: true,
@@ -66,8 +73,9 @@ export class PackagesService {
     });
     if (!pkg) throw new NotFoundException(`ไม่พบห่อ ${id}`);
 
-    const isExpired = pkg.expiryDate && pkg.expiryDate < new Date() && pkg.status === PackageStatus.STERILE;
-    return { ...pkg, isExpired: isExpired ?? false };
+    const expired =
+      !!pkg.expiryDate && isExpired(pkg.expiryDate) && pkg.status === PackageStatus.STERILE;
+    return { ...pkg, isExpired: expired };
   }
 
   async findAll(status?: PackageStatus, templateId?: string) {
@@ -80,6 +88,7 @@ export class PackagesService {
       include: {
         setTemplate: true,
         batch: { select: { id: true, status: true } },
+        tags: { include: { tag: true } },
         // movement ล่าสุด → บอกตำแหน่งปัจจุบันของห่อ (การ์ดแสดง "อยู่ที่ ...")
         movements: {
           orderBy: { createdAt: 'desc' },
@@ -91,7 +100,9 @@ export class PackagesService {
     }).then(pkgs =>
       pkgs.map(p => ({
         ...p,
-        isExpired: p.expiryDate ? p.expiryDate < now && p.status === PackageStatus.STERILE : false,
+        isExpired: p.expiryDate
+          ? isExpired(p.expiryDate, now) && p.status === PackageStatus.STERILE
+          : false,
       })),
     );
   }
@@ -126,6 +137,28 @@ export class PackagesService {
       data: { status: PackageStatus.DISCARDED, notes },
     });
     await this.audit.log(userId, 'PACKAGE_DISCARD', id, { previousStatus: pkg.status });
+  }
+
+  /** ตั้ง tag ของห่อ (แทนที่ทั้งชุด) — ใช้ติด/ถอด tag จากหน้ารายละเอียด */
+  async setTags(id: string, tagIds: string[], userId: string) {
+    const pkg = await this.prisma.package.findUnique({ where: { id } });
+    if (!pkg) throw new NotFoundException(`ไม่พบห่อ ${id}`);
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.packageTag.deleteMany({ where: { packageId: id } });
+      if (tagIds.length) {
+        await tx.packageTag.createMany({
+          data: tagIds.map((tagId) => ({ packageId: id, tagId })),
+          skipDuplicates: true,
+        });
+      }
+      await this.audit.logTx(tx, userId, 'PACKAGE_TAGS_SET', id, { tagIds });
+    });
+
+    return this.prisma.packageTag.findMany({
+      where: { packageId: id },
+      include: { tag: true },
+    });
   }
 
   /** Reserve an offline ID pool */

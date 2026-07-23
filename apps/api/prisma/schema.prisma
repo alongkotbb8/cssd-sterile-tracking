@@ -139,11 +139,189 @@ model Package {
   createdBy     User          @relation("PackageCreator", fields: [createdById], references: [id])
 
   movements Movement[]
+  tags      PackageTag[]
+  printJobs PrintJob[]
 
   @@index([status])
   @@index([expiryDate])
   @@index([batchId])
   @@map("packages")
+}
+
+// ─── Print Job Queue + Gateway (AI_DEVELOPMENT_GUARDRAILS.md ข้อ 5) ─────────
+//
+// PWA ไม่พิมพ์ตรง — สร้าง PrintJob แล้วรอ Gateway (บริการแยก มี credential
+// ของตัวเอง) มา claim/พิมพ์/ACK ผลจริง ห้าม PWA ตั้งสถานะเป็น PRINTED เอง
+
+enum PrintJobStatus {
+  QUEUED      // รอ gateway claim
+  CLAIMED     // gateway จองงานแล้ว ยังไม่เริ่มพิมพ์ — ยังไม่เคยเรียก transport.send()
+  PRINTING    // gateway กำลังจะเรียก transport.send() — ถ้าค้างที่นี่ ไม่รู้ว่า
+              // ส่งไปหาเครื่องพิมพ์สำเร็จหรือยัง (อาจ crash กลางคัน) ห้าม auto-retry
+  SENT        // transport.send() ยืนยันสำเร็จแล้ว (ข้อมูลถึงเครื่องพิมพ์แน่นอน) —
+              // รอแค่ ACK ยืนยันกลับมาที่ backend เท่านั้น ห้าม auto-retry เด็ดขาด
+  PRINTED     // พิมพ์สำเร็จยืนยันแล้ว — ตั้งได้จาก gateway ACK เท่านั้น
+  SIMULATED   // Console/Mock transport (dev/test) — ไม่ใช่พิมพ์จริง ไม่แตะ
+              // Package.printedAt/reprintCount เด็ดขาด แยกจาก PRINTED ชัดเจน
+  FAILED      // พิมพ์ไม่สำเร็จรอบนี้ (transport.send() เองล้มเหลว ก่อนข้อมูลออกจาก gateway)
+  RETRYING    // failed แล้วเข้าคิวใหม่รออีกครั้ง (attemptCount < max)
+  DEAD_LETTER // fail ครบจำนวนครั้งที่กำหนด ต้องมีคนมาดูมือ
+  ACK_UNKNOWN // ส่งสำเร็จ (SENT) แต่ ACK กลับมาไม่ได้ (network) ก่อน lease timeout —
+              // ไม่รู้ว่าพิมพ์จริงหรือยัง ห้าม auto-retry ต้องให้ SUPERVISOR/ADMIN ตัดสิน
+  RESOLVED_PRINTED  // SUPERVISOR/ADMIN ยืนยันว่า ACK_UNKNOWN นี้พิมพ์จริงแล้ว (terminal,
+                    // แตะ Package.printedAt/reprintCount แล้ว) — resolve ได้ครั้งเดียว (FIX-03)
+  RESOLVED_REQUEUED // SUPERVISOR/ADMIN ตัดสินว่า ACK_UNKNOWN นี้ไม่ยืนยันผล → เปิดงานใหม่
+                    // แทน (terminal, งานใหม่ลิงก์กลับผ่าน requeuedFromJobId) resolve ได้ครั้งเดียว
+  CANCELLED   // ยกเลิกตอนยัง QUEUED เท่านั้น (claim แล้วยกเลิกไม่ได้ — อาจพิมพ์ไปแล้ว)
+}
+
+enum GatewayEnvironment {
+  DEVELOPMENT
+  TEST
+  PRODUCTION
+}
+
+enum GatewayTransportMode {
+  CONSOLE   // mock (dev/test) — พิมพ์จริงไม่ได้
+  SERIAL    // ต่อ USB/Serial จริง
+  BLUETOOTH // ต่อ Bluetooth จริง
+}
+
+// เครื่องพิมพ์/gateway 1 ตัว = 1 credential แยกจาก user JWT โดยสิ้นเชิง
+// API key จริง = "{keyId}.{secret}" — keyId ใช้ lookup แถวตรงๆ (เร็ว, ไม่ต้อง
+// bcrypt.compare วนทุกแถว), secret เก็บแค่ bcrypt hash ไม่เก็บ plaintext
+model PrinterDevice {
+  id              String    @id @default(cuid())
+  name            String    @db.VarChar(100)
+  keyId           String    @unique @db.VarChar(24)
+  apiKeyHash      String
+  isActive        Boolean   @default(true)
+  lastHeartbeatAt DateTime?
+  createdAt       DateTime  @default(now())
+  revokedAt       DateTime?
+
+  // FIX-05: capability ที่ backend เป็นผู้กำหนด (ไม่เชื่อ flag จาก gateway request)
+  // canConfirmRealPrint = true เท่านั้นที่ ACK แล้วตั้ง Package เป็น PRINTED ได้จริง
+  // false → ACK ได้แค่ SIMULATED (console/dev/test) แก้ค่าได้เฉพาะ ADMIN + มี AuditLog
+  // ค่า default ปลอดภัยสุด (DEVELOPMENT/CONSOLE/false) — backfill แถวเดิมได้เลย
+  environment         GatewayEnvironment   @default(DEVELOPMENT)
+  transportMode       GatewayTransportMode @default(CONSOLE)
+  canConfirmRealPrint Boolean              @default(false)
+
+  printJobsTargeted PrintJob[] @relation("PrintJobRequestedPrinter")
+  printJobsClaimed  PrintJob[] @relation("PrintJobClaimedPrinter")
+
+  @@map("printer_devices")
+}
+
+model PrintJob {
+  id String @id @default(cuid())
+
+  packageId String
+  package   Package @relation(fields: [packageId], references: [id])
+
+  // requestedPrinterId = สิ่งที่ผู้ใช้ระบุตอนสร้าง (null = งานกลาง เครื่องไหนก็
+  // claim ได้) — "immutable" ไม่เปลี่ยนหลังสร้าง ใช้เป็นเงื่อนไข claim()
+  // printerId = เครื่องที่ "claim ไปแล้วจริง" (null จนกว่าจะมี gateway claim)
+  // แยก 2 ฟิลด์นี้ชัดเจนกัน lease-recovery สับสนระหว่างงานกลางกับงานที่ระบุเครื่อง
+  requestedPrinterId String?
+  requestedPrinter    PrinterDevice? @relation("PrintJobRequestedPrinter", fields: [requestedPrinterId], references: [id])
+  printerId          String?
+  printer            PrinterDevice? @relation("PrintJobClaimedPrinter", fields: [printerId], references: [id])
+
+  requestedById String
+  requestedBy   User           @relation("PrintJobRequester", fields: [requestedById], references: [id])
+  status        PrintJobStatus @default(QUEUED)
+  attemptCount  Int            @default(0)
+
+  // isReprint คำนวณที่ backend เสมอ (package.printedAt != null ตอนสร้าง) —
+  // client ส่งมาเองไม่ได้ กันหลบการกรอกเหตุผล reprint (AI_DEVELOPMENT_GUARDRAILS.md ข้อ 2.2)
+  isReprint     Boolean @default(false)
+  reprintReason String? @db.VarChar(200)
+
+  // payload สร้างจาก backend ล้วนๆ (ชื่อชุด/QR/วันที่ถ้ามี) — client ส่งมาเองไม่ได้
+  payload     Json
+  payloadHash String @db.VarChar(64)
+
+  errorCode String? @db.VarChar(100)
+
+  createdAt  DateTime  @default(now())
+  claimedAt  DateTime?
+  printingAt DateTime?
+  sentAt     DateTime? // transport.send() ยืนยันสำเร็จ (ก่อน ACK ถึง backend)
+  printedAt  DateTime?
+  failedAt   DateTime?
+
+  // การแก้ไข ACK_UNKNOWN ด้วยมือ (SUPERVISOR/ADMIN ตัดสินว่าพิมพ์จริงหรือไม่)
+  // resolvedAt != null = resolve ไปแล้ว ใช้เป็นเงื่อนไข CAS กัน resolve ซ้ำ (FIX-03)
+  resolvedById String?
+  resolvedBy   User?     @relation("PrintJobResolver", fields: [resolvedById], references: [id])
+  resolvedAt   DateTime?
+  resolutionNote String? @db.VarChar(300)
+
+  // งานที่เกิดจากการ REQUEUE ของงาน ACK_UNKNOWN เดิม ลิงก์กลับเพื่อตรวจสอบสายสัมพันธ์
+  // (FIX-03) — self relation: 1 งานเดิม → 1 งานใหม่ (unique กัน REQUEUE สร้างซ้ำหลายงาน)
+  requeuedFromJobId String?  @unique
+  requeuedFrom      PrintJob?  @relation("PrintJobRequeue", fields: [requeuedFromJobId], references: [id])
+  requeuedTo        PrintJob?  @relation("PrintJobRequeue")
+
+  @@index([status])
+  @@index([packageId])
+  @@index([printerId])
+  @@index([requestedPrinterId])
+  @@map("print_jobs")
+}
+
+// ─── Tagging (จัดกลุ่ม/ค้นหาห่อ) ────────────────────────────────────────────
+
+model Tag {
+  id        String   @id @default(cuid())
+  name      String   @unique @db.VarChar(50)
+  colorHex  String?  @db.VarChar(9) // เช่น #FF5722
+  createdAt DateTime @default(now())
+
+  packages PackageTag[]
+
+  @@map("tags")
+}
+
+model PackageTag {
+  packageId String
+  package   Package @relation(fields: [packageId], references: [id], onDelete: Cascade)
+  tagId     String
+  tag       Tag     @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([packageId, tagId])
+  @@map("package_tags")
+}
+
+// ─── Idempotency (กันคำขอซ้ำจาก offline sync/retry) ─────────────────────────
+
+enum IdempotencyStatus {
+  PENDING // insert สำเร็จ กำลังรัน mutation จริง — request อื่นที่ยิง key ซ้ำระหว่างนี้ต้องรอ/ถูกปฏิเสธ
+  DONE    // รันจบแล้ว มี response ให้ replay
+}
+
+// การ insert row นี้เองคือ compare-and-swap อะตอมมิก (unique constraint บน key) —
+// ป้องกัน 2 request พร้อมกันด้วย key เดียวกันวิ่งผ่านทั้งคู่ (ต้อง fail อย่างน้อยหนึ่งฝั่งที่ insert)
+model IdempotentRequest {
+  key         String            @id @db.VarChar(100)
+  userId      String
+  endpoint    String            @db.VarChar(60)
+  method      String            @db.VarChar(10)
+  requestHash String            @db.VarChar(64) // sha256 ของ payload — key ซ้ำแต่ payload ต่างกันต้องถูกปฏิเสธ
+  status      IdempotencyStatus @default(PENDING)
+  response    Json?
+  createdAt   DateTime          @default(now())
+  // ถ้า process ล่มระหว่าง PENDING (หลัง insert แต่ก่อน mutation จบ) แถวจะค้าง
+  // ตลอดไปถ้าไม่มี timeout — reconciliation cron จะลบแถว PENDING ที่เกิน
+  // เวลานี้ทิ้ง เพื่อให้ client retry ด้วย key เดิมได้จริง (ไม่ auto-rerun เอง
+  // เพราะไม่รู้ว่า mutation รอบก่อนสำเร็จไปแล้วหรือยัง — ให้ client เป็นคนสั่งใหม่)
+  expiresAt   DateTime
+
+  @@index([createdAt])
+  @@index([status, expiresAt])
+  @@map("idempotent_requests")
 }
 
 // Running number sequence (one row per set_template per day)
@@ -184,6 +362,9 @@ model User {
   passwordHash String
   role         UserRole   @default(CSSD)
   status       UserStatus @default(ACTIVE)
+  // Account lockout (brute-force ต่อบัญชี) — fail 5 ครั้งติด → ล็อก 15 นาที
+  failedLoginCount Int       @default(0)
+  lockedUntil      DateTime?
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
 
@@ -191,6 +372,8 @@ model User {
   performedMovements Movement[] @relation("MovementPerformer")
   auditLogs         AuditLog[]
   fcmTokens         FcmToken[]
+  printJobsRequested PrintJob[] @relation("PrintJobRequester")
+  printJobsResolved  PrintJob[] @relation("PrintJobResolver")
 
   @@map("users")
 }

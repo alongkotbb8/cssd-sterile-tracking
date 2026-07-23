@@ -1,13 +1,13 @@
 import {
   Injectable,
   BadRequestException,
-  HttpException,
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { PackageStatus, MovementType } from '@prisma/client';
+import { PackageStatus, MovementType, Prisma } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { AuditService } from '../../common/audit/audit.service';
+import { isExpired, daysLeft } from '../../common/expiry';
 
 export interface ScanResult {
   packageId: string;
@@ -25,57 +25,69 @@ export class ScanService {
     private audit: AuditService,
   ) {}
 
-  /** Log full error server-side, return only a safe message to the client. */
-  private safeError(e: unknown, packageId: string): string {
-    if (e instanceof HttpException) return e.message;
-    this.logger.error(`Scan failed for package ${packageId}`, e instanceof Error ? e.stack : String(e));
-    return 'เกิดข้อผิดพลาดภายในระบบ';
-  }
+  /**
+   * ⚠️ FIX-02 แนวทาง A: ทั้ง request รันในทรานแซกชันเดียว (idempotency ส่ง tx เข้ามา)
+   *
+   * ผลลัพธ์รายห่อ (สำเร็จ/ไม่ผ่าน) ยังรายงานแยกได้เหมือนเดิม เพราะ "ไม่ผ่าน" ที่
+   * เป็นเหตุการณ์ปกติ (ไม่พบห่อ/สถานะผิด/หมดอายุ/CAS ชน) จะ **ไม่ throw** แค่ push
+   * ลง results แล้วไปห่อถัดไป ทรานแซกชันยังใช้ได้ต่อ
+   *
+   * แต่ถ้าเกิด DB error จริง (constraint/connection) จะ throw ออกไปให้ทรานแซกชัน
+   * rollback ทั้ง request (all-or-nothing) — ปลอดภัยกว่าเดิมเพราะไม่มีทางที่บาง
+   * ห่อ commit แล้วบางห่อค้าง และ retry ด้วย idempotency-key เดิมจะเริ่มใหม่สะอาด
+   * (ต่างจากพฤติกรรมเดิมที่ commit ทีละห่อแยกกัน — ดู PROGRESS.md/known limitations)
+   */
 
-  /** Scan in: PACKED → STERILE (batch must be PASSED) */
-  async scanIn(packageIds: string[], batchId: string, userId: string): Promise<ScanResult[]> {
-    const batch = await this.prisma.sterilizationBatch.findUnique({ where: { id: batchId } });
+  /**
+   * Scan in: ผูกห่อ PACKED เข้ารอบนึ่งที่ยัง PENDING (ก่อนเริ่มนึ่ง)
+   *
+   * ลำดับที่ถูกหลัก traceability: ห่อต้องอยู่ในรอบ *ก่อน* มีผลตรวจ — ห่อจะ
+   * กลายเป็น STERILE ก็ต่อเมื่อ SUPERVISOR/ADMIN บันทึกผล CI/BI ผ่าน
+   */
+  async scanIn(
+    packageIds: string[],
+    batchId: string,
+    userId: string,
+    manualEntry: boolean,
+    tx: Prisma.TransactionClient,
+  ): Promise<ScanResult[]> {
+    const batch = await tx.sterilizationBatch.findUnique({ where: { id: batchId } });
     if (!batch) throw new NotFoundException('ไม่พบรอบนึ่ง');
-    if (batch.status !== 'PASSED') throw new BadRequestException('รอบนึ่งยังไม่ผ่านการตรวจสอบ');
+    if (batch.status !== 'PENDING') {
+      throw new BadRequestException(
+        'รอบนึ่งนี้บันทึกผลไปแล้ว — เพิ่มห่อย้อนหลังไม่ได้ กรุณาเปิดรอบใหม่',
+      );
+    }
 
     const results: ScanResult[] = [];
     for (const id of packageIds) {
-      try {
-        const pkg = await this.prisma.package.findUnique({ where: { id } });
-        if (!pkg) { results.push({ packageId: id, success: false, error: 'ไม่พบห่อ' }); continue; }
-        if (pkg.status !== PackageStatus.PACKED) {
-          results.push({ packageId: id, success: false, error: `สถานะปัจจุบัน: ${pkg.status}` }); continue;
-        }
-
-        // Domain rule: SEAL = +180 days, CLOTH = +7 days — always computed server-side.
-        const sterilizeDate = batch.finishedAt ?? new Date();
-        const shelfLife = pkg.wrapType === 'SEAL' ? 180 : 7;
-        const expiryDate = new Date(sterilizeDate);
-        expiryDate.setUTCDate(expiryDate.getUTCDate() + shelfLife);
-
-        const updated = await this.prisma.$transaction(async (tx) => {
-          // status ใน where เป็น compare-and-swap อะตอมมิก กันสแกนซ้ำพร้อมกันจาก 2 เครื่อง
-          const { count } = await tx.package.updateMany({
-            where: { id, status: PackageStatus.PACKED },
-            data: { status: PackageStatus.STERILE, batchId, sterilizeDate, expiryDate },
-          });
-          if (count === 0) return null;
-          await tx.movement.create({
-            data: { packageId: id, type: MovementType.IN, performedById: userId },
-          });
-          return tx.package.findUniqueOrThrow({ where: { id } });
-        });
-
-        if (!updated) {
-          results.push({ packageId: id, success: false, error: 'ห่อนี้ถูกสแกนไปพร้อมกันจากที่อื่นแล้ว' });
-          continue;
-        }
-
-        await this.audit.log(userId, 'SCAN_IN', id, { batchId, expiryDate });
-        results.push({ packageId: id, success: true, package: updated as unknown as Record<string, unknown> });
-      } catch (e) {
-        results.push({ packageId: id, success: false, error: this.safeError(e, id) });
+      const pkg = await tx.package.findUnique({ where: { id } });
+      if (!pkg) { results.push({ packageId: id, success: false, error: 'ไม่พบห่อ' }); continue; }
+      if (pkg.status !== PackageStatus.PACKED) {
+        results.push({ packageId: id, success: false, error: `สถานะปัจจุบัน: ${pkg.status}` }); continue;
       }
+      if (pkg.batchId === batchId) {
+        results.push({ packageId: id, success: false, error: 'ห่อนี้อยู่ในรอบนี้แล้ว' }); continue;
+      }
+      if (pkg.batchId) {
+        results.push({ packageId: id, success: false, error: 'ห่อนี้อยู่ในรอบนึ่งอื่นอยู่แล้ว' }); continue;
+      }
+
+      // CAS: batchId ต้องยังว่างและสถานะยัง PACKED กันสแกนซ้ำพร้อมกันจาก 2 เครื่อง
+      const { count } = await tx.package.updateMany({
+        where: { id, status: PackageStatus.PACKED, batchId: null },
+        data: { batchId },
+      });
+      if (count === 0) {
+        results.push({ packageId: id, success: false, error: 'ห่อนี้ถูกสแกนไปพร้อมกันจากที่อื่นแล้ว' });
+        continue;
+      }
+      await this.audit.logTx(tx, userId, 'SCAN_IN_BATCH', id, {
+        batchId,
+        ...(manualEntry ? { manualEntry: true } : {}),
+      });
+      const updated = await tx.package.findUniqueOrThrow({ where: { id } });
+      results.push({ packageId: id, success: true, package: updated as unknown as Record<string, unknown> });
     }
     return results;
   }
@@ -90,63 +102,62 @@ export class ScanService {
     departmentId: string,
     receiverName: string | undefined,
     userId: string,
+    manualEntry: boolean,
+    tx: Prisma.TransactionClient,
   ): Promise<ScanResult[]> {
-    const dept = await this.prisma.department.findUnique({ where: { id: departmentId } });
+    const dept = await tx.department.findUnique({ where: { id: departmentId } });
     if (!dept) throw new NotFoundException('ไม่พบแผนกปลายทาง');
 
     const now = new Date();
     const results: ScanResult[] = [];
 
     for (const id of packageIds) {
-      try {
-        const pkg = await this.prisma.package.findUnique({ where: { id } });
-        if (!pkg) { results.push({ packageId: id, success: false, error: 'ไม่พบห่อ' }); continue; }
+      const pkg = await tx.package.findUnique({ where: { id } });
+      if (!pkg) { results.push({ packageId: id, success: false, error: 'ไม่พบห่อ' }); continue; }
 
-        // FR-4: block expired
-        if (pkg.expiryDate && pkg.expiryDate < now) {
-          results.push({ packageId: id, success: false, error: '⛔ ห้ามใช้ — ห่อหมดอายุแล้ว' }); continue;
-        }
-        if (pkg.status !== PackageStatus.STERILE && pkg.status !== PackageStatus.PACKED) {
-          results.push({ packageId: id, success: false, error: `สถานะปัจจุบัน: ${pkg.status}` }); continue;
-        }
-
-        const fromStatus = pkg.status;
-        const toStatus =
-          fromStatus === PackageStatus.STERILE ? PackageStatus.ISSUED : PackageStatus.PACKED_OUT;
-
-        const done = await this.prisma.$transaction(async (tx) => {
-          // status ใน where เป็น compare-and-swap อะตอมมิก กันสแกนซ้ำพร้อมกันจาก 2 เครื่อง
-          const { count } = await tx.package.updateMany({
-            where: { id, status: fromStatus },
-            data: { status: toStatus },
-          });
-          if (count === 0) return false;
-          await tx.movement.create({
-            data: {
-              packageId: id,
-              type: MovementType.OUT,
-              departmentId,
-              receiverName: receiverName ?? null,
-              performedById: userId,
-            },
-          });
-          return true;
-        });
-
-        if (!done) {
-          results.push({ packageId: id, success: false, error: 'ห่อนี้ถูกสแกนไปพร้อมกันจากที่อื่นแล้ว' });
-          continue;
-        }
-
-        await this.audit.log(userId, 'SCAN_OUT', id, {
+      // FR-4: block expired — บันทึกเหตุการณ์ถูกบล็อกไว้ทำรายงานเหตุการณ์ผิดปกติ
+      // (ใช้ได้ตลอดวันหมดอายุ บล็อกตั้งแต่วันถัดไป — ดู common/expiry.ts)
+      if (pkg.expiryDate && isExpired(pkg.expiryDate, now)) {
+        await this.audit.logTx(tx, userId, 'SCAN_BLOCKED', id, {
+          reason: 'EXPIRED',
           departmentId,
-          receiverName,
-          ...(toStatus === PackageStatus.PACKED_OUT ? { unsterile: true } : {}),
+          expiryDate: pkg.expiryDate,
         });
-        results.push({ packageId: id, success: true });
-      } catch (e) {
-        results.push({ packageId: id, success: false, error: this.safeError(e, id) });
+        results.push({ packageId: id, success: false, error: '⛔ ห้ามใช้ — ห่อหมดอายุแล้ว' }); continue;
       }
+      if (pkg.status !== PackageStatus.STERILE && pkg.status !== PackageStatus.PACKED) {
+        results.push({ packageId: id, success: false, error: `สถานะปัจจุบัน: ${pkg.status}` }); continue;
+      }
+
+      const fromStatus = pkg.status;
+      const toStatus =
+        fromStatus === PackageStatus.STERILE ? PackageStatus.ISSUED : PackageStatus.PACKED_OUT;
+
+      // status ใน where เป็น compare-and-swap อะตอมมิก กันสแกนซ้ำพร้อมกันจาก 2 เครื่อง
+      const { count } = await tx.package.updateMany({
+        where: { id, status: fromStatus },
+        data: { status: toStatus },
+      });
+      if (count === 0) {
+        results.push({ packageId: id, success: false, error: 'ห่อนี้ถูกสแกนไปพร้อมกันจากที่อื่นแล้ว' });
+        continue;
+      }
+      await tx.movement.create({
+        data: {
+          packageId: id,
+          type: MovementType.OUT,
+          departmentId,
+          receiverName: receiverName ?? null,
+          performedById: userId,
+        },
+      });
+      await this.audit.logTx(tx, userId, 'SCAN_OUT', id, {
+        departmentId,
+        receiverName,
+        ...(toStatus === PackageStatus.PACKED_OUT ? { unsterile: true } : {}),
+        ...(manualEntry ? { manualEntry: true } : {}),
+      });
+      results.push({ packageId: id, success: true });
     }
     return results;
   }
@@ -156,49 +167,46 @@ export class ScanService {
    *   ISSUED     → RETURNED (ปกติ — รอ reprocess)
    *   PACKED_OUT → PACKED   (ของไม่เคยฆ่าเชื้อ คืนแล้วพร้อมเข้ารอบนึ่งได้ทันที)
    */
-  async scanReturn(packageIds: string[], departmentId: string, userId: string): Promise<ScanResult[]> {
-    const dept = await this.prisma.department.findUnique({ where: { id: departmentId } });
+  async scanReturn(
+    packageIds: string[],
+    departmentId: string,
+    userId: string,
+    manualEntry: boolean,
+    tx: Prisma.TransactionClient,
+  ): Promise<ScanResult[]> {
+    const dept = await tx.department.findUnique({ where: { id: departmentId } });
     if (!dept) throw new NotFoundException('ไม่พบแผนก');
 
     const results: ScanResult[] = [];
     for (const id of packageIds) {
-      try {
-        const pkg = await this.prisma.package.findUnique({ where: { id } });
-        if (!pkg) { results.push({ packageId: id, success: false, error: 'ไม่พบห่อ' }); continue; }
-        if (pkg.status !== PackageStatus.ISSUED && pkg.status !== PackageStatus.PACKED_OUT) {
-          results.push({ packageId: id, success: false, error: `สถานะปัจจุบัน: ${pkg.status}` }); continue;
-        }
-
-        const fromStatus = pkg.status;
-        const toStatus =
-          fromStatus === PackageStatus.ISSUED ? PackageStatus.RETURNED : PackageStatus.PACKED;
-
-        const done = await this.prisma.$transaction(async (tx) => {
-          // status ใน where เป็น compare-and-swap อะตอมมิก กันสแกนซ้ำพร้อมกันจาก 2 เครื่อง
-          const { count } = await tx.package.updateMany({
-            where: { id, status: fromStatus },
-            data: { status: toStatus },
-          });
-          if (count === 0) return false;
-          await tx.movement.create({
-            data: { packageId: id, type: MovementType.RETURN, departmentId, performedById: userId },
-          });
-          return true;
-        });
-
-        if (!done) {
-          results.push({ packageId: id, success: false, error: 'ห่อนี้ถูกสแกนไปพร้อมกันจากที่อื่นแล้ว' });
-          continue;
-        }
-
-        await this.audit.log(userId, 'SCAN_RETURN', id, {
-          departmentId,
-          ...(fromStatus === PackageStatus.PACKED_OUT ? { unsterile: true } : {}),
-        });
-        results.push({ packageId: id, success: true });
-      } catch (e) {
-        results.push({ packageId: id, success: false, error: this.safeError(e, id) });
+      const pkg = await tx.package.findUnique({ where: { id } });
+      if (!pkg) { results.push({ packageId: id, success: false, error: 'ไม่พบห่อ' }); continue; }
+      if (pkg.status !== PackageStatus.ISSUED && pkg.status !== PackageStatus.PACKED_OUT) {
+        results.push({ packageId: id, success: false, error: `สถานะปัจจุบัน: ${pkg.status}` }); continue;
       }
+
+      const fromStatus = pkg.status;
+      const toStatus =
+        fromStatus === PackageStatus.ISSUED ? PackageStatus.RETURNED : PackageStatus.PACKED;
+
+      // status ใน where เป็น compare-and-swap อะตอมมิก กันสแกนซ้ำพร้อมกันจาก 2 เครื่อง
+      const { count } = await tx.package.updateMany({
+        where: { id, status: fromStatus },
+        data: { status: toStatus },
+      });
+      if (count === 0) {
+        results.push({ packageId: id, success: false, error: 'ห่อนี้ถูกสแกนไปพร้อมกันจากที่อื่นแล้ว' });
+        continue;
+      }
+      await tx.movement.create({
+        data: { packageId: id, type: MovementType.RETURN, departmentId, performedById: userId },
+      });
+      await this.audit.logTx(tx, userId, 'SCAN_RETURN', id, {
+        departmentId,
+        ...(fromStatus === PackageStatus.PACKED_OUT ? { unsterile: true } : {}),
+        ...(manualEntry ? { manualEntry: true } : {}),
+      });
+      results.push({ packageId: id, success: true });
     }
     return results;
   }
@@ -212,11 +220,10 @@ export class ScanService {
     if (!pkg) throw new NotFoundException(`ไม่พบห่อ ${packageId}`);
 
     const now = new Date();
-    const isExpired = pkg.expiryDate ? pkg.expiryDate < now : false;
-    const daysLeft = pkg.expiryDate
-      ? Math.ceil((pkg.expiryDate.getTime() - now.getTime()) / 86_400_000)
-      : null;
-
-    return { ...pkg, isExpired, daysLeft };
+    return {
+      ...pkg,
+      isExpired: pkg.expiryDate ? isExpired(pkg.expiryDate, now) : false,
+      daysLeft: pkg.expiryDate ? daysLeft(pkg.expiryDate, now) : null,
+    };
   }
 }

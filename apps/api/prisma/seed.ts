@@ -85,7 +85,20 @@ async function main() {
   ]);
   console.log(`✅ Sterilizers: ${sterilizers.length}`);
 
-  // Users
+  // Users — production ต้องตั้งรหัสผ่านผ่าน env (SEED_ADMIN_PASSWORD ฯลฯ)
+  // ค่า fallback ใช้ได้เฉพาะ dev; ใน production ถ้าไม่ตั้ง env จะ throw ทันที
+  const isProd = process.env.NODE_ENV === 'production';
+  const seedPassword = (envKey: string, devFallback: string): string => {
+    const fromEnv = process.env[envKey];
+    if (fromEnv && fromEnv.length >= 8) return fromEnv;
+    if (isProd) {
+      throw new Error(
+        `Production seed requires ${envKey} (>=8 chars) — refusing to seed default password`,
+      );
+    }
+    return devFallback;
+  };
+
   const hash = (pw: string) => bcrypt.hash(pw, 10);
   const users = await Promise.all([
     prisma.user.upsert({
@@ -95,7 +108,7 @@ async function main() {
         employeeCode: 'ADMIN001',
         name: 'ผู้ดูแลระบบ',
         email: 'admin@cssd.local',
-        passwordHash: await hash('Admin@1234'),
+        passwordHash: await hash(seedPassword('SEED_ADMIN_PASSWORD', 'Admin@1234')),
         role: UserRole.ADMIN,
       },
     }),
@@ -106,7 +119,7 @@ async function main() {
         employeeCode: 'SUP001',
         name: 'หัวหน้าหน่วย CSSD',
         email: 'supervisor@cssd.local',
-        passwordHash: await hash('Sup@1234'),
+        passwordHash: await hash(seedPassword('SEED_SUPERVISOR_PASSWORD', 'Sup@1234')),
         role: UserRole.SUPERVISOR,
       },
     }),
@@ -117,7 +130,7 @@ async function main() {
         employeeCode: 'STAFF001',
         name: 'เจ้าหน้าที่ CSSD 1',
         email: 'staff1@cssd.local',
-        passwordHash: await hash('Staff@1234'),
+        passwordHash: await hash(seedPassword('SEED_STAFF_PASSWORD', 'Staff@1234')),
         role: UserRole.CSSD,
       },
     }),

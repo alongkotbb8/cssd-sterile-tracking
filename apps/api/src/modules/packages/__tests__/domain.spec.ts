@@ -1,4 +1,5 @@
 import { calcExpiryDate, formatPackageId, isValidTransition } from '@cssd/shared';
+import { daysLeft, isExpired } from '../../../common/expiry';
 
 describe('Domain: calcExpiryDate', () => {
   const sterilize = new Date('2026-06-30');
@@ -89,5 +90,52 @@ describe('Domain: expired package block', () => {
     const now = new Date('2026-06-30');
     const isExpired = expiryDate < now;
     expect(isExpired).toBe(false);
+  });
+
+  // นิยามวันหมดอายุ (แก้ตามผล audit): expiryDate = วันสุดท้ายที่ใช้ได้
+  // ห่อใช้ได้ตลอดวันหมดอายุ และถูกบล็อกตั้งแต่ 00:00 UTC ของวันถัดไป
+  // (ก่อนแก้ โค้ดเทียบ expiryDate < now ตรงๆ → บล็อกตั้งแต่เที่ยงคืนของวันหมดอายุเอง)
+  describe('expiry boundary semantics (common/expiry.ts)', () => {
+    const expiryDate = new Date('2026-12-31T00:00:00Z'); // ค่าที่ DB ส่งกลับ (@db.Date)
+
+    it('ยังใช้ได้ตอนเช้าของวันหมดอายุ', () => {
+      expect(isExpired(expiryDate, new Date('2026-12-31T08:00:00Z'))).toBe(false);
+      expect(daysLeft(expiryDate, new Date('2026-12-31T08:00:00Z'))).toBe(0);
+    });
+
+    it('ยังใช้ได้ตอน 23:59 ของวันหมดอายุ (UTC)', () => {
+      expect(isExpired(expiryDate, new Date('2026-12-31T23:59:59Z'))).toBe(false);
+    });
+
+    it('ถูกบล็อกตั้งแต่ 00:00 ของวันถัดไป', () => {
+      expect(isExpired(expiryDate, new Date('2027-01-01T00:00:00Z'))).toBe(true);
+      expect(daysLeft(expiryDate, new Date('2027-01-01T08:00:00Z'))).toBeLessThan(0);
+    });
+
+    it('วันก่อนหมดอายุ daysLeft = 1', () => {
+      expect(daysLeft(expiryDate, new Date('2026-12-30T08:00:00Z'))).toBe(1);
+    });
+  });
+});
+
+describe('Domain: batch result decides sterility (traceability order)', () => {
+  // จำลอง logic ใน BatchesService.recordResult
+  const decideBatchStatus = (ci: boolean, bi: boolean | null) =>
+    ci && (bi === null || bi) ? 'PASSED' : 'FAILED';
+
+  it('CI ผ่าน + BI ยังไม่มา (null) → PASSED', () =>
+    expect(decideBatchStatus(true, null)).toBe('PASSED'));
+  it('CI ผ่าน + BI ผ่าน → PASSED', () => expect(decideBatchStatus(true, true)).toBe('PASSED'));
+  it('CI ไม่ผ่าน → FAILED เสมอ', () => {
+    expect(decideBatchStatus(false, true)).toBe('FAILED');
+    expect(decideBatchStatus(false, null)).toBe('FAILED');
+  });
+  it('BI ไม่ผ่าน → FAILED', () => expect(decideBatchStatus(true, false)).toBe('FAILED'));
+
+  it('ห่อเป็น STERILE ได้เฉพาะผ่าน transition PACKED → STERILE (ตอนผลผ่าน)', () => {
+    expect(isValidTransition('PACKED', 'STERILE')).toBe(true);
+    // ไม่มีทางลัดจากสถานะอื่นไป STERILE
+    (['PACKED_OUT', 'ISSUED', 'RETURNED', 'DISCARDED'] as const).forEach(s =>
+      expect(isValidTransition(s, 'STERILE')).toBe(false));
   });
 });

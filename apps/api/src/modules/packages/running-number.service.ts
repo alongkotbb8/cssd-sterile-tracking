@@ -22,13 +22,17 @@ export class RunningNumberService {
    * (the retry takes the `update: increment` path and succeeds).
    */
   private async incrementSeq(
+    db: Prisma.TransactionClient | PrismaService,
     setTemplateId: string,
     dateStr: string,
     by: number,
   ): Promise<RunningNumberSequence> {
     for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
       try {
-        return await this.prisma.runningNumberSequence.upsert({
+        // upsert = INSERT ... ON CONFLICT DO UPDATE (statement เดียว atomic) จึง
+        // ปลอดภัยเมื่อรันในทรานแซกชันร่วมกับ package.create (FIX-02 แนวทาง A) —
+        // เลขรันจะ rollback ไปพร้อมกันถ้าทรานแซกชันล้ม (ไม่เกิดเลขกระโดด)
+        return await db.runningNumberSequence.upsert({
           where: { setTemplateId_date: { setTemplateId, date: dateStr } },
           update: { lastSeq: { increment: by } },
           create: { setTemplateId, date: dateStr, lastSeq: by },
@@ -42,9 +46,14 @@ export class RunningNumberService {
     throw new ConflictException('ออกเลขรันไม่สำเร็จ กรุณาลองใหม่');
   }
 
-  async nextId(setTemplateCode: string, setTemplateId: string, date: Date): Promise<string> {
+  async nextId(
+    setTemplateCode: string,
+    setTemplateId: string,
+    date: Date,
+    db: Prisma.TransactionClient | PrismaService = this.prisma,
+  ): Promise<string> {
     const dateStr = this.toDateStr(date);
-    const row = await this.incrementSeq(setTemplateId, dateStr, 1);
+    const row = await this.incrementSeq(db, setTemplateId, dateStr, 1);
     return this.format(setTemplateCode, dateStr, row.lastSeq);
   }
 
@@ -58,7 +67,7 @@ export class RunningNumberService {
     userId: string,
   ): Promise<string[]> {
     const dateStr = this.toDateStr(date);
-    const row = await this.incrementSeq(setTemplateId, dateStr, count);
+    const row = await this.incrementSeq(this.prisma, setTemplateId, dateStr, count);
 
     const from = row.lastSeq - count + 1;
     const to = row.lastSeq;
