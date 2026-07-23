@@ -16,7 +16,7 @@ export class DepartmentsService {
 
   async create(dto: CreateDepartmentDto, userId: string) {
     const existing = await this.prisma.department.findUnique({ where: { code: dto.code } });
-    if (existing) throw new ConflictException('รหัสแผนก/สถานที่นี้มีอยู่แล้ว');
+    if (existing) throw new ConflictException({ message: 'รหัสแผนก/สถานที่นี้มีอยู่แล้ว', code: 'DEPT_DUPLICATE' });
 
     return this.prisma.$transaction(async (tx) => {
       const created = await tx.department.create({

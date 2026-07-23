@@ -296,6 +296,12 @@ abstract class AppLocalizations {
   /// **'เกิดข้อผิดพลาดไม่ทราบสาเหตุ'**
   String get errUnknown;
 
+  /// No description provided for @srvAuthRateLimited.
+  ///
+  /// In th, this message translates to:
+  /// **'พยายามเข้าสู่ระบบบ่อยเกินไป กรุณาลองใหม่อีกครั้งภายหลัง'**
+  String get srvAuthRateLimited;
+
   /// No description provided for @srvAuthLocked.
   ///
   /// In th, this message translates to:
@@ -307,6 +313,48 @@ abstract class AppLocalizations {
   /// In th, this message translates to:
   /// **'ไม่พบห่อ'**
   String get srvPkgNotFound;
+
+  /// No description provided for @srvPkgIdInvalid.
+  ///
+  /// In th, this message translates to:
+  /// **'รูปแบบเลขห่อไม่ถูกต้อง'**
+  String get srvPkgIdInvalid;
+
+  /// No description provided for @srvRunningNumberFailed.
+  ///
+  /// In th, this message translates to:
+  /// **'ออกเลขรันไม่สำเร็จ กรุณาลองใหม่'**
+  String get srvRunningNumberFailed;
+
+  /// No description provided for @srvDeptDuplicate.
+  ///
+  /// In th, this message translates to:
+  /// **'รหัสแผนก/สถานที่นี้มีอยู่แล้ว'**
+  String get srvDeptDuplicate;
+
+  /// No description provided for @srvTagDuplicate.
+  ///
+  /// In th, this message translates to:
+  /// **'มีแท็กชื่อนี้อยู่แล้ว'**
+  String get srvTagDuplicate;
+
+  /// No description provided for @srvTemplateDuplicate.
+  ///
+  /// In th, this message translates to:
+  /// **'รหัสชุดอุปกรณ์นี้มีอยู่แล้ว'**
+  String get srvTemplateDuplicate;
+
+  /// No description provided for @srvCleanupDateInvalid.
+  ///
+  /// In th, this message translates to:
+  /// **'วันที่ตัดข้อมูลต้องเป็นอดีตเท่านั้น'**
+  String get srvCleanupDateInvalid;
+
+  /// No description provided for @srvIdempotencyConflict.
+  ///
+  /// In th, this message translates to:
+  /// **'คำขอนี้ถูกส่งซ้ำ — โหลดใหม่แล้วลองอีกครั้ง'**
+  String get srvIdempotencyConflict;
 
   /// No description provided for @srvPkgWrongStatus.
   ///

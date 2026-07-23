@@ -138,6 +138,8 @@ String? serverErrorFromCode(AppLocalizations l10n, String? code) {
   switch (code) {
     case 'AUTH_LOCKED':
       return l10n.srvAuthLocked;
+    case 'AUTH_RATE_LIMITED':
+      return l10n.srvAuthRateLimited;
     case 'PKG_NOT_FOUND':
       return l10n.srvPkgNotFound;
     case 'PKG_WRONG_STATUS':
@@ -154,8 +156,22 @@ String? serverErrorFromCode(AppLocalizations l10n, String? code) {
       return l10n.srvPkgUnsterileExternalOnly;
     case 'PKG_DISCARDED':
       return l10n.srvPkgDiscarded;
+    case 'PKG_ID_INVALID':
+      return l10n.srvPkgIdInvalid;
     case 'REPRINT_REASON_REQUIRED':
       return l10n.srvReprintReasonRequired;
+    case 'RUNNING_NUMBER_FAILED':
+      return l10n.srvRunningNumberFailed;
+    case 'DEPT_DUPLICATE':
+      return l10n.srvDeptDuplicate;
+    case 'TAG_DUPLICATE':
+      return l10n.srvTagDuplicate;
+    case 'TEMPLATE_DUPLICATE':
+      return l10n.srvTemplateDuplicate;
+    case 'CLEANUP_DATE_INVALID':
+      return l10n.srvCleanupDateInvalid;
+    case 'IDEMPOTENCY_CONFLICT':
+      return l10n.srvIdempotencyConflict;
     case 'BATCH_NOT_FOUND':
       return l10n.srvBatchNotFound;
     case 'BATCH_DUPLICATE':

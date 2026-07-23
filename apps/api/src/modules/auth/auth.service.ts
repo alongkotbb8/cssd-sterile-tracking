@@ -77,7 +77,7 @@ export class AuthService {
    */
   async revokeSessions(userId: string, actorId: string) {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
-    if (!user) throw new NotFoundException('ไม่พบผู้ใช้');
+    if (!user) throw new NotFoundException({ message: 'ไม่พบผู้ใช้', code: 'USER_NOT_FOUND' });
     await this.prisma.$transaction(async (tx) => {
       await tx.user.update({
         where: { id: userId },

@@ -20,7 +20,7 @@ export class MasterDataService {
 
   async createTag(name: string, colorHex: string | undefined, userId: string) {
     const existing = await this.prisma.tag.findUnique({ where: { name } });
-    if (existing) throw new ConflictException('มี tag ชื่อนี้อยู่แล้ว');
+    if (existing) throw new ConflictException({ message: 'มี tag ชื่อนี้อยู่แล้ว', code: 'TAG_DUPLICATE' });
     const created = await this.prisma.$transaction(async (tx) => {
       const t = await tx.tag.create({ data: { name, colorHex } });
       await this.audit.logTx(tx, userId, 'TAG_CREATE', t.id, { name });
@@ -39,7 +39,7 @@ export class MasterDataService {
 
   async createTemplate(dto: CreateSetTemplateDto, userId: string) {
     const existing = await this.prisma.setTemplate.findUnique({ where: { code: dto.code } });
-    if (existing) throw new ConflictException('รหัสชุดอุปกรณ์นี้มีอยู่แล้ว');
+    if (existing) throw new ConflictException({ message: 'รหัสชุดอุปกรณ์นี้มีอยู่แล้ว', code: 'TEMPLATE_DUPLICATE' });
 
     return this.prisma.$transaction(async (tx) => {
       const created = await tx.setTemplate.create({

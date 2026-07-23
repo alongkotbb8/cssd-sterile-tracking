@@ -20,6 +20,6 @@ export function isValidPackageId(id: string): boolean {
 /** ตรวจ path param (lookup/:id) — โยน 400 ถ้ารูปแบบไม่ถูกต้อง (กัน API-direct bypass) */
 export function assertValidPackageId(id: string): void {
   if (!isValidPackageId(id)) {
-    throw new BadRequestException('รูปแบบเลขห่อไม่ถูกต้อง');
+    throw new BadRequestException({ message: 'รูปแบบเลขห่อไม่ถูกต้อง', code: 'PKG_ID_INVALID' });
   }
 }

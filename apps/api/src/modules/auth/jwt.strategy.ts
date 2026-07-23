@@ -26,7 +26,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     // แปลว่า session ถูกเพิกถอน (logout-all / ADMIN revoke) → ปฏิเสธทันที
     // (token เก่าก่อนมีฟีเจอร์นี้ไม่มี ver → ถือว่าถูกเพิกถอน ต้อง login ใหม่)
     if ((payload.ver ?? -1) !== user.tokenVersion) {
-      throw new UnauthorizedException('เซสชันถูกเพิกถอน กรุณาเข้าสู่ระบบใหม่');
+      throw new UnauthorizedException({ message: 'เซสชันถูกเพิกถอน กรุณาเข้าสู่ระบบใหม่', code: 'AUTH_SESSION_REVOKED' });
     }
     return { id: user.id, role: user.role, name: user.name };
   }

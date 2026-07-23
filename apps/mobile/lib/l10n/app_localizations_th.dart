@@ -114,11 +114,37 @@ class AppLocalizationsTh extends AppLocalizations {
   String get errUnknown => 'เกิดข้อผิดพลาดไม่ทราบสาเหตุ';
 
   @override
+  String get srvAuthRateLimited =>
+      'พยายามเข้าสู่ระบบบ่อยเกินไป กรุณาลองใหม่อีกครั้งภายหลัง';
+
+  @override
   String get srvAuthLocked =>
       'บัญชีถูกล็อกชั่วคราวจากการใส่รหัสผิดหลายครั้ง — กรุณาลองใหม่ภายหลัง';
 
   @override
   String get srvPkgNotFound => 'ไม่พบห่อ';
+
+  @override
+  String get srvPkgIdInvalid => 'รูปแบบเลขห่อไม่ถูกต้อง';
+
+  @override
+  String get srvRunningNumberFailed => 'ออกเลขรันไม่สำเร็จ กรุณาลองใหม่';
+
+  @override
+  String get srvDeptDuplicate => 'รหัสแผนก/สถานที่นี้มีอยู่แล้ว';
+
+  @override
+  String get srvTagDuplicate => 'มีแท็กชื่อนี้อยู่แล้ว';
+
+  @override
+  String get srvTemplateDuplicate => 'รหัสชุดอุปกรณ์นี้มีอยู่แล้ว';
+
+  @override
+  String get srvCleanupDateInvalid => 'วันที่ตัดข้อมูลต้องเป็นอดีตเท่านั้น';
+
+  @override
+  String get srvIdempotencyConflict =>
+      'คำขอนี้ถูกส่งซ้ำ — โหลดใหม่แล้วลองอีกครั้ง';
 
   @override
   String get srvPkgWrongStatus => 'สถานะห่อไม่ถูกต้องสำหรับการดำเนินการนี้';

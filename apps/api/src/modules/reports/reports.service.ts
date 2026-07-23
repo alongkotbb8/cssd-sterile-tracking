@@ -325,7 +325,7 @@ export class ReportsService {
   async cleanup(beforeStr: string, userId: string) {
     const before = parseDateOrThrow(beforeStr, 'before');
     if (before >= new Date()) {
-      throw new BadRequestException('วันที่ตัดข้อมูลต้องเป็นอดีตเท่านั้น');
+      throw new BadRequestException({ message: 'วันที่ตัดข้อมูลต้องเป็นอดีตเท่านั้น', code: 'CLEANUP_DATE_INVALID' });
     }
 
     // ⚠️ **ปิดการลบแบบทำลายข้อมูลแล้ว** — Movement คือ traceability history รายห่อ

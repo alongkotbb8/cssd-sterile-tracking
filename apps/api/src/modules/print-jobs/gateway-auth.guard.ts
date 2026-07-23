@@ -25,17 +25,17 @@ export class GatewayAuthGuard implements CanActivate {
     const header = req.headers['x-gateway-key'];
     const raw = Array.isArray(header) ? header[0] : header;
     if (!raw || typeof raw !== 'string' || !raw.includes('.')) {
-      throw new UnauthorizedException('ต้องส่ง X-Gateway-Key');
+      throw new UnauthorizedException({ message: 'ต้องส่ง X-Gateway-Key', code: 'GATEWAY_KEY_MISSING' });
     }
 
     const [keyId, secret] = raw.split('.', 2);
     const printer = await this.prisma.printerDevice.findUnique({ where: { keyId } });
     if (!printer || !printer.isActive || printer.revokedAt) {
-      throw new UnauthorizedException('Gateway ไม่ถูกต้องหรือถูกเพิกถอนแล้ว');
+      throw new UnauthorizedException({ message: 'Gateway ไม่ถูกต้องหรือถูกเพิกถอนแล้ว', code: 'GATEWAY_KEY_INVALID' });
     }
 
     const ok = await bcrypt.compare(secret, printer.apiKeyHash);
-    if (!ok) throw new UnauthorizedException('Gateway key ไม่ถูกต้อง');
+    if (!ok) throw new UnauthorizedException({ message: 'Gateway key ไม่ถูกต้อง', code: 'GATEWAY_KEY_INVALID' });
 
     const gateway: AuthenticatedGateway = { id: printer.id, name: printer.name };
     req.gateway = gateway;

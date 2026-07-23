@@ -43,7 +43,7 @@ export class RunningNumberService {
         if (!isUniqueConflict) throw e;
       }
     }
-    throw new ConflictException('ออกเลขรันไม่สำเร็จ กรุณาลองใหม่');
+    throw new ConflictException({ message: 'ออกเลขรันไม่สำเร็จ กรุณาลองใหม่', code: 'RUNNING_NUMBER_FAILED' });
   }
 
   async nextId(

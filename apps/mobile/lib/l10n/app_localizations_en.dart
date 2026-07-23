@@ -113,11 +113,38 @@ class AppLocalizationsEn extends AppLocalizations {
   String get errUnknown => 'An unknown error occurred';
 
   @override
+  String get srvAuthRateLimited =>
+      'Too many sign-in attempts — please try again later';
+
+  @override
   String get srvAuthLocked =>
       'Account temporarily locked after repeated failed attempts — please try again later';
 
   @override
   String get srvPkgNotFound => 'Package not found';
+
+  @override
+  String get srvPkgIdInvalid => 'Invalid package number format';
+
+  @override
+  String get srvRunningNumberFailed =>
+      'Could not issue a running number — please try again';
+
+  @override
+  String get srvDeptDuplicate => 'That department/location code already exists';
+
+  @override
+  String get srvTagDuplicate => 'A tag with that name already exists';
+
+  @override
+  String get srvTemplateDuplicate => 'That instrument-set code already exists';
+
+  @override
+  String get srvCleanupDateInvalid => 'The cutoff date must be in the past';
+
+  @override
+  String get srvIdempotencyConflict =>
+      'This request was sent twice — reload and try again';
 
   @override
   String get srvPkgWrongStatus =>

@@ -127,7 +127,7 @@ export class IdempotencyService {
     method: string,
   ): T {
     if (existing.userId !== userId) {
-      throw new ConflictException('Idempotency-Key นี้ถูกใช้โดยผู้ใช้อื่นแล้ว');
+      throw new ConflictException({ message: 'Idempotency-Key นี้ถูกใช้โดยผู้ใช้อื่นแล้ว', code: 'IDEMPOTENCY_CONFLICT' });
     }
     // key เดิมต้องมาจาก endpoint+method เดิมเท่านั้น — กัน client เผลอ reuse key
     // ข้าม endpoint (เช่น key เดียวยิงทั้ง scan/out และ print-jobs/create)
