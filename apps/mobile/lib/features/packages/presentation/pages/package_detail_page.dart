@@ -70,6 +70,8 @@ class PackageDetailPage extends ConsumerWidget {
               const SizedBox(height: 12),
               _InfoCard(pkg: pkg),
               const SizedBox(height: 12),
+              _TagsCard(pkg: pkg),
+              const SizedBox(height: 12),
               _HistoryCard(movements: pkg.movements),
             ],
           ),
@@ -360,6 +362,218 @@ class _InfoCard extends StatelessWidget {
             ]),
           ),
       ]),
+    );
+  }
+}
+
+/// การ์ดจัดการ tag ของห่อ — แสดง tag ปัจจุบัน + ปุ่มแก้ไข (ติด/ถอด)
+class _TagsCard extends ConsumerWidget {
+  const _TagsCard({required this.pkg});
+  final PackageModel pkg;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: SterelisColors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: SterelisColors.border),
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          const Text('ป้ายกำกับ',
+              style: TextStyle(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 14,
+                  color: SterelisColors.textStrong)),
+          const Spacer(),
+          TextButton.icon(
+            onPressed: () => _editTags(context, ref),
+            icon: const Icon(Icons.edit_outlined, size: 16),
+            label: const Text('แก้ไข'),
+            style: TextButton.styleFrom(
+                visualDensity: VisualDensity.compact,
+                padding: const EdgeInsets.symmetric(horizontal: 8)),
+          ),
+        ]),
+        const SizedBox(height: 4),
+        if (pkg.tags.isEmpty)
+          const Text('ยังไม่มีป้ายกำกับ',
+              style: TextStyle(fontSize: 13, color: SterelisColors.textFaint))
+        else
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: pkg.tags.map((t) => _TagPill(tag: t)).toList(),
+          ),
+      ]),
+    );
+  }
+
+  Future<void> _editTags(BuildContext context, WidgetRef ref) async {
+    final changed = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: SterelisColors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      builder: (_) => _EditTagsSheet(pkg: pkg),
+    );
+    if (changed == true) {
+      ref.invalidate(packageDetailProvider(pkg.id));
+    }
+  }
+}
+
+/// ป้าย tag แบบอ่านอย่างเดียว (มีจุดสีตาม colorHex)
+class _TagPill extends StatelessWidget {
+  const _TagPill({required this.tag});
+  final Tag tag;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = tag.colorValue != null
+        ? Color(tag.colorValue!)
+        : SterelisColors.blue500;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: c.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: c.withValues(alpha: 0.5)),
+      ),
+      child: Row(mainAxisSize: MainAxisSize.min, children: [
+        CircleAvatar(backgroundColor: c, radius: 5),
+        const SizedBox(width: 6),
+        Text(tag.name,
+            style: const TextStyle(
+                fontSize: 12.5,
+                fontWeight: FontWeight.w600,
+                color: SterelisColors.textStrong)),
+      ]),
+    );
+  }
+}
+
+/// Sheet ติด/ถอด tag — toggle chips จากรายการ tag ทั้งหมด แล้วบันทึกทีเดียว
+class _EditTagsSheet extends ConsumerStatefulWidget {
+  const _EditTagsSheet({required this.pkg});
+  final PackageModel pkg;
+
+  @override
+  ConsumerState<_EditTagsSheet> createState() => _EditTagsSheetState();
+}
+
+class _EditTagsSheetState extends ConsumerState<_EditTagsSheet> {
+  late final Set<String> _selected =
+      widget.pkg.tags.map((t) => t.id).toSet();
+  bool _saving = false;
+
+  Future<void> _save() async {
+    setState(() => _saving = true);
+    try {
+      await ref
+          .read(packageRepositoryProvider)
+          .setTags(widget.pkg.id, _selected.toList());
+      if (!mounted) return;
+      Navigator.of(context).pop(true);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _saving = false);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(apiErrorMessage(e)),
+        backgroundColor: SterelisColors.danger,
+      ));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final tagsAsync = ref.watch(tagsProvider);
+    final bottom = MediaQuery.of(context).viewInsets.bottom;
+
+    return Padding(
+      padding: EdgeInsets.fromLTRB(20, 16, 20, 20 + bottom),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Center(
+            child: Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                  color: SterelisColors.border,
+                  borderRadius: BorderRadius.circular(2)),
+            ),
+          ),
+          const SizedBox(height: 16),
+          const Text('ป้ายกำกับของห่อ',
+              style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800,
+                  color: SterelisColors.textStrong)),
+          const SizedBox(height: 4),
+          const Text('เลือกป้ายที่ต้องการให้ห่อนี้มี (แตะเพื่อเปิด/ปิด)',
+              style: TextStyle(fontSize: 13, color: SterelisColors.textMuted)),
+          const SizedBox(height: 16),
+          tagsAsync.when(
+            loading: () => const Padding(
+              padding: EdgeInsets.all(16),
+              child: Center(child: CircularProgressIndicator()),
+            ),
+            error: (e, _) => Text(apiErrorMessage(e),
+                style: const TextStyle(color: SterelisColors.danger)),
+            data: (tags) => tags.isEmpty
+                ? const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 12),
+                    child: Text(
+                        'ยังไม่มีป้ายในระบบ — เพิ่มได้ที่เมนูข้อมูลตั้งต้น (SUPERVISOR/ADMIN)',
+                        style: TextStyle(color: SterelisColors.textFaint)),
+                  )
+                : Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: tags.map((t) {
+                      final sel = _selected.contains(t.id);
+                      final c = t.colorValue != null
+                          ? Color(t.colorValue!)
+                          : SterelisColors.blue500;
+                      return FilterChip(
+                        avatar: CircleAvatar(backgroundColor: c, radius: 6),
+                        label: Text(t.name),
+                        selected: sel,
+                        showCheckmark: false,
+                        onSelected: _saving
+                            ? null
+                            : (_) => setState(() {
+                                  if (!_selected.add(t.id)) {
+                                    _selected.remove(t.id);
+                                  }
+                                }),
+                        selectedColor: c.withValues(alpha: 0.16),
+                        side: BorderSide(color: sel ? c : SterelisColors.border),
+                      );
+                    }).toList(),
+                  ),
+          ),
+          const SizedBox(height: 16),
+          FilledButton.icon(
+            onPressed: _saving ? null : _save,
+            icon: _saving
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                        strokeWidth: 2, color: Colors.white))
+                : const Icon(Icons.check),
+            label: const Text('บันทึกป้ายกำกับ'),
+            style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
+          ),
+        ],
+      ),
     );
   }
 }

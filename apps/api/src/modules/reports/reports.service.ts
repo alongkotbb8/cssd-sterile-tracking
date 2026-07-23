@@ -213,26 +213,46 @@ export class ReportsService {
     }));
   }
 
-  /** รายงาน recall: รอบที่ผลไม่ผ่านทั้งหมด + ห่อที่ถูก recall + ตำแหน่งล่าสุด */
+  /** รายงาน recall: รอบที่ผลไม่ผ่านทั้งหมด + ห่อที่ถูก recall + ตำแหน่งล่าสุด
+   *
+   *  ห่อของแต่ละรอบดึงจาก **ประวัติถาวร (PackageBatchAttempt)** ไม่ใช่ relation
+   *  `batch.packages` (= batchId ปัจจุบัน) — ไม่งั้นห่อที่ถูกปลด batchId ตอนรอบไม่ผ่าน/
+   *  ถูก reprocess จะหายจากรายงาน recall ทั้งที่เคยอยู่ในรอบที่ปนเปื้อน */
   async recalls() {
     const failed = await this.prisma.sterilizationBatch.findMany({
       where: { status: 'FAILED' },
-      include: {
-        sterilizer: true,
-        packages: {
-          include: {
-            setTemplate: true,
-            movements: {
-              orderBy: { createdAt: 'desc' },
-              take: 1,
-              include: { department: true },
-            },
-          },
-        },
-      },
+      include: { sterilizer: true },
       orderBy: { finishedAt: 'desc' },
     });
-    return failed;
+
+    return Promise.all(
+      failed.map(async (b) => {
+        const attempts = await this.prisma.packageBatchAttempt.findMany({
+          where: { batchId: b.id },
+          orderBy: { boundAt: 'asc' },
+          include: {
+            package: {
+              include: {
+                setTemplate: true,
+                movements: {
+                  orderBy: { createdAt: 'desc' },
+                  take: 1,
+                  include: { department: true },
+                },
+              },
+            },
+          },
+        });
+        return {
+          ...b,
+          packages: attempts.map((a) => ({
+            ...a.package,
+            attemptResult: a.result,
+            stillBound: a.package.batchId === b.id,
+          })),
+        };
+      }),
+    );
   }
 
   /**

@@ -145,6 +145,53 @@ describe('[integration] Batch workflow / recall / reprocess / cleanup', () => {
     expect((await prisma.package.findUniqueOrThrow({ where: { id: 'PKG-PO2' } })).status).toBe('PACKED_OUT');
   });
 
+  it('early release → attempt PENDING + resolvedAt = null (ยังไม่ตัดสิน BI)', async () => {
+    const batchId = await bindPackages(1, ['PKG-RA1']);
+    await tx((t) => svc.batches.recordResult(batchId, true, null, seed.userId, t));
+    let att = await prisma.packageBatchAttempt.findFirstOrThrow({ where: { batchId } });
+    expect(att.result).toBe('PENDING');
+    expect(att.resolvedAt).toBeNull(); // ← bug fix: PENDING ต้องไม่ตั้ง resolvedAt
+
+    await tx((t) => svc.batches.recordBiResult(batchId, true, seed.userId, t));
+    att = await prisma.packageBatchAttempt.findFirstOrThrow({ where: { batchId } });
+    expect(att.result).toBe('PASSED');
+    expect(att.resolvedAt).not.toBeNull(); // ตัดสินแล้ว → มี resolvedAt
+  });
+
+  it('P0 recall ค้นผ่านประวัติ attempt — ห่อ STERILE ที่ batchId ถูกปลดยังถูก recall', async () => {
+    const batchId = await bindPackages(1, ['PKG-RC1']);
+    await tx((t) => svc.batches.recordResult(batchId, true, null, seed.userId, t)); // PENDING_BI → STERILE
+    // จำลองห่อที่ batchId ปัจจุบันไม่ชี้รอบนี้แล้ว (เช่นถูกปลด) แต่ยังหมุนเวียนอยู่
+    await prisma.package.update({ where: { id: 'PKG-RC1' }, data: { batchId: null } });
+    await tx((t) => svc.batches.recordBiResult(batchId, false, seed.userId, t)); // BI fail → recall
+    // ค้นด้วย batchId ปัจจุบันจะพลาด — ต้องค้นผ่าน PackageBatchAttempt จึงจะ recall ได้
+    expect((await prisma.package.findUniqueOrThrow({ where: { id: 'PKG-RC1' } })).status).toBe('RETURNED');
+  });
+
+  it('P0 getPackages ดึงจากประวัติ — ห่อที่ batchId ถูกปลด (CI fail) ยังแสดงในรอบเดิม', async () => {
+    const batchId = await bindPackages(1, ['PKG-GP1']);
+    await tx((t) => svc.batches.recordResult(batchId, false, null, seed.userId, t)); // CI fail → PACKED, batchId null
+    const pkgs = (await svc.batches.getPackages(batchId)) as any[];
+    expect(pkgs).toHaveLength(1);
+    expect(pkgs[0].id).toBe('PKG-GP1');
+    expect(pkgs[0].attemptResult).toBe('FAILED');
+    expect(pkgs[0].stillBound).toBe(false); // batchId ถูกปลดแล้ว แต่ยังอยู่ในรายการผ่านประวัติ
+  });
+
+  it('P0 reports.recalls ดึงห่อจากประวัติ — ห่อที่ batchId ถูกปลดยังอยู่ในรายงาน recall', async () => {
+    const batchId = await bindPackages(1, ['PKG-RR1']);
+    await tx((t) => svc.batches.recordResult(batchId, false, null, seed.userId, t)); // FAILED, batchId null
+    const report = (await reports.recalls()) as any[];
+    const b = report.find((x) => x.id === batchId);
+    expect(b).toBeTruthy();
+    expect(b.packages.map((p: any) => p.id)).toContain('PKG-RR1');
+  });
+
+  it('P1 lookup ปฏิเสธเลขห่อรูปแบบผิด (กัน API-direct bypass)', async () => {
+    await expect(svc.scan.lookup('bad id!')).rejects.toBeTruthy();
+    await expect(svc.scan.lookup('a'.repeat(61))).rejects.toBeTruthy();
+  });
+
   it('Cleanup ไม่ลบ Movement history (traceability คงอยู่)', async () => {
     await makePackage(prisma, seed, { id: 'PKG-CL1' });
     await prisma.movement.create({

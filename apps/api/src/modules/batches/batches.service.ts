@@ -177,7 +177,8 @@ export class BatchesService {
     return b;
   }
 
-  /** ตั้งผลของ attempt ของรอบนี้ (option: เฉพาะที่ยังเป็น [onlyFrom]) */
+  /** ตั้งผลของ attempt ของรอบนี้ (option: เฉพาะที่ยังเป็น [onlyFrom])
+   *  resolvedAt ตั้งค่าเฉพาะเมื่อผลถูกตัดสินจริง — ถ้ายัง PENDING (รอ BI) ให้คง null */
   private async setAttemptResult(
     tx: Prisma.TransactionClient,
     batchId: string,
@@ -186,7 +187,10 @@ export class BatchesService {
   ) {
     await tx.packageBatchAttempt.updateMany({
       where: { batchId, ...(onlyFrom ? { result: onlyFrom } : {}) },
-      data: { result, resolvedAt: new Date() },
+      data: {
+        result,
+        resolvedAt: result === BatchAttemptResult.PENDING ? null : new Date(),
+      },
     });
   }
 
@@ -195,15 +199,35 @@ export class BatchesService {
     return { recalled: packages.length, packages };
   }
 
-  /** แกนกลางของ recall — รับ tx เพื่อให้ recordResult/recordBiResult เรียกในทรานแซกชันเดียวกันได้ */
+  /** แกนกลางของ recall — รับ tx เพื่อให้ recordResult/recordBiResult เรียกในทรานแซกชันเดียวกันได้
+   *
+   * ระบุห่อจาก **ประวัติการผูกถาวร (PackageBatchAttempt)** ไม่ใช่ `Package.batchId` ปัจจุบัน
+   * เพราะห่อที่ถูก reprocess/เข้ารอบใหม่ batchId จะเปลี่ยน/ถูกปลด — ถ้าค้นด้วย batchId
+   * ปัจจุบันจะพลาดห่อเหล่านั้น (patient safety) จากนั้น recall เฉพาะห่อที่ยังหมุนเวียนเป็น
+   * ผลผลิตของรอบนี้ (STERILE/ISSUED และยัง **ไม่ถูกฆ่าเชื้อใหม่ในรอบอื่น** — batchId ยังเป็น
+   * รอบนี้หรือว่าง) ห่อที่ผ่าน reprocess แล้วเข้ารอบใหม่ที่ผ่านผล จะถูกดูแลด้วย recall ของ
+   * รอบนั้นเอง จึงไม่ over-recall ผลผลิตดีของรอบอื่น
+   */
   private async recallTx(tx: Prisma.TransactionClient, batchId: string, userId: string) {
     const batch = await tx.sterilizationBatch.findUnique({ where: { id: batchId } });
     if (!batch) throw new NotFoundException('ไม่พบรอบนึ่ง');
 
     const recallable: PackageStatus[] = [PackageStatus.STERILE, PackageStatus.ISSUED];
 
+    // ห่อทุกใบที่เคยผูกกับรอบนี้ (ประวัติถาวร) — ครอบห่อที่ batchId ถูกปลด/เปลี่ยนไปแล้ว
+    const attempts = await tx.packageBatchAttempt.findMany({
+      where: { batchId },
+      select: { packageId: true },
+    });
+    const attemptIds = [...new Set(attempts.map(a => a.packageId))];
+
     const affected = await tx.package.findMany({
-      where: { batchId, status: { in: recallable } },
+      where: {
+        id: { in: attemptIds },
+        status: { in: recallable },
+        // ไม่ดึงห่อที่ถูกฆ่าเชื้อใหม่ในรอบอื่นแล้ว (batchId ชี้รอบอื่น = ปลอดภัยด้วยรอบใหม่)
+        OR: [{ batchId }, { batchId: null }],
+      },
       include: {
         setTemplate: true,
         movements: {
@@ -226,19 +250,33 @@ export class BatchesService {
     return affected;
   }
 
-  /** Get all packages in a batch with their current locations */
+  /** ห่อทั้งหมดในรอบนึ่ง + ตำแหน่งปัจจุบัน — ดึงจาก **ประวัติถาวร (PackageBatchAttempt)**
+   *  ไม่ใช่ `Package.batchId` ปัจจุบัน เพื่อให้ห่อที่ถูกปลด batchId (รอบไม่ผ่าน/ถูก reprocess)
+   *  ยังคงแสดงในรายละเอียดรอบเดิม พร้อมผล attempt และว่ายังผูกกับรอบนี้อยู่ไหม */
   async getPackages(batchId: string) {
-    return this.prisma.package.findMany({
+    const attempts = await this.prisma.packageBatchAttempt.findMany({
       where: { batchId },
+      orderBy: { boundAt: 'asc' },
       include: {
-        setTemplate: true,
-        movements: {
-          orderBy: { createdAt: 'desc' },
-          take: 1,
-          include: { department: true },
+        package: {
+          include: {
+            setTemplate: true,
+            movements: {
+              orderBy: { createdAt: 'desc' },
+              take: 1,
+              include: { department: true },
+            },
+          },
         },
       },
     });
+    return attempts.map(a => ({
+      ...a.package,
+      attemptResult: a.result,
+      boundAt: a.boundAt,
+      resolvedAt: a.resolvedAt,
+      stillBound: a.package.batchId === batchId,
+    }));
   }
 
   async findOne(id: string) {

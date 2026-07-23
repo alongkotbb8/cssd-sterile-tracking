@@ -8,6 +8,7 @@ import { PackageStatus, MovementType, Prisma } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { AuditService } from '../../common/audit/audit.service';
 import { isExpired, daysLeft } from '../../common/expiry';
+import { assertValidPackageId } from './package-id.util';
 
 export interface ScanResult {
   packageId: string;
@@ -263,6 +264,7 @@ export class ScanService {
 
   /** Lookup: scan QR → get package info + expiry warning */
   async lookup(packageId: string) {
+    assertValidPackageId(packageId); // ตรวจรูปแบบก่อน query (กัน API-direct bypass)
     const pkg = await this.prisma.package.findUnique({
       where: { id: packageId },
       include: { setTemplate: true, batch: true },

@@ -9,33 +9,52 @@ import {
   ArrayNotEmpty,
   ArrayMaxSize,
   MaxLength,
+  Matches,
 } from 'class-validator';
+import { applyDecorators } from '@nestjs/common';
 import { ScanService } from './scan.service';
+import { PACKAGE_ID_PATTERN, PACKAGE_ID_MAX_LEN } from './package-id.util';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { IdempotencyService } from '../../common/idempotency/idempotency.service';
 
+/**
+ * เลขห่อ (running number) จาก body — ตรวจ charset + ความยาว ที่ backend ด้วย
+ * (ไม่พึ่ง client validate อย่างเดียว) กันเรียก API ตรงด้วยค่าขยะ/ยิง lookup ทิ้ง
+ * รูปแบบ: {SET}-{YYYYMMDD}-{SEQ} → อักขระ [A-Za-z0-9-] เท่านั้น, ยาว ≤ 60
+ */
+function IsPackageIdArray() {
+  return applyDecorators(
+    IsArray(),
+    ArrayNotEmpty(),
+    ArrayMaxSize(200),
+    IsString({ each: true }),
+    MaxLength(PACKAGE_ID_MAX_LEN, { each: true }),
+    Matches(PACKAGE_ID_PATTERN, { each: true, message: 'เลขห่อมีอักขระไม่ถูกต้อง' }),
+  );
+}
+
 class ScanInDto {
-  @IsArray() @ArrayNotEmpty() @ArrayMaxSize(200) @IsString({ each: true }) packageIds: string[];
+  @IsPackageIdArray() packageIds: string[];
   @IsString() batchId: string;
   // ผู้ใช้พิมพ์เลขห่อเอง (กล้องใช้ไม่ได้) — ต้องติด flag ไว้ตรวจสอบย้อนหลังได้เสมอ
   @IsOptional() @IsBoolean() manualEntry?: boolean;
 }
 
 class ScanOutDto {
-  @IsArray() @ArrayNotEmpty() @ArrayMaxSize(200) @IsString({ each: true }) packageIds: string[];
+  @IsPackageIdArray() packageIds: string[];
   @IsString() departmentId: string;
   @IsOptional() @IsString() @MaxLength(100) receiverName?: string;
   @IsOptional() @IsBoolean() manualEntry?: boolean;
 }
 
 class ScanReturnDto {
-  @IsArray() @ArrayNotEmpty() @ArrayMaxSize(200) @IsString({ each: true }) packageIds: string[];
+  @IsPackageIdArray() packageIds: string[];
   @IsString() departmentId: string;
   @IsOptional() @IsBoolean() manualEntry?: boolean;
 }
 
 class ReprocessDto {
-  @IsArray() @ArrayNotEmpty() @ArrayMaxSize(200) @IsString({ each: true }) packageIds: string[];
+  @IsPackageIdArray() packageIds: string[];
   @IsOptional() @IsBoolean() manualEntry?: boolean;
 }
 

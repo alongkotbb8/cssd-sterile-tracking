@@ -187,6 +187,17 @@ class PackageRepository {
     );
     return PackageModel.fromJson(res.data!);
   }
+
+  /// ตั้ง tag ของห่อ (แทนที่ทั้งชุด) — ส่งรายการ tagId ที่ต้องการให้ห่อนี้มี
+  /// (PUT /packages/:id/tags) แล้ว invalidate detail + list ให้รีเฟรช
+  Future<void> setTags(String id, List<String> tagIds) async {
+    await _ref.read(dioProvider).put<List<dynamic>>(
+      '/packages/${Uri.encodeComponent(id)}/tags',
+      data: {'tagIds': tagIds},
+    );
+    _ref.invalidate(packageDetailProvider(id));
+    _ref.invalidate(packagesProvider);
+  }
 }
 
 /// ---------- Scan ----------
@@ -251,6 +262,22 @@ class ScanRepository {
       data: {
         'packageIds': packageIds,
         'departmentId': departmentId,
+        if (manualEntry) 'manualEntry': true,
+      },
+      options: Options(headers: {'Idempotency-Key': newIdempotencyKey()}),
+    );
+    return _results(res.data!);
+  }
+
+  /// Reprocess: ห่อที่ส่งคืน (RETURNED) → PACKED เพื่อเข้ารอบนึ่งใหม่ (ไม่ต้องเลือกปลายทาง)
+  Future<List<ScanResultItem>> scanReprocess(
+    List<String> packageIds, {
+    bool manualEntry = false,
+  }) async {
+    final res = await _ref.read(dioProvider).post<List<dynamic>>(
+      '/scan/reprocess',
+      data: {
+        'packageIds': packageIds,
         if (manualEntry) 'manualEntry': true,
       },
       options: Options(headers: {'Idempotency-Key': newIdempotencyKey()}),

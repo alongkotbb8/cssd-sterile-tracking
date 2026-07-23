@@ -161,6 +161,7 @@ class PackageModel {
   final List<Movement> movements;
   final DateTime? printedAt; // พิมพ์ label ล่าสุดเมื่อไหร่
   final int reprintCount; // จำนวนครั้งที่พิมพ์ซ้ำ (ไม่นับครั้งแรก)
+  final List<Tag> tags; // ป้ายกำกับที่ผูกกับห่อ (จาก detail endpoint)
 
   const PackageModel({
     required this.id,
@@ -175,6 +176,7 @@ class PackageModel {
     this.movements = const [],
     this.printedAt,
     this.reprintCount = 0,
+    this.tags = const [],
   });
 
   factory PackageModel.fromJson(Map<String, dynamic> j) => PackageModel(
@@ -193,6 +195,11 @@ class PackageModel {
             .toList(),
         printedAt: _date(j['printedAt']),
         reprintCount: (j['reprintCount'] ?? 0) as int,
+        // detail endpoint ส่ง tags เป็น [{ tag: {id,name,colorHex} }] (join table)
+        tags: ((j['tags'] as List?) ?? const [])
+            .map((e) => Tag.fromJson(
+                (e as Map<String, dynamic>)['tag'] as Map<String, dynamic>))
+            .toList(),
       );
 
   int? get daysLeft => expiryDate?.difference(DateTime.now()).inDays;

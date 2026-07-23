@@ -26,7 +26,7 @@ bool isValidPackageId(String id) {
   return RegExp(r'^[A-Za-z0-9-]+$').hasMatch(id);
 }
 
-enum ScanMode { scanIn, scanOut, scanReturn }
+enum ScanMode { scanIn, scanOut, scanReturn, scanReprocess }
 
 extension on ScanMode {
   // "เข้ารอบนึ่ง" (ไม่ใช่ "นำเข้าคลัง") — ห่อจะเข้าคลัง (STERILE) อัตโนมัติ
@@ -35,15 +35,18 @@ extension on ScanMode {
         ScanMode.scanIn => 'เข้ารอบนึ่ง',
         ScanMode.scanOut => 'เบิกออก',
         ScanMode.scanReturn => 'ส่งคืน',
+        ScanMode.scanReprocess => 'Reprocess',
       };
 
   /// สถานะห่อที่ mode นี้รับได้
   /// - เบิกออก: STERILE (ปกติ) และ PACKED (ส่งออกโดยยังไม่ฆ่าเชื้อ เช่น ส่ง รพ.อื่น)
   /// - ส่งคืน: ISSUED (ปกติ → รอ reprocess) และ PACKED_OUT (คืนแล้วกลับเป็น PACKED)
+  /// - reprocess: RETURNED (ส่งคืนแล้ว) → PACKED เพื่อเข้ารอบนึ่งใหม่
   Set<String> get allowedStatuses => switch (this) {
         ScanMode.scanIn => const {'PACKED'},
         ScanMode.scanOut => const {'STERILE', 'PACKED'},
         ScanMode.scanReturn => const {'ISSUED', 'PACKED_OUT'},
+        ScanMode.scanReprocess => const {'RETURNED'},
       };
 }
 
@@ -343,6 +346,7 @@ class _ScanPageState extends ConsumerState<ScanPage> with WidgetsBindingObserver
     return switch (_mode) {
       ScanMode.scanIn => _batch != null,
       ScanMode.scanOut || ScanMode.scanReturn => _department != null,
+      ScanMode.scanReprocess => true, // ไม่ต้องเลือกปลายทาง
     };
   }
 
@@ -357,6 +361,7 @@ class _ScanPageState extends ConsumerState<ScanPage> with WidgetsBindingObserver
       ScanMode.scanOut => 'แผนก ${_department?.name ?? ''}'
           '${_receiverCtrl.text.trim().isNotEmpty ? ' · ผู้รับ ${_receiverCtrl.text.trim()}' : ''}',
       ScanMode.scanReturn => 'แผนก ${_department?.name ?? ''}',
+      ScanMode.scanReprocess => 'กลับเป็น "แพ็กแล้ว" เพื่อเข้ารอบนึ่งใหม่',
     };
     final confirmed = await showDialog<bool>(
       context: context,
@@ -409,6 +414,8 @@ class _ScanPageState extends ConsumerState<ScanPage> with WidgetsBindingObserver
               receiverName: _receiverCtrl.text.trim(), manualEntry: manual),
           ScanMode.scanReturn =>
             repo.scanReturn(ids, _department!.id, manualEntry: manual),
+          ScanMode.scanReprocess =>
+            repo.scanReprocess(ids, manualEntry: manual),
         };
       }
 
@@ -594,12 +601,23 @@ class _ScanPageState extends ConsumerState<ScanPage> with WidgetsBindingObserver
           color: SterelisColors.white,
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
           child: SegmentedButton<ScanMode>(
+            // ซ่อนไอคอนติ๊ก + label กระชับ เพื่อให้ 4 โหมดพอดีจอแคบ (ไม่ overflow)
+            showSelectedIcon: false,
             segments: ScanMode.values
-                .map((m) => ButtonSegment(value: m, label: Text(m.title)))
+                .map((m) => ButtonSegment(
+                    value: m,
+                    label: Text(m.title,
+                        style: const TextStyle(fontSize: 12.5),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis)))
                 .toList(),
             selected: {_mode},
             onSelectionChanged: (s) => _switchMode(s.first),
             style: ButtonStyle(
+              visualDensity: VisualDensity.compact,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              padding: const WidgetStatePropertyAll(
+                  EdgeInsets.symmetric(horizontal: 6)),
               backgroundColor: WidgetStateProperty.resolveWith((states) =>
                   states.contains(WidgetState.selected)
                       ? SterelisColors.blue500
@@ -807,6 +825,25 @@ class _TargetSelector extends ConsumerWidget {
               ),
           ]),
         ),
+      );
+    }
+
+    // Reprocess ไม่ต้องเลือกปลายทาง — สแกนห่อที่ส่งคืน (RETURNED) แล้วยืนยันได้เลย
+    if (mode == ScanMode.scanReprocess) {
+      return Container(
+        color: SterelisColors.white,
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+        child: const Row(children: [
+          Icon(Icons.recycling_outlined,
+              size: 18, color: SterelisColors.teal500),
+          SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'สแกนห่อที่ส่งคืนแล้ว (RETURNED) เพื่อกลับเป็น "แพ็กแล้ว" พร้อมเข้ารอบนึ่งใหม่',
+              style: TextStyle(fontSize: 12.5, color: SterelisColors.textMuted),
+            ),
+          ),
+        ]),
       );
     }
 

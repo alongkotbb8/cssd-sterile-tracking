@@ -1,6 +1,7 @@
 import {
   Controller,
   Post,
+  Put,
   Get,
   Body,
   Headers,
@@ -14,6 +15,7 @@ import { ApiBearerAuth, ApiTags, ApiOperation, ApiQuery, ApiHeader } from '@nest
 import { PackageStatus } from '@prisma/client';
 import { PackagesService } from './packages.service';
 import { CreatePackageDto } from './dto/create-package.dto';
+import { SetTagsDto } from './dto/set-tags.dto';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { IdempotencyService } from '../../common/idempotency/idempotency.service';
 
@@ -57,6 +59,16 @@ export class PackagesController {
   @ApiOperation({ summary: 'ดูรายละเอียดห่อ + ประวัติ movement' })
   findOne(@Param('id') id: string) {
     return this.svc.findOne(id);
+  }
+
+  @Put(':id/tags')
+  @ApiOperation({ summary: 'ตั้ง tag ของห่อ (แทนที่ทั้งชุด) — ใช้ติด/ถอด tag' })
+  setTags(
+    @Param('id') id: string,
+    @Body() dto: SetTagsDto,
+    @CurrentUser() user: { id: string },
+  ) {
+    return this.svc.setTags(id, dto.tagIds, user.id);
   }
 
   // หมายเหตุ: เดิมมี POST /reserve-pool (จองเลขรัน pool สำหรับ offline) — ตัดออกแล้ว
