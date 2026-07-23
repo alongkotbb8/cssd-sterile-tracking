@@ -446,4 +446,354 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get deptSaveButton => 'Save place';
+
+  @override
+  String get reportTitle => 'Summary report';
+
+  @override
+  String get reportPrintTooltip => 'Print report (PDF)';
+
+  @override
+  String get reportPeriodToday => 'Today';
+
+  @override
+  String get reportPeriodWeek => 'Last 7 days';
+
+  @override
+  String get reportPeriodMonth => 'This month';
+
+  @override
+  String get moveIn => 'In';
+
+  @override
+  String get moveOut => 'Out';
+
+  @override
+  String get moveReturn => 'Return';
+
+  @override
+  String get reportTotal => 'Total';
+
+  @override
+  String reportMovementsTitle(int count) {
+    return 'Movements ($count)';
+  }
+
+  @override
+  String get reportNoMovements => 'No movements in this period';
+
+  @override
+  String reportDeptLine(String dept) {
+    return 'Dept $dept';
+  }
+
+  @override
+  String reportByLine(String name) {
+    return 'by $name';
+  }
+
+  @override
+  String get pdfReportTitle => 'CSSD sterile tracking report';
+
+  @override
+  String pdfDateRange(String from, String to, String printed) {
+    return 'Period $from – $to · printed $printed';
+  }
+
+  @override
+  String get pdfNoMovements => '— No movements in this period —';
+
+  @override
+  String get pdfColDatetime => 'Date-time';
+
+  @override
+  String get pdfColType => 'Type';
+
+  @override
+  String get pdfColPackage => 'Package';
+
+  @override
+  String get pdfColSet => 'Set';
+
+  @override
+  String get pdfColDept => 'Dept';
+
+  @override
+  String get pdfColUser => 'User';
+
+  @override
+  String get pdfInspector => 'Inspector / CSSD supervisor';
+
+  @override
+  String pdfError(String error) {
+    return 'Failed to create PDF: $error';
+  }
+
+  @override
+  String get cleanupTitle => 'Clean up old data (save space)';
+
+  @override
+  String get cleanupDesc =>
+      'After archiving the printed report, you can delete old history from the system; packages still in stock or in use are not deleted';
+
+  @override
+  String get cleanupButton => 'Delete history before this period';
+
+  @override
+  String get cleanupConfirmTitle => 'Clean up old data?';
+
+  @override
+  String cleanupConfirmBody(String date) {
+    return 'This permanently deletes movement history and discarded packages created before $date';
+  }
+
+  @override
+  String get cleanupKeep =>
+      '✓ Packages still in stock/circulation (packed·sterile·issued·awaiting reprocess) are kept';
+
+  @override
+  String get cleanupIrreversible =>
+      '✗ Deleted data cannot be recovered — archive a printed report first';
+
+  @override
+  String get cleanupConfirmAction => 'Delete permanently';
+
+  @override
+  String cleanupDone(int m, int p) {
+    return 'Cleaned up: $m history entries · $p discarded packages';
+  }
+
+  @override
+  String get commonYes => 'Yes';
+
+  @override
+  String get pjStatusQueued => 'Waiting for printer to claim';
+
+  @override
+  String get pjStatusClaimed => 'Printer claimed the job';
+
+  @override
+  String get pjStatusPrinting => 'Sending to printer';
+
+  @override
+  String get pjStatusSent => 'Data sent to printer';
+
+  @override
+  String get pjStatusPrinted => 'Printed successfully';
+
+  @override
+  String get pjStatusSimulated => 'Simulated (test mode, not a real print)';
+
+  @override
+  String get pjStatusFailed => 'Print failed (retrying)';
+
+  @override
+  String get pjStatusRetrying => 'Retrying print';
+
+  @override
+  String get pjStatusDeadLetter => 'Permanently failed — needs review';
+
+  @override
+  String get pjStatusAckUnknown =>
+      'Unsure if actually printed — needs supervisor decision';
+
+  @override
+  String get pjStatusResolvedPrinted => 'Supervisor confirmed printed';
+
+  @override
+  String get pjStatusResolvedRequeued => 'Supervisor requeued the job';
+
+  @override
+  String get pjStatusCancelled => 'Cancelled';
+
+  @override
+  String get pjStepQueued => 'Queued';
+
+  @override
+  String get pjStepClaimed => 'Claimed';
+
+  @override
+  String get pjStepPrinting => 'Sending';
+
+  @override
+  String get pjStepSent => 'At printer';
+
+  @override
+  String get pjStepPrinted => 'Done';
+
+  @override
+  String get pjScopeAll => 'All';
+
+  @override
+  String get pjScopeMine => 'Mine';
+
+  @override
+  String get pjPageTitle => 'Print jobs';
+
+  @override
+  String get pjNone => 'No print jobs yet';
+
+  @override
+  String pjScopeLine(String scope) {
+    return 'Scope: $scope';
+  }
+
+  @override
+  String pjNeedAttention(int count) {
+    return '$count need attention';
+  }
+
+  @override
+  String get pjCancelTitle => 'Cancel print job?';
+
+  @override
+  String get pjCancelBody =>
+      'Only jobs not yet claimed by a printer can be cancelled';
+
+  @override
+  String get pjCancelNo => 'No';
+
+  @override
+  String get pjCancelYes => 'Cancel job';
+
+  @override
+  String get pjResolveConfirm => 'Confirm it was actually printed';
+
+  @override
+  String get pjResolveRequeue => 'Requeue the job (not confirming print)';
+
+  @override
+  String get pjResolveNote => 'Decision note (required)';
+
+  @override
+  String get pjResolveNoteHint => 'e.g. checked the printer and found...';
+
+  @override
+  String get pjResolveNoteRequired => 'A decision note is required';
+
+  @override
+  String get pjResolveDone => 'Decision saved';
+
+  @override
+  String get pjDetailTitle => 'Print job status';
+
+  @override
+  String get pjSimulatedBanner =>
+      'Test mode (SIMULATED) — not a real print, not counted as print history';
+
+  @override
+  String get pjAckBanner =>
+      'Unsure whether it actually printed — please contact a supervisor (SUPERVISOR/ADMIN) to check and decide';
+
+  @override
+  String get pjDeadBanner =>
+      'Printing failed the maximum number of times — check the printer and reprint';
+
+  @override
+  String get pjCancelButton => 'Cancel print job';
+
+  @override
+  String pjPackageTitle(String id) {
+    return 'Package $id';
+  }
+
+  @override
+  String get pjFieldCreated => 'Created';
+
+  @override
+  String get pjFieldPrinter => 'Printer';
+
+  @override
+  String get pjFieldAttempts => 'Attempts';
+
+  @override
+  String get pjFieldReprint => 'Reprint';
+
+  @override
+  String get pjFieldReprintReason => 'Reprint reason';
+
+  @override
+  String get pjFieldErrorCode => 'Error code';
+
+  @override
+  String get pjFieldSentAt => 'Sent to printer at';
+
+  @override
+  String get pjFieldPrintedAt => 'Printed at';
+
+  @override
+  String get pjFieldResolvedAt => 'Resolved at';
+
+  @override
+  String get pjFieldResolutionNote => 'Resolution note';
+
+  @override
+  String get pjResolveSectionTitle => 'Decision (supervisor)';
+
+  @override
+  String get pjResolveSectionHint =>
+      'This job reached the printer but the result can\'t be confirmed — check the physical printer before deciding';
+
+  @override
+  String get pjResolveConfirmBtn => 'Confirm printed';
+
+  @override
+  String get pjResolveRequeueBtn => 'Don\'t confirm — requeue';
+
+  @override
+  String get pjReprintReasonRequired =>
+      'Some packages were printed before — a reprint reason is required';
+
+  @override
+  String get pjCreatedOne =>
+      'Print job created — waiting for the printer to claim it';
+
+  @override
+  String pjCreatedMany(int count) {
+    return 'Created $count print jobs';
+  }
+
+  @override
+  String get pjPrintLabel => 'Print label';
+
+  @override
+  String pjPrintLabelCount(int count) {
+    return 'Print $count labels';
+  }
+
+  @override
+  String get pjSubmitDesc =>
+      'The system creates print jobs and sends them to the printer (Gateway) — track status until actually printed';
+
+  @override
+  String get pjTargetPrinter => 'Target printer';
+
+  @override
+  String get pjAutoAnyPrinter => 'Automatic (any printer)';
+
+  @override
+  String get pjOfflineSuffix => ' · offline';
+
+  @override
+  String get pjReprintReasonLabel => 'Reprint reason';
+
+  @override
+  String get pjReprintReasonHint => 'e.g. previous label damaged/fell off';
+
+  @override
+  String pjCreatingProgress(int done, int total) {
+    return 'Creating job $done/$total...';
+  }
+
+  @override
+  String get pjCreateButton => 'Create print job';
+
+  @override
+  String pjCreateButtonCount(int count) {
+    return 'Create $count print jobs';
+  }
+
+  @override
+  String get pjAutoHint =>
+      'Sent automatically — a free printer will claim the job';
 }

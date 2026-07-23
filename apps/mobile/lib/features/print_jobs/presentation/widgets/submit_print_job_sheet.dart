@@ -6,6 +6,7 @@ import '../../../../core/api/api_client.dart';
 import '../../../../core/api/repositories.dart';
 import '../../../../core/models/models.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../l10n/app_localizations.dart';
 
 /// สร้างงานพิมพ์ผ่าน Print Job Queue (แทนการพิมพ์ตรง) — เลือก gateway + เหตุผล
 /// พิมพ์ซ้ำ (ถ้าเคยพิมพ์แล้ว) → สร้าง PrintJob 1 งานต่อ 1 ห่อ แล้วพาไปดูสถานะ
@@ -58,9 +59,10 @@ class _SubmitPrintJobSheetState extends ConsumerState<_SubmitPrintJobSheet> {
   }
 
   Future<void> _submit() async {
+    final l10n = AppLocalizations.of(context);
     if (_hasReprint && _reasonCtrl.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('มีห่อที่เคยพิมพ์แล้ว — ต้องระบุเหตุผลการพิมพ์ซ้ำ'),
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(l10n.pjReprintReasonRequired),
         backgroundColor: SterelisColors.danger,
       ));
       return;
@@ -88,8 +90,8 @@ class _SubmitPrintJobSheetState extends ConsumerState<_SubmitPrintJobSheet> {
       final messenger = ScaffoldMessenger.of(context);
       messenger.showSnackBar(SnackBar(
         content: Text(created.length == 1
-            ? 'สร้างงานพิมพ์แล้ว — รอเครื่องพิมพ์รับงาน'
-            : 'สร้างงานพิมพ์ ${created.length} งานแล้ว'),
+            ? l10n.pjCreatedOne
+            : l10n.pjCreatedMany(created.length)),
         backgroundColor: SterelisColors.success,
       ));
       // งานเดียว → ไปหน้าสถานะเลย; หลายงาน → ไปหน้ารายการงานพิมพ์
@@ -110,6 +112,7 @@ class _SubmitPrintJobSheetState extends ConsumerState<_SubmitPrintJobSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final bottom = MediaQuery.of(context).viewInsets.bottom;
     final gateways = ref.watch(gatewaysProvider);
 
@@ -132,21 +135,21 @@ class _SubmitPrintJobSheetState extends ConsumerState<_SubmitPrintJobSheet> {
           const SizedBox(height: 16),
           Text(
             widget.pkgs.length == 1
-                ? 'พิมพ์ label'
-                : 'พิมพ์ label ${widget.pkgs.length} ห่อ',
+                ? l10n.pjPrintLabel
+                : l10n.pjPrintLabelCount(widget.pkgs.length),
             style: const TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.w800,
                 color: SterelisColors.textStrong),
           ),
           const SizedBox(height: 4),
-          const Text(
-            'ระบบจะสร้างงานพิมพ์แล้วส่งให้เครื่องพิมพ์ (Gateway) — ติดตามสถานะได้จนพิมพ์จริง',
-            style: TextStyle(fontSize: 13, color: SterelisColors.textMuted),
+          Text(
+            l10n.pjSubmitDesc,
+            style: const TextStyle(fontSize: 13, color: SterelisColors.textMuted),
           ),
           const SizedBox(height: 18),
-          const Text('เครื่องพิมพ์ปลายทาง',
-              style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+          Text(l10n.pjTargetPrinter,
+              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
           const SizedBox(height: 8),
           // ตัวเลือก gateway — CSSD อาจโหลดรายการไม่ได้ (สิทธิ์เฉพาะ SUPERVISOR/ADMIN)
           // จึง fallback เป็น "อัตโนมัติ" อย่างเดียวเมื่อโหลดไม่ได้/ว่าง
@@ -163,10 +166,10 @@ class _SubmitPrintJobSheetState extends ConsumerState<_SubmitPrintJobSheet> {
                 spacing: 8,
                 runSpacing: 8,
                 children: [
-                  _gatewayChip(null, 'อัตโนมัติ (เครื่องไหนก็ได้)', true),
+                  _gatewayChip(null, l10n.pjAutoAnyPrinter, true),
                   ...online.map((g) => _gatewayChip(
                         g.id,
-                        '${g.name}${g.isOnline ? '' : ' · ออฟไลน์'}',
+                        '${g.name}${g.isOnline ? '' : l10n.pjOfflineSuffix}',
                         g.isOnline,
                       )),
                 ],
@@ -181,12 +184,12 @@ class _SubmitPrintJobSheetState extends ConsumerState<_SubmitPrintJobSheet> {
                 color: SterelisColors.warningBg,
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: const Row(children: [
-                Icon(Icons.info_outline, color: SterelisColors.warning, size: 18),
-                SizedBox(width: 8),
+              child: Row(children: [
+                const Icon(Icons.info_outline, color: SterelisColors.warning, size: 18),
+                const SizedBox(width: 8),
                 Expanded(
-                  child: Text('มีห่อที่เคยพิมพ์แล้ว — ต้องระบุเหตุผลการพิมพ์ซ้ำ',
-                      style: TextStyle(fontSize: 13, color: SterelisColors.text)),
+                  child: Text(l10n.pjReprintReasonRequired,
+                      style: const TextStyle(fontSize: 13, color: SterelisColors.text)),
                 ),
               ]),
             ),
@@ -195,9 +198,9 @@ class _SubmitPrintJobSheetState extends ConsumerState<_SubmitPrintJobSheet> {
               controller: _reasonCtrl,
               enabled: !_submitting,
               maxLength: 200,
-              decoration: const InputDecoration(
-                labelText: 'เหตุผลการพิมพ์ซ้ำ',
-                hintText: 'เช่น label เดิมชำรุด/หลุด',
+              decoration: InputDecoration(
+                labelText: l10n.pjReprintReasonLabel,
+                hintText: l10n.pjReprintReasonHint,
               ),
             ),
           ],
@@ -211,10 +214,10 @@ class _SubmitPrintJobSheetState extends ConsumerState<_SubmitPrintJobSheet> {
                     child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                 : const Icon(Icons.print_outlined),
             label: Text(_submitting
-                ? 'กำลังสร้างงาน $_done/${widget.pkgs.length}...'
+                ? l10n.pjCreatingProgress(_done, widget.pkgs.length)
                 : widget.pkgs.length == 1
-                    ? 'สร้างงานพิมพ์'
-                    : 'สร้างงานพิมพ์ ${widget.pkgs.length} งาน'),
+                    ? l10n.pjCreateButton
+                    : l10n.pjCreateButtonCount(widget.pkgs.length)),
             style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
           ),
         ],
@@ -228,12 +231,12 @@ class _SubmitPrintJobSheetState extends ConsumerState<_SubmitPrintJobSheet> {
           color: SterelisColors.blue50,
           borderRadius: BorderRadius.circular(12),
         ),
-        child: const Row(children: [
-          Icon(Icons.print_outlined, color: SterelisColors.blue600, size: 18),
-          SizedBox(width: 8),
+        child: Row(children: [
+          const Icon(Icons.print_outlined, color: SterelisColors.blue600, size: 18),
+          const SizedBox(width: 8),
           Expanded(
-            child: Text('ส่งแบบอัตโนมัติ — เครื่องพิมพ์ที่ว่างจะรับงานเอง',
-                style: TextStyle(fontSize: 13, color: SterelisColors.text)),
+            child: Text(AppLocalizations.of(context).pjAutoHint,
+                style: const TextStyle(fontSize: 13, color: SterelisColors.text)),
           ),
         ]),
       );

@@ -8,6 +8,7 @@ import '../../../../core/api/repositories.dart';
 import '../../../../core/auth/auth_controller.dart';
 import '../../../../core/models/models.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../l10n/app_localizations.dart';
 import '../print_job_status_style.dart';
 
 /// รายการงานพิมพ์ — CSSD เห็นของตัวเอง, SUPERVISOR/ADMIN เห็นทั้งหมด (backend filter)
@@ -19,11 +20,14 @@ class PrintJobsPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final async = ref.watch(printJobsProvider(null));
     final role = ref.watch(authControllerProvider).user?.role;
-    final scope = (role == 'SUPERVISOR' || role == 'ADMIN') ? 'ทั้งระบบ' : 'ของฉัน';
+    final l10n = AppLocalizations.of(context);
+    final scope = (role == 'SUPERVISOR' || role == 'ADMIN')
+        ? l10n.pjScopeAll
+        : l10n.pjScopeMine;
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('งานพิมพ์'),
+        title: Text(l10n.pjPageTitle),
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
@@ -43,9 +47,9 @@ class PrintJobsPage extends ConsumerWidget {
         ),
         data: (jobs) {
           if (jobs.isEmpty) {
-            return const Center(
-              child: Text('ยังไม่มีงานพิมพ์',
-                  style: TextStyle(color: SterelisColors.textMuted)),
+            return Center(
+              child: Text(l10n.pjNone,
+                  style: const TextStyle(color: SterelisColors.textMuted)),
             );
           }
           // ดันงานที่ต้องดูแลขึ้นบนสุด
@@ -62,7 +66,7 @@ class PrintJobsPage extends ConsumerWidget {
               padding: const EdgeInsets.all(16),
               children: [
                 Row(children: [
-                  Text('ขอบเขต: $scope',
+                  Text(l10n.pjScopeLine(scope),
                       style: const TextStyle(fontSize: 13, color: SterelisColors.textMuted)),
                   const Spacer(),
                   if (needAttention > 0)
@@ -72,7 +76,7 @@ class PrintJobsPage extends ConsumerWidget {
                         color: SterelisColors.warningBg,
                         borderRadius: BorderRadius.circular(20),
                       ),
-                      child: Text('ต้องดูแล $needAttention',
+                      child: Text(l10n.pjNeedAttention(needAttention),
                           style: const TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.w700,
@@ -103,7 +107,7 @@ class _JobCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final style = PrintJobStatusStyle.of(job.status);
+    final style = PrintJobStatusStyle.of(AppLocalizations.of(context), job.status);
     final highlight = job.needsSupervisor || job.status == 'DEAD_LETTER';
     return Card(
       margin: const EdgeInsets.only(bottom: 10),

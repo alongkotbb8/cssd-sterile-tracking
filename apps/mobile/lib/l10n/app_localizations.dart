@@ -853,6 +853,624 @@ abstract class AppLocalizations {
   /// In th, this message translates to:
   /// **'บันทึกสถานที่'**
   String get deptSaveButton;
+
+  /// No description provided for @reportTitle.
+  ///
+  /// In th, this message translates to:
+  /// **'รายงานสรุป'**
+  String get reportTitle;
+
+  /// No description provided for @reportPrintTooltip.
+  ///
+  /// In th, this message translates to:
+  /// **'พิมพ์รายงาน (PDF)'**
+  String get reportPrintTooltip;
+
+  /// No description provided for @reportPeriodToday.
+  ///
+  /// In th, this message translates to:
+  /// **'วันนี้'**
+  String get reportPeriodToday;
+
+  /// No description provided for @reportPeriodWeek.
+  ///
+  /// In th, this message translates to:
+  /// **'7 วันล่าสุด'**
+  String get reportPeriodWeek;
+
+  /// No description provided for @reportPeriodMonth.
+  ///
+  /// In th, this message translates to:
+  /// **'เดือนนี้'**
+  String get reportPeriodMonth;
+
+  /// No description provided for @moveIn.
+  ///
+  /// In th, this message translates to:
+  /// **'นำเข้าคลัง'**
+  String get moveIn;
+
+  /// No description provided for @moveOut.
+  ///
+  /// In th, this message translates to:
+  /// **'เบิกออก'**
+  String get moveOut;
+
+  /// No description provided for @moveReturn.
+  ///
+  /// In th, this message translates to:
+  /// **'ส่งคืน'**
+  String get moveReturn;
+
+  /// No description provided for @reportTotal.
+  ///
+  /// In th, this message translates to:
+  /// **'รวม'**
+  String get reportTotal;
+
+  /// No description provided for @reportMovementsTitle.
+  ///
+  /// In th, this message translates to:
+  /// **'รายการเคลื่อนไหว ({count})'**
+  String reportMovementsTitle(int count);
+
+  /// No description provided for @reportNoMovements.
+  ///
+  /// In th, this message translates to:
+  /// **'ไม่มีการเคลื่อนไหวในช่วงนี้'**
+  String get reportNoMovements;
+
+  /// No description provided for @reportDeptLine.
+  ///
+  /// In th, this message translates to:
+  /// **'แผนก {dept}'**
+  String reportDeptLine(String dept);
+
+  /// No description provided for @reportByLine.
+  ///
+  /// In th, this message translates to:
+  /// **'โดย {name}'**
+  String reportByLine(String name);
+
+  /// No description provided for @pdfReportTitle.
+  ///
+  /// In th, this message translates to:
+  /// **'รายงานระบบตามรอยอุปกรณ์ปลอดเชื้อ (CSSD)'**
+  String get pdfReportTitle;
+
+  /// No description provided for @pdfDateRange.
+  ///
+  /// In th, this message translates to:
+  /// **'ช่วงวันที่ {from} – {to} · พิมพ์เมื่อ {printed}'**
+  String pdfDateRange(String from, String to, String printed);
+
+  /// No description provided for @pdfNoMovements.
+  ///
+  /// In th, this message translates to:
+  /// **'— ไม่มีการเคลื่อนไหวในช่วงนี้ —'**
+  String get pdfNoMovements;
+
+  /// No description provided for @pdfColDatetime.
+  ///
+  /// In th, this message translates to:
+  /// **'วัน-เวลา'**
+  String get pdfColDatetime;
+
+  /// No description provided for @pdfColType.
+  ///
+  /// In th, this message translates to:
+  /// **'ประเภท'**
+  String get pdfColType;
+
+  /// No description provided for @pdfColPackage.
+  ///
+  /// In th, this message translates to:
+  /// **'เลขห่อ'**
+  String get pdfColPackage;
+
+  /// No description provided for @pdfColSet.
+  ///
+  /// In th, this message translates to:
+  /// **'ชุด'**
+  String get pdfColSet;
+
+  /// No description provided for @pdfColDept.
+  ///
+  /// In th, this message translates to:
+  /// **'แผนก'**
+  String get pdfColDept;
+
+  /// No description provided for @pdfColUser.
+  ///
+  /// In th, this message translates to:
+  /// **'ผู้ทำรายการ'**
+  String get pdfColUser;
+
+  /// No description provided for @pdfInspector.
+  ///
+  /// In th, this message translates to:
+  /// **'ผู้ตรวจสอบ / หัวหน้าหน่วยจ่ายกลาง'**
+  String get pdfInspector;
+
+  /// No description provided for @pdfError.
+  ///
+  /// In th, this message translates to:
+  /// **'สร้าง PDF ไม่สำเร็จ: {error}'**
+  String pdfError(String error);
+
+  /// No description provided for @cleanupTitle.
+  ///
+  /// In th, this message translates to:
+  /// **'ล้างข้อมูลเก่า (ประหยัดพื้นที่)'**
+  String get cleanupTitle;
+
+  /// No description provided for @cleanupDesc.
+  ///
+  /// In th, this message translates to:
+  /// **'หลังพิมพ์รายงานเก็บเข้าแฟ้มแล้ว สามารถลบประวัติเก่าออกจากระบบได้ โดยห่อที่ยังอยู่ในคลังและอยู่ระหว่างใช้งานจะไม่ถูกลบ'**
+  String get cleanupDesc;
+
+  /// No description provided for @cleanupButton.
+  ///
+  /// In th, this message translates to:
+  /// **'ลบประวัติก่อนช่วงนี้'**
+  String get cleanupButton;
+
+  /// No description provided for @cleanupConfirmTitle.
+  ///
+  /// In th, this message translates to:
+  /// **'ล้างข้อมูลเก่า?'**
+  String get cleanupConfirmTitle;
+
+  /// No description provided for @cleanupConfirmBody.
+  ///
+  /// In th, this message translates to:
+  /// **'จะลบประวัติการเคลื่อนไหวและห่อที่ทิ้งแล้ว ที่เกิดก่อนวันที่ {date} อย่างถาวร'**
+  String cleanupConfirmBody(String date);
+
+  /// No description provided for @cleanupKeep.
+  ///
+  /// In th, this message translates to:
+  /// **'✓ ห่อที่ยังอยู่ในคลัง/วงจร (แพ็ก·ปลอดเชื้อ·เบิกออก·รอ reprocess) จะไม่ถูกลบ'**
+  String get cleanupKeep;
+
+  /// No description provided for @cleanupIrreversible.
+  ///
+  /// In th, this message translates to:
+  /// **'✗ ข้อมูลที่ลบแล้วกู้คืนไม่ได้ ควรพิมพ์รายงานเก็บเข้าแฟ้มก่อน'**
+  String get cleanupIrreversible;
+
+  /// No description provided for @cleanupConfirmAction.
+  ///
+  /// In th, this message translates to:
+  /// **'ลบถาวร'**
+  String get cleanupConfirmAction;
+
+  /// No description provided for @cleanupDone.
+  ///
+  /// In th, this message translates to:
+  /// **'ล้างข้อมูลแล้ว: ประวัติ {m} รายการ · ห่อที่ทิ้งแล้ว {p} ห่อ'**
+  String cleanupDone(int m, int p);
+
+  /// No description provided for @commonYes.
+  ///
+  /// In th, this message translates to:
+  /// **'ใช่'**
+  String get commonYes;
+
+  /// No description provided for @pjStatusQueued.
+  ///
+  /// In th, this message translates to:
+  /// **'รอเครื่องพิมพ์รับงาน'**
+  String get pjStatusQueued;
+
+  /// No description provided for @pjStatusClaimed.
+  ///
+  /// In th, this message translates to:
+  /// **'เครื่องพิมพ์รับงานแล้ว'**
+  String get pjStatusClaimed;
+
+  /// No description provided for @pjStatusPrinting.
+  ///
+  /// In th, this message translates to:
+  /// **'กำลังส่งไปเครื่องพิมพ์'**
+  String get pjStatusPrinting;
+
+  /// No description provided for @pjStatusSent.
+  ///
+  /// In th, this message translates to:
+  /// **'ส่งข้อมูลถึงเครื่องพิมพ์แล้ว'**
+  String get pjStatusSent;
+
+  /// No description provided for @pjStatusPrinted.
+  ///
+  /// In th, this message translates to:
+  /// **'พิมพ์สำเร็จ'**
+  String get pjStatusPrinted;
+
+  /// No description provided for @pjStatusSimulated.
+  ///
+  /// In th, this message translates to:
+  /// **'จำลอง (โหมดทดสอบ ไม่ใช่พิมพ์จริง)'**
+  String get pjStatusSimulated;
+
+  /// No description provided for @pjStatusFailed.
+  ///
+  /// In th, this message translates to:
+  /// **'พิมพ์ไม่สำเร็จ (กำลังจะลองใหม่)'**
+  String get pjStatusFailed;
+
+  /// No description provided for @pjStatusRetrying.
+  ///
+  /// In th, this message translates to:
+  /// **'กำลังลองพิมพ์ใหม่'**
+  String get pjStatusRetrying;
+
+  /// No description provided for @pjStatusDeadLetter.
+  ///
+  /// In th, this message translates to:
+  /// **'ล้มเหลวถาวร ต้องตรวจสอบ'**
+  String get pjStatusDeadLetter;
+
+  /// No description provided for @pjStatusAckUnknown.
+  ///
+  /// In th, this message translates to:
+  /// **'ไม่แน่ใจว่าพิมพ์จริง — ต้องให้หัวหน้าตัดสิน'**
+  String get pjStatusAckUnknown;
+
+  /// No description provided for @pjStatusResolvedPrinted.
+  ///
+  /// In th, this message translates to:
+  /// **'หัวหน้ายืนยันว่าพิมพ์แล้ว'**
+  String get pjStatusResolvedPrinted;
+
+  /// No description provided for @pjStatusResolvedRequeued.
+  ///
+  /// In th, this message translates to:
+  /// **'หัวหน้าสั่งเปิดงานพิมพ์ใหม่'**
+  String get pjStatusResolvedRequeued;
+
+  /// No description provided for @pjStatusCancelled.
+  ///
+  /// In th, this message translates to:
+  /// **'ยกเลิกแล้ว'**
+  String get pjStatusCancelled;
+
+  /// No description provided for @pjStepQueued.
+  ///
+  /// In th, this message translates to:
+  /// **'เข้าคิว'**
+  String get pjStepQueued;
+
+  /// No description provided for @pjStepClaimed.
+  ///
+  /// In th, this message translates to:
+  /// **'รับงาน'**
+  String get pjStepClaimed;
+
+  /// No description provided for @pjStepPrinting.
+  ///
+  /// In th, this message translates to:
+  /// **'ส่งพิมพ์'**
+  String get pjStepPrinting;
+
+  /// No description provided for @pjStepSent.
+  ///
+  /// In th, this message translates to:
+  /// **'ถึงเครื่อง'**
+  String get pjStepSent;
+
+  /// No description provided for @pjStepPrinted.
+  ///
+  /// In th, this message translates to:
+  /// **'สำเร็จ'**
+  String get pjStepPrinted;
+
+  /// No description provided for @pjScopeAll.
+  ///
+  /// In th, this message translates to:
+  /// **'ทั้งระบบ'**
+  String get pjScopeAll;
+
+  /// No description provided for @pjScopeMine.
+  ///
+  /// In th, this message translates to:
+  /// **'ของฉัน'**
+  String get pjScopeMine;
+
+  /// No description provided for @pjPageTitle.
+  ///
+  /// In th, this message translates to:
+  /// **'งานพิมพ์'**
+  String get pjPageTitle;
+
+  /// No description provided for @pjNone.
+  ///
+  /// In th, this message translates to:
+  /// **'ยังไม่มีงานพิมพ์'**
+  String get pjNone;
+
+  /// No description provided for @pjScopeLine.
+  ///
+  /// In th, this message translates to:
+  /// **'ขอบเขต: {scope}'**
+  String pjScopeLine(String scope);
+
+  /// No description provided for @pjNeedAttention.
+  ///
+  /// In th, this message translates to:
+  /// **'ต้องดูแล {count}'**
+  String pjNeedAttention(int count);
+
+  /// No description provided for @pjCancelTitle.
+  ///
+  /// In th, this message translates to:
+  /// **'ยกเลิกงานพิมพ์?'**
+  String get pjCancelTitle;
+
+  /// No description provided for @pjCancelBody.
+  ///
+  /// In th, this message translates to:
+  /// **'ยกเลิกได้เฉพาะงานที่ยังไม่ถูกเครื่องพิมพ์รับไป'**
+  String get pjCancelBody;
+
+  /// No description provided for @pjCancelNo.
+  ///
+  /// In th, this message translates to:
+  /// **'ไม่'**
+  String get pjCancelNo;
+
+  /// No description provided for @pjCancelYes.
+  ///
+  /// In th, this message translates to:
+  /// **'ยกเลิกงาน'**
+  String get pjCancelYes;
+
+  /// No description provided for @pjResolveConfirm.
+  ///
+  /// In th, this message translates to:
+  /// **'ยืนยันว่าพิมพ์จริงแล้ว'**
+  String get pjResolveConfirm;
+
+  /// No description provided for @pjResolveRequeue.
+  ///
+  /// In th, this message translates to:
+  /// **'เปิดงานพิมพ์ใหม่ (ไม่ยืนยันว่าพิมพ์)'**
+  String get pjResolveRequeue;
+
+  /// No description provided for @pjResolveNote.
+  ///
+  /// In th, this message translates to:
+  /// **'หมายเหตุการตัดสินใจ (บังคับ)'**
+  String get pjResolveNote;
+
+  /// No description provided for @pjResolveNoteHint.
+  ///
+  /// In th, this message translates to:
+  /// **'เช่น ตรวจกับเครื่องพิมพ์แล้วพบว่า...'**
+  String get pjResolveNoteHint;
+
+  /// No description provided for @pjResolveNoteRequired.
+  ///
+  /// In th, this message translates to:
+  /// **'ต้องระบุหมายเหตุการตัดสินใจ'**
+  String get pjResolveNoteRequired;
+
+  /// No description provided for @pjResolveDone.
+  ///
+  /// In th, this message translates to:
+  /// **'บันทึกการตัดสินใจแล้ว'**
+  String get pjResolveDone;
+
+  /// No description provided for @pjDetailTitle.
+  ///
+  /// In th, this message translates to:
+  /// **'สถานะงานพิมพ์'**
+  String get pjDetailTitle;
+
+  /// No description provided for @pjSimulatedBanner.
+  ///
+  /// In th, this message translates to:
+  /// **'โหมดทดสอบ (SIMULATED) — ไม่ใช่การพิมพ์จริง ไม่นับเป็นประวัติการพิมพ์'**
+  String get pjSimulatedBanner;
+
+  /// No description provided for @pjAckBanner.
+  ///
+  /// In th, this message translates to:
+  /// **'ไม่แน่ใจว่าพิมพ์จริงหรือไม่ — กรุณาติดต่อหัวหน้า (SUPERVISOR/ADMIN) เพื่อตรวจสอบและตัดสิน'**
+  String get pjAckBanner;
+
+  /// No description provided for @pjDeadBanner.
+  ///
+  /// In th, this message translates to:
+  /// **'พิมพ์ล้มเหลวครบจำนวนครั้งแล้ว — ต้องตรวจสอบเครื่องพิมพ์แล้วสั่งพิมพ์ใหม่'**
+  String get pjDeadBanner;
+
+  /// No description provided for @pjCancelButton.
+  ///
+  /// In th, this message translates to:
+  /// **'ยกเลิกงานพิมพ์'**
+  String get pjCancelButton;
+
+  /// No description provided for @pjPackageTitle.
+  ///
+  /// In th, this message translates to:
+  /// **'ห่อ {id}'**
+  String pjPackageTitle(String id);
+
+  /// No description provided for @pjFieldCreated.
+  ///
+  /// In th, this message translates to:
+  /// **'สร้างเมื่อ'**
+  String get pjFieldCreated;
+
+  /// No description provided for @pjFieldPrinter.
+  ///
+  /// In th, this message translates to:
+  /// **'เครื่องพิมพ์'**
+  String get pjFieldPrinter;
+
+  /// No description provided for @pjFieldAttempts.
+  ///
+  /// In th, this message translates to:
+  /// **'จำนวนครั้งที่พยายาม'**
+  String get pjFieldAttempts;
+
+  /// No description provided for @pjFieldReprint.
+  ///
+  /// In th, this message translates to:
+  /// **'พิมพ์ซ้ำ'**
+  String get pjFieldReprint;
+
+  /// No description provided for @pjFieldReprintReason.
+  ///
+  /// In th, this message translates to:
+  /// **'เหตุผลพิมพ์ซ้ำ'**
+  String get pjFieldReprintReason;
+
+  /// No description provided for @pjFieldErrorCode.
+  ///
+  /// In th, this message translates to:
+  /// **'รหัสข้อผิดพลาด'**
+  String get pjFieldErrorCode;
+
+  /// No description provided for @pjFieldSentAt.
+  ///
+  /// In th, this message translates to:
+  /// **'ส่งถึงเครื่องเมื่อ'**
+  String get pjFieldSentAt;
+
+  /// No description provided for @pjFieldPrintedAt.
+  ///
+  /// In th, this message translates to:
+  /// **'พิมพ์เสร็จเมื่อ'**
+  String get pjFieldPrintedAt;
+
+  /// No description provided for @pjFieldResolvedAt.
+  ///
+  /// In th, this message translates to:
+  /// **'หัวหน้าตัดสินเมื่อ'**
+  String get pjFieldResolvedAt;
+
+  /// No description provided for @pjFieldResolutionNote.
+  ///
+  /// In th, this message translates to:
+  /// **'หมายเหตุการตัดสิน'**
+  String get pjFieldResolutionNote;
+
+  /// No description provided for @pjResolveSectionTitle.
+  ///
+  /// In th, this message translates to:
+  /// **'ตัดสินใจ (หัวหน้า)'**
+  String get pjResolveSectionTitle;
+
+  /// No description provided for @pjResolveSectionHint.
+  ///
+  /// In th, this message translates to:
+  /// **'งานนี้ส่งถึงเครื่องพิมพ์แล้วแต่ยืนยันผลไม่ได้ — ตรวจกับเครื่องพิมพ์จริงก่อนตัดสิน'**
+  String get pjResolveSectionHint;
+
+  /// No description provided for @pjResolveConfirmBtn.
+  ///
+  /// In th, this message translates to:
+  /// **'ยืนยันว่าพิมพ์แล้ว'**
+  String get pjResolveConfirmBtn;
+
+  /// No description provided for @pjResolveRequeueBtn.
+  ///
+  /// In th, this message translates to:
+  /// **'ไม่ยืนยัน — เปิดงานพิมพ์ใหม่'**
+  String get pjResolveRequeueBtn;
+
+  /// No description provided for @pjReprintReasonRequired.
+  ///
+  /// In th, this message translates to:
+  /// **'มีห่อที่เคยพิมพ์แล้ว — ต้องระบุเหตุผลการพิมพ์ซ้ำ'**
+  String get pjReprintReasonRequired;
+
+  /// No description provided for @pjCreatedOne.
+  ///
+  /// In th, this message translates to:
+  /// **'สร้างงานพิมพ์แล้ว — รอเครื่องพิมพ์รับงาน'**
+  String get pjCreatedOne;
+
+  /// No description provided for @pjCreatedMany.
+  ///
+  /// In th, this message translates to:
+  /// **'สร้างงานพิมพ์ {count} งานแล้ว'**
+  String pjCreatedMany(int count);
+
+  /// No description provided for @pjPrintLabel.
+  ///
+  /// In th, this message translates to:
+  /// **'พิมพ์ label'**
+  String get pjPrintLabel;
+
+  /// No description provided for @pjPrintLabelCount.
+  ///
+  /// In th, this message translates to:
+  /// **'พิมพ์ label {count} ห่อ'**
+  String pjPrintLabelCount(int count);
+
+  /// No description provided for @pjSubmitDesc.
+  ///
+  /// In th, this message translates to:
+  /// **'ระบบจะสร้างงานพิมพ์แล้วส่งให้เครื่องพิมพ์ (Gateway) — ติดตามสถานะได้จนพิมพ์จริง'**
+  String get pjSubmitDesc;
+
+  /// No description provided for @pjTargetPrinter.
+  ///
+  /// In th, this message translates to:
+  /// **'เครื่องพิมพ์ปลายทาง'**
+  String get pjTargetPrinter;
+
+  /// No description provided for @pjAutoAnyPrinter.
+  ///
+  /// In th, this message translates to:
+  /// **'อัตโนมัติ (เครื่องไหนก็ได้)'**
+  String get pjAutoAnyPrinter;
+
+  /// No description provided for @pjOfflineSuffix.
+  ///
+  /// In th, this message translates to:
+  /// **' · ออฟไลน์'**
+  String get pjOfflineSuffix;
+
+  /// No description provided for @pjReprintReasonLabel.
+  ///
+  /// In th, this message translates to:
+  /// **'เหตุผลการพิมพ์ซ้ำ'**
+  String get pjReprintReasonLabel;
+
+  /// No description provided for @pjReprintReasonHint.
+  ///
+  /// In th, this message translates to:
+  /// **'เช่น label เดิมชำรุด/หลุด'**
+  String get pjReprintReasonHint;
+
+  /// No description provided for @pjCreatingProgress.
+  ///
+  /// In th, this message translates to:
+  /// **'กำลังสร้างงาน {done}/{total}...'**
+  String pjCreatingProgress(int done, int total);
+
+  /// No description provided for @pjCreateButton.
+  ///
+  /// In th, this message translates to:
+  /// **'สร้างงานพิมพ์'**
+  String get pjCreateButton;
+
+  /// No description provided for @pjCreateButtonCount.
+  ///
+  /// In th, this message translates to:
+  /// **'สร้างงานพิมพ์ {count} งาน'**
+  String pjCreateButtonCount(int count);
+
+  /// No description provided for @pjAutoHint.
+  ///
+  /// In th, this message translates to:
+  /// **'ส่งแบบอัตโนมัติ — เครื่องพิมพ์ที่ว่างจะรับงานเอง'**
+  String get pjAutoHint;
 }
 
 class _AppLocalizationsDelegate

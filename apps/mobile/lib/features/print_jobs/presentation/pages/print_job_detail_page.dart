@@ -9,6 +9,7 @@ import '../../../../core/api/repositories.dart';
 import '../../../../core/auth/auth_controller.dart';
 import '../../../../core/models/models.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../l10n/app_localizations.dart';
 import '../print_job_status_style.dart';
 
 /// หน้าติดตามสถานะงานพิมพ์ — poll ทุก 2.5 วิ จนกว่างานจะจบ (terminal)
@@ -47,14 +48,15 @@ class _PrintJobDetailPageState extends ConsumerState<PrintJobDetailPage> {
   }
 
   Future<void> _cancel() async {
+    final l10n = AppLocalizations.of(context);
     final ok = await showDialog<bool>(
       context: context,
       builder: (d) => AlertDialog(
-        title: const Text('ยกเลิกงานพิมพ์?'),
-        content: const Text('ยกเลิกได้เฉพาะงานที่ยังไม่ถูกเครื่องพิมพ์รับไป'),
+        title: Text(l10n.pjCancelTitle),
+        content: Text(l10n.pjCancelBody),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('ไม่')),
-          FilledButton(onPressed: () => Navigator.pop(d, true), child: const Text('ยกเลิกงาน')),
+          TextButton(onPressed: () => Navigator.pop(d, false), child: Text(l10n.pjCancelNo)),
+          FilledButton(onPressed: () => Navigator.pop(d, true), child: Text(l10n.pjCancelYes)),
         ],
       ),
     );
@@ -70,9 +72,10 @@ class _PrintJobDetailPageState extends ConsumerState<PrintJobDetailPage> {
   }
 
   Future<void> _resolve(String decision) async {
+    final l10n = AppLocalizations.of(context);
     final title = decision == 'CONFIRM_PRINTED'
-        ? 'ยืนยันว่าพิมพ์จริงแล้ว'
-        : 'เปิดงานพิมพ์ใหม่ (ไม่ยืนยันว่าพิมพ์)';
+        ? l10n.pjResolveConfirm
+        : l10n.pjResolveRequeue;
     final noteCtrl = TextEditingController();
     final ok = await showDialog<bool>(
       context: context,
@@ -83,14 +86,14 @@ class _PrintJobDetailPageState extends ConsumerState<PrintJobDetailPage> {
           maxLength: 300,
           minLines: 2,
           maxLines: 4,
-          decoration: const InputDecoration(
-            labelText: 'หมายเหตุการตัดสินใจ (บังคับ)',
-            hintText: 'เช่น ตรวจกับเครื่องพิมพ์แล้วพบว่า...',
+          decoration: InputDecoration(
+            labelText: l10n.pjResolveNote,
+            hintText: l10n.pjResolveNoteHint,
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('ยกเลิก')),
-          FilledButton(onPressed: () => Navigator.pop(d, true), child: const Text('บันทึก')),
+          TextButton(onPressed: () => Navigator.pop(d, false), child: Text(l10n.actionCancel)),
+          FilledButton(onPressed: () => Navigator.pop(d, true), child: Text(l10n.actionSave)),
         ],
       ),
     );
@@ -98,8 +101,8 @@ class _PrintJobDetailPageState extends ConsumerState<PrintJobDetailPage> {
     final note = noteCtrl.text.trim();
     if (note.isEmpty) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-            content: Text('ต้องระบุหมายเหตุการตัดสินใจ'),
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(l10n.pjResolveNoteRequired),
             backgroundColor: SterelisColors.danger));
       }
       return;
@@ -107,8 +110,8 @@ class _PrintJobDetailPageState extends ConsumerState<PrintJobDetailPage> {
     try {
       await ref.read(printJobRepositoryProvider).resolve(widget.id, decision, note);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-            content: Text('บันทึกการตัดสินใจแล้ว'), backgroundColor: SterelisColors.success));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(l10n.pjResolveDone), backgroundColor: SterelisColors.success));
       }
     } catch (e) {
       if (mounted) {
@@ -123,9 +126,10 @@ class _PrintJobDetailPageState extends ConsumerState<PrintJobDetailPage> {
     final async = ref.watch(printJobDetailProvider(widget.id));
     final role = ref.watch(authControllerProvider).user?.role;
     final isSupervisor = role == 'SUPERVISOR' || role == 'ADMIN';
+    final l10n = AppLocalizations.of(context);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('สถานะงานพิมพ์')),
+      appBar: AppBar(title: Text(l10n.pjDetailTitle)),
       body: async.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(
@@ -138,7 +142,7 @@ class _PrintJobDetailPageState extends ConsumerState<PrintJobDetailPage> {
         ),
         data: (job) {
           _stopPollingIfTerminal(job);
-          final style = PrintJobStatusStyle.of(job.status);
+          final style = PrintJobStatusStyle.of(l10n, job.status);
           return RefreshIndicator(
             onRefresh: () async => ref.invalidate(printJobDetailProvider(widget.id)),
             child: ListView(
@@ -152,8 +156,7 @@ class _PrintJobDetailPageState extends ConsumerState<PrintJobDetailPage> {
                 if (job.isSimulated) ...[
                   const SizedBox(height: 16),
                   _banner(Icons.science_outlined, SterelisColors.warning,
-                      SterelisColors.warningBg,
-                      'โหมดทดสอบ (SIMULATED) — ไม่ใช่การพิมพ์จริง ไม่นับเป็นประวัติการพิมพ์'),
+                      SterelisColors.warningBg, l10n.pjSimulatedBanner),
                 ],
                 if (job.needsSupervisor) ...[
                   const SizedBox(height: 16),
@@ -161,21 +164,19 @@ class _PrintJobDetailPageState extends ConsumerState<PrintJobDetailPage> {
                     _resolveActions()
                   else
                     _banner(Icons.help_outline, SterelisColors.warning,
-                        SterelisColors.warningBg,
-                        'ไม่แน่ใจว่าพิมพ์จริงหรือไม่ — กรุณาติดต่อหัวหน้า (SUPERVISOR/ADMIN) เพื่อตรวจสอบและตัดสิน'),
+                        SterelisColors.warningBg, l10n.pjAckBanner),
                 ],
                 if (job.status == 'DEAD_LETTER') ...[
                   const SizedBox(height: 16),
                   _banner(Icons.report_gmailerrorred_outlined, SterelisColors.danger,
-                      SterelisColors.dangerBg,
-                      'พิมพ์ล้มเหลวครบจำนวนครั้งแล้ว — ต้องตรวจสอบเครื่องพิมพ์แล้วสั่งพิมพ์ใหม่'),
+                      SterelisColors.dangerBg, l10n.pjDeadBanner),
                 ],
                 if (job.canCancel) ...[
                   const SizedBox(height: 20),
                   OutlinedButton.icon(
                     onPressed: _cancel,
                     icon: const Icon(Icons.cancel_outlined),
-                    label: const Text('ยกเลิกงานพิมพ์'),
+                    label: Text(l10n.pjCancelButton),
                     style: OutlinedButton.styleFrom(
                       minimumSize: const Size.fromHeight(48),
                       foregroundColor: SterelisColors.danger,
@@ -206,7 +207,7 @@ class _PrintJobDetailPageState extends ConsumerState<PrintJobDetailPage> {
                   style: TextStyle(
                       fontWeight: FontWeight.w800, fontSize: 16, color: style.color)),
               const SizedBox(height: 2),
-              Text('ห่อ ${job.packageId}',
+              Text(AppLocalizations.of(context).pjPackageTitle(job.packageId),
                   style: const TextStyle(
                       fontFamily: 'monospace', fontSize: 13, color: SterelisColors.textMuted)),
             ]),
@@ -220,6 +221,7 @@ class _PrintJobDetailPageState extends ConsumerState<PrintJobDetailPage> {
   Widget _timeline(PrintJob job) {
     final idx = printProgressIndex(job.status);
     if (idx < 0) return const SizedBox.shrink(); // ไม่อยู่บน happy path (FAILED/ACK_UNKNOWN ฯลฯ)
+    final steps = printProgressSteps(AppLocalizations.of(context));
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
       decoration: BoxDecoration(
@@ -229,7 +231,7 @@ class _PrintJobDetailPageState extends ConsumerState<PrintJobDetailPage> {
       ),
       child: Row(
         children: [
-          for (var i = 0; i < kPrintProgressSteps.length; i++) ...[
+          for (var i = 0; i < steps.length; i++) ...[
             Expanded(
               child: Column(children: [
                 Icon(
@@ -238,13 +240,13 @@ class _PrintJobDetailPageState extends ConsumerState<PrintJobDetailPage> {
                   color: i <= idx ? SterelisColors.success : SterelisColors.textFaint,
                 ),
                 const SizedBox(height: 4),
-                Text(kPrintProgressSteps[i].$2,
+                Text(steps[i].$2,
                     style: TextStyle(
                         fontSize: 11,
                         color: i <= idx ? SterelisColors.text : SterelisColors.textFaint)),
               ]),
             ),
-            if (i < kPrintProgressSteps.length - 1)
+            if (i < steps.length - 1)
               Container(
                 width: 16,
                 height: 2,
@@ -257,17 +259,18 @@ class _PrintJobDetailPageState extends ConsumerState<PrintJobDetailPage> {
   }
 
   Widget _details(PrintJob job) {
+    final l10n = AppLocalizations.of(context);
     final rows = <(String, String)>[
-      ('สร้างเมื่อ', _fmt(job.createdAt)),
-      if (job.printerId != null) ('เครื่องพิมพ์', job.printerId!),
-      if (job.attemptCount > 0) ('จำนวนครั้งที่พยายาม', '${job.attemptCount}'),
-      if (job.isReprint) ('พิมพ์ซ้ำ', 'ใช่'),
-      if (job.reprintReason != null) ('เหตุผลพิมพ์ซ้ำ', job.reprintReason!),
-      if (job.errorCode != null) ('รหัสข้อผิดพลาด', job.errorCode!),
-      if (job.sentAt != null) ('ส่งถึงเครื่องเมื่อ', _fmt(job.sentAt!)),
-      if (job.printedAt != null) ('พิมพ์เสร็จเมื่อ', _fmt(job.printedAt!)),
-      if (job.resolvedAt != null) ('หัวหน้าตัดสินเมื่อ', _fmt(job.resolvedAt!)),
-      if (job.resolutionNote != null) ('หมายเหตุการตัดสิน', job.resolutionNote!),
+      (l10n.pjFieldCreated, _fmt(job.createdAt)),
+      if (job.printerId != null) (l10n.pjFieldPrinter, job.printerId!),
+      if (job.attemptCount > 0) (l10n.pjFieldAttempts, '${job.attemptCount}'),
+      if (job.isReprint) (l10n.pjFieldReprint, l10n.commonYes),
+      if (job.reprintReason != null) (l10n.pjFieldReprintReason, job.reprintReason!),
+      if (job.errorCode != null) (l10n.pjFieldErrorCode, job.errorCode!),
+      if (job.sentAt != null) (l10n.pjFieldSentAt, _fmt(job.sentAt!)),
+      if (job.printedAt != null) (l10n.pjFieldPrintedAt, _fmt(job.printedAt!)),
+      if (job.resolvedAt != null) (l10n.pjFieldResolvedAt, _fmt(job.resolvedAt!)),
+      if (job.resolutionNote != null) (l10n.pjFieldResolutionNote, job.resolutionNote!),
     ];
     return Container(
       padding: const EdgeInsets.all(16),
@@ -300,34 +303,37 @@ class _PrintJobDetailPageState extends ConsumerState<PrintJobDetailPage> {
     );
   }
 
-  Widget _resolveActions() => Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: SterelisColors.warningBg,
-          borderRadius: BorderRadius.circular(16),
+  Widget _resolveActions() {
+    final l10n = AppLocalizations.of(context);
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: SterelisColors.warningBg,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Text(l10n.pjResolveSectionTitle,
+            style: const TextStyle(
+                fontWeight: FontWeight.w800, color: SterelisColors.textStrong)),
+        const SizedBox(height: 4),
+        Text(l10n.pjResolveSectionHint,
+            style: const TextStyle(fontSize: 13, color: SterelisColors.text)),
+        const SizedBox(height: 12),
+        FilledButton.icon(
+          onPressed: () => _resolve('CONFIRM_PRINTED'),
+          icon: const Icon(Icons.verified_outlined, size: 18),
+          label: Text(l10n.pjResolveConfirmBtn),
+          style: FilledButton.styleFrom(backgroundColor: SterelisColors.success),
         ),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          const Text('ตัดสินใจ (หัวหน้า)',
-              style: TextStyle(fontWeight: FontWeight.w800, color: SterelisColors.textStrong)),
-          const SizedBox(height: 4),
-          const Text(
-              'งานนี้ส่งถึงเครื่องพิมพ์แล้วแต่ยืนยันผลไม่ได้ — ตรวจกับเครื่องพิมพ์จริงก่อนตัดสิน',
-              style: TextStyle(fontSize: 13, color: SterelisColors.text)),
-          const SizedBox(height: 12),
-          FilledButton.icon(
-            onPressed: () => _resolve('CONFIRM_PRINTED'),
-            icon: const Icon(Icons.verified_outlined, size: 18),
-            label: const Text('ยืนยันว่าพิมพ์แล้ว'),
-            style: FilledButton.styleFrom(backgroundColor: SterelisColors.success),
-          ),
-          const SizedBox(height: 8),
-          OutlinedButton.icon(
-            onPressed: () => _resolve('REQUEUE'),
-            icon: const Icon(Icons.replay, size: 18),
-            label: const Text('ไม่ยืนยัน — เปิดงานพิมพ์ใหม่'),
-          ),
-        ]),
-      );
+        const SizedBox(height: 8),
+        OutlinedButton.icon(
+          onPressed: () => _resolve('REQUEUE'),
+          icon: const Icon(Icons.replay, size: 18),
+          label: Text(l10n.pjResolveRequeueBtn),
+        ),
+      ]),
+    );
+  }
 
   Widget _banner(IconData icon, Color color, Color bg, String text) => Container(
         padding: const EdgeInsets.all(14),

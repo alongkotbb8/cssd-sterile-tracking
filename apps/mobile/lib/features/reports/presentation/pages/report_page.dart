@@ -11,16 +11,18 @@ import '../../../../core/api/repositories.dart';
 import '../../../../core/auth/auth_controller.dart';
 import '../../../../core/models/models.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../l10n/app_localizations.dart';
 
 enum ReportPeriod { today, week, month }
 
-extension on ReportPeriod {
-  String get label => switch (this) {
-        ReportPeriod.today => 'วันนี้',
-        ReportPeriod.week => '7 วันล่าสุด',
-        ReportPeriod.month => 'เดือนนี้',
-      };
+/// ป้ายชื่อช่วงเวลา (i18n)
+String reportPeriodLabel(AppLocalizations l10n, ReportPeriod p) => switch (p) {
+      ReportPeriod.today => l10n.reportPeriodToday,
+      ReportPeriod.week => l10n.reportPeriodWeek,
+      ReportPeriod.month => l10n.reportPeriodMonth,
+    };
 
+extension on ReportPeriod {
   /// ช่วงวันที่ (รวมปลายทั้งสองด้าน) ตามเวลาท้องถิ่น
   (DateTime, DateTime) get range {
     final now = DateTime.now();
@@ -52,14 +54,15 @@ class ReportPage extends ConsumerWidget {
     final report = ref.watch(weeklyReportProvider(range));
     final isAdmin =
         ref.watch(authControllerProvider).user?.role == 'ADMIN';
+    final l10n = AppLocalizations.of(context);
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('รายงานสรุป'),
+        title: Text(l10n.reportTitle),
         actions: [
           report.maybeWhen(
             data: (r) => IconButton(
-              tooltip: 'พิมพ์รายงาน (PDF)',
+              tooltip: l10n.reportPrintTooltip,
               icon: const Icon(Icons.print_outlined),
               onPressed: () => _printReport(context, period, r),
             ),
@@ -78,7 +81,7 @@ class ReportPage extends ConsumerWidget {
               return Padding(
                 padding: const EdgeInsets.only(right: 8),
                 child: ChoiceChip(
-                  label: Text(p.label),
+                  label: Text(reportPeriodLabel(l10n, p)),
                   selected: sel,
                   showCheckmark: false,
                   onSelected: (_) =>
@@ -115,7 +118,7 @@ class ReportPage extends ConsumerWidget {
                   OutlinedButton(
                     onPressed: () =>
                         ref.invalidate(weeklyReportProvider(range)),
-                    child: const Text('ลองใหม่'),
+                    child: Text(l10n.commonRetry),
                   ),
                 ]),
               ),
@@ -146,6 +149,7 @@ class ReportPage extends ConsumerWidget {
   Future<void> _printReport(
       BuildContext context, ReportPeriod period, WeeklyReport r) async {
     final messenger = ScaffoldMessenger.of(context);
+    final l10n = AppLocalizations.of(context);
     try {
       // ฟอนต์ bundle ในแอป (ไม่โหลดจากเน็ต) — สร้างรายงานได้แม้ offline
       final font = pw.Font.ttf(
@@ -157,9 +161,9 @@ class ReportPage extends ConsumerWidget {
       final (from, to) = period.range;
 
       String typeLabel(String t) => switch (t) {
-            'IN' => 'นำเข้าคลัง',
-            'OUT' => 'เบิกออก',
-            'RETURN' => 'ส่งคืน',
+            'IN' => l10n.moveIn,
+            'OUT' => l10n.moveOut,
+            'RETURN' => l10n.moveReturn,
             _ => t,
           };
 
@@ -173,30 +177,30 @@ class ReportPage extends ConsumerWidget {
             child: pw.Column(
                 crossAxisAlignment: pw.CrossAxisAlignment.start,
                 children: [
-                  pw.Text('รายงานระบบตามรอยอุปกรณ์ปลอดเชื้อ (CSSD)',
+                  pw.Text(l10n.pdfReportTitle,
                       style: pw.TextStyle(
                           fontSize: 16, fontWeight: pw.FontWeight.bold)),
                   pw.SizedBox(height: 2),
                   pw.Text(
-                      'ช่วงวันที่ ${dfmt.format(from)} – ${dfmt.format(to)}'
-                      ' · พิมพ์เมื่อ ${tfmt.format(DateTime.now())}',
+                      l10n.pdfDateRange(dfmt.format(from), dfmt.format(to),
+                          tfmt.format(DateTime.now())),
                       style: const pw.TextStyle(
                           fontSize: 10, color: PdfColors.grey700)),
                 ]),
           ),
           pw.SizedBox(height: 6),
           pw.Row(children: [
-            _pdfStat('นำเข้าคลัง', r.inCount, font, fontBold),
+            _pdfStat(l10n.moveIn, r.inCount, font, fontBold),
             pw.SizedBox(width: 10),
-            _pdfStat('เบิกออก', r.outCount, font, fontBold),
+            _pdfStat(l10n.moveOut, r.outCount, font, fontBold),
             pw.SizedBox(width: 10),
-            _pdfStat('ส่งคืน', r.returnCount, font, fontBold),
+            _pdfStat(l10n.moveReturn, r.returnCount, font, fontBold),
             pw.SizedBox(width: 10),
-            _pdfStat('รวม', r.movements.length, font, fontBold),
+            _pdfStat(l10n.reportTotal, r.movements.length, font, fontBold),
           ]),
           pw.SizedBox(height: 14),
           if (r.movements.isEmpty)
-            pw.Text('— ไม่มีการเคลื่อนไหวในช่วงนี้ —',
+            pw.Text(l10n.pdfNoMovements,
                 style:
                     const pw.TextStyle(fontSize: 11, color: PdfColors.grey))
           else
@@ -207,7 +211,14 @@ class ReportPage extends ConsumerWidget {
               headerDecoration:
                   const pw.BoxDecoration(color: PdfColors.grey200),
               cellAlignments: {0: pw.Alignment.centerLeft},
-              headers: ['วัน-เวลา', 'ประเภท', 'เลขห่อ', 'ชุด', 'แผนก', 'ผู้ทำรายการ'],
+              headers: [
+                l10n.pdfColDatetime,
+                l10n.pdfColType,
+                l10n.pdfColPackage,
+                l10n.pdfColSet,
+                l10n.pdfColDept,
+                l10n.pdfColUser
+              ],
               data: r.movements
                   .map((m) => [
                         m.createdAt != null ? tfmt.format(m.createdAt!) : '-',
@@ -224,7 +235,7 @@ class ReportPage extends ConsumerWidget {
             pw.Column(children: [
               pw.Container(width: 160, height: 0.8, color: PdfColors.grey),
               pw.SizedBox(height: 4),
-              pw.Text('ผู้ตรวจสอบ / หัวหน้าหน่วยจ่ายกลาง',
+              pw.Text(l10n.pdfInspector,
                   style: const pw.TextStyle(fontSize: 9)),
             ]),
           ]),
@@ -238,7 +249,7 @@ class ReportPage extends ConsumerWidget {
       );
     } catch (e) {
       messenger.showSnackBar(SnackBar(
-        content: Text('สร้าง PDF ไม่สำเร็จ: $e'),
+        content: Text(l10n.pdfError('$e')),
         backgroundColor: SterelisColors.danger,
       ));
     }
@@ -305,14 +316,15 @@ class _SummaryRow extends StatelessWidget {
       );
     }
 
+    final l10n = AppLocalizations.of(context);
     return Row(children: [
-      card('นำเข้าคลัง', report.inCount, SterelisColors.success,
+      card(l10n.moveIn, report.inCount, SterelisColors.success,
           SterelisColors.successBg, Icons.login),
       const SizedBox(width: 8),
-      card('เบิกออก', report.outCount, SterelisColors.blue500,
+      card(l10n.moveOut, report.outCount, SterelisColors.blue500,
           SterelisColors.blue50, Icons.logout),
       const SizedBox(width: 8),
-      card('ส่งคืน', report.returnCount, SterelisColors.warning,
+      card(l10n.moveReturn, report.returnCount, SterelisColors.warning,
           SterelisColors.warningBg, Icons.keyboard_return),
     ]);
   }
@@ -324,6 +336,7 @@ class _MovementsCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final tfmt = DateFormat('dd/MM HH:mm');
     return Container(
       padding: const EdgeInsets.all(16),
@@ -333,18 +346,18 @@ class _MovementsCard extends StatelessWidget {
         border: Border.all(color: SterelisColors.border),
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text('รายการเคลื่อนไหว (${movements.length})',
+        Text(l10n.reportMovementsTitle(movements.length),
             style: const TextStyle(
                 fontWeight: FontWeight.w700,
                 fontSize: 14,
                 color: SterelisColors.textStrong)),
         const SizedBox(height: 6),
         if (movements.isEmpty)
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 14),
-            child: Text('ไม่มีการเคลื่อนไหวในช่วงนี้',
-                style:
-                    TextStyle(color: SterelisColors.textFaint, fontSize: 13)),
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 14),
+            child: Text(l10n.reportNoMovements,
+                style: const TextStyle(
+                    color: SterelisColors.textFaint, fontSize: 13)),
           )
         else
           for (final m in movements)
@@ -365,9 +378,9 @@ class _MovementsCard extends StatelessWidget {
                         Text(
                           [
                             if (m.departmentName != null)
-                              'แผนก ${m.departmentName}',
+                              l10n.reportDeptLine(m.departmentName!),
                             if (m.performedByName != null)
-                              'โดย ${m.performedByName}',
+                              l10n.reportByLine(m.performedByName!),
                           ].join(' · '),
                           style: const TextStyle(
                               fontSize: 11.5,
@@ -435,6 +448,7 @@ class _CleanupCardState extends ConsumerState<_CleanupCard> {
   Future<void> _cleanup() async {
     // ลบเฉพาะประวัติที่เกิด "ก่อนวันเริ่มต้นของช่วงที่กำลังดู/พิมพ์"
     // เพื่อให้รายงานที่เพิ่งพิมพ์เก็บเข้าแฟ้มยังตรงกับข้อมูลในระบบ
+    final l10n = AppLocalizations.of(context);
     final (from, _) = widget.period.range;
     final before = from;
     final dfmt = DateFormat('dd/MM/yyyy');
@@ -443,32 +457,31 @@ class _CleanupCardState extends ConsumerState<_CleanupCard> {
       context: context,
       builder: (dctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('ล้างข้อมูลเก่า?'),
+        title: Text(l10n.cleanupConfirmTitle),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('จะลบประวัติการเคลื่อนไหวและห่อที่ทิ้งแล้ว '
-                'ที่เกิดก่อนวันที่ ${dfmt.format(before)} อย่างถาวร'),
+            Text(l10n.cleanupConfirmBody(dfmt.format(before))),
             const SizedBox(height: 10),
-            const Text('✓ ห่อที่ยังอยู่ในคลัง/วงจร (แพ็ก·ปลอดเชื้อ·เบิกออก·รอ reprocess) จะไม่ถูกลบ',
-                style: TextStyle(
+            Text(l10n.cleanupKeep,
+                style: const TextStyle(
                     fontSize: 12.5, color: SterelisColors.success)),
             const SizedBox(height: 4),
-            const Text('✗ ข้อมูลที่ลบแล้วกู้คืนไม่ได้ ควรพิมพ์รายงานเก็บเข้าแฟ้มก่อน',
-                style:
-                    TextStyle(fontSize: 12.5, color: SterelisColors.danger)),
+            Text(l10n.cleanupIrreversible,
+                style: const TextStyle(
+                    fontSize: 12.5, color: SterelisColors.danger)),
           ],
         ),
         actions: [
           TextButton(
               onPressed: () => Navigator.of(dctx).pop(false),
-              child: const Text('ยกเลิก')),
+              child: Text(l10n.actionCancel)),
           FilledButton(
             style:
                 FilledButton.styleFrom(backgroundColor: SterelisColors.danger),
             onPressed: () => Navigator.of(dctx).pop(true),
-            child: const Text('ลบถาวร'),
+            child: Text(l10n.cleanupConfirmAction),
           ),
         ],
       ),
@@ -483,10 +496,10 @@ class _CleanupCardState extends ConsumerState<_CleanupCard> {
       ref.invalidate(packagesProvider);
       ref.invalidate(dashboardProvider);
       if (!mounted) return;
-      final m = result['deletedMovements'] ?? 0;
-      final p = result['deletedPackages'] ?? 0;
+      final m = (result['deletedMovements'] ?? 0) as int;
+      final p = (result['deletedPackages'] ?? 0) as int;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('ล้างข้อมูลแล้ว: ประวัติ $m รายการ · ห่อที่ทิ้งแล้ว $p ห่อ'),
+        content: Text(AppLocalizations.of(context).cleanupDone(m, p)),
         backgroundColor: SterelisColors.success,
       ));
     } catch (e) {
@@ -502,6 +515,7 @@ class _CleanupCardState extends ConsumerState<_CleanupCard> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -510,21 +524,21 @@ class _CleanupCardState extends ConsumerState<_CleanupCard> {
         border: Border.all(color: const Color(0xFFF4D9A8)),
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        const Row(children: [
-          Icon(Icons.cleaning_services_outlined,
+        Row(children: [
+          const Icon(Icons.cleaning_services_outlined,
               color: SterelisColors.warning, size: 20),
-          SizedBox(width: 8),
-          Text('ล้างข้อมูลเก่า (ประหยัดพื้นที่)',
-              style: TextStyle(
+          const SizedBox(width: 8),
+          Text(l10n.cleanupTitle,
+              style: const TextStyle(
                   fontWeight: FontWeight.w700,
                   fontSize: 14,
                   color: SterelisColors.textStrong)),
         ]),
         const SizedBox(height: 6),
-        const Text(
-          'หลังพิมพ์รายงานเก็บเข้าแฟ้มแล้ว สามารถลบประวัติเก่าออกจากระบบได้ '
-          'โดยห่อที่ยังอยู่ในคลังและอยู่ระหว่างใช้งานจะไม่ถูกลบ',
-          style: TextStyle(fontSize: 12.5, color: SterelisColors.textMuted),
+        Text(
+          l10n.cleanupDesc,
+          style: const TextStyle(
+              fontSize: 12.5, color: SterelisColors.textMuted),
         ),
         const SizedBox(height: 12),
         OutlinedButton.icon(
@@ -535,7 +549,7 @@ class _CleanupCardState extends ConsumerState<_CleanupCard> {
                   height: 16,
                   child: CircularProgressIndicator(strokeWidth: 2))
               : const Icon(Icons.delete_sweep_outlined, size: 18),
-          label: const Text('ลบประวัติก่อนช่วงนี้'),
+          label: Text(l10n.cleanupButton),
           style: OutlinedButton.styleFrom(
             foregroundColor: SterelisColors.danger,
             side: const BorderSide(color: SterelisColors.danger),
