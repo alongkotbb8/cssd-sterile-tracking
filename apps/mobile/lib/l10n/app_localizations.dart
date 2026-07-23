@@ -199,6 +199,660 @@ abstract class AppLocalizations {
   /// In th, this message translates to:
   /// **'ออกทุกอุปกรณ์'**
   String get logoutAllConfirmAction;
+
+  /// No description provided for @commonRetry.
+  ///
+  /// In th, this message translates to:
+  /// **'ลองใหม่'**
+  String get commonRetry;
+
+  /// No description provided for @commonSelectAll.
+  ///
+  /// In th, this message translates to:
+  /// **'เลือกทั้งหมด'**
+  String get commonSelectAll;
+
+  /// No description provided for @commonClearAll.
+  ///
+  /// In th, this message translates to:
+  /// **'ล้างทั้งหมด'**
+  String get commonClearAll;
+
+  /// No description provided for @statusPacked.
+  ///
+  /// In th, this message translates to:
+  /// **'แพ็กแล้ว'**
+  String get statusPacked;
+
+  /// No description provided for @statusPackedOut.
+  ///
+  /// In th, this message translates to:
+  /// **'ส่งออกไม่ฆ่าเชื้อ'**
+  String get statusPackedOut;
+
+  /// No description provided for @statusSterile.
+  ///
+  /// In th, this message translates to:
+  /// **'ปลอดเชื้อ'**
+  String get statusSterile;
+
+  /// No description provided for @statusIssued.
+  ///
+  /// In th, this message translates to:
+  /// **'เบิกออก'**
+  String get statusIssued;
+
+  /// No description provided for @statusReturned.
+  ///
+  /// In th, this message translates to:
+  /// **'รอ Reprocess'**
+  String get statusReturned;
+
+  /// No description provided for @statusExpired.
+  ///
+  /// In th, this message translates to:
+  /// **'หมดอายุ'**
+  String get statusExpired;
+
+  /// No description provided for @filterAll.
+  ///
+  /// In th, this message translates to:
+  /// **'ทั้งหมด'**
+  String get filterAll;
+
+  /// No description provided for @pkgListTitle.
+  ///
+  /// In th, this message translates to:
+  /// **'รายการห่อ'**
+  String get pkgListTitle;
+
+  /// No description provided for @pkgSelectedCount.
+  ///
+  /// In th, this message translates to:
+  /// **'เลือก {count} ห่อ'**
+  String pkgSelectedCount(int count);
+
+  /// No description provided for @pkgSelectToPrintTooltip.
+  ///
+  /// In th, this message translates to:
+  /// **'เลือกเพื่อพิมพ์หลายใบ'**
+  String get pkgSelectToPrintTooltip;
+
+  /// No description provided for @pkgCreateNew.
+  ///
+  /// In th, this message translates to:
+  /// **'สร้างห่อใหม่'**
+  String get pkgCreateNew;
+
+  /// No description provided for @pkgSelectToPrintHint.
+  ///
+  /// In th, this message translates to:
+  /// **'เลือกห่อเพื่อพิมพ์'**
+  String get pkgSelectToPrintHint;
+
+  /// No description provided for @pkgPrintSelected.
+  ///
+  /// In th, this message translates to:
+  /// **'พิมพ์ที่เลือก ({count})'**
+  String pkgPrintSelected(int count);
+
+  /// No description provided for @pkgSearchHint.
+  ///
+  /// In th, this message translates to:
+  /// **'ค้นหาเลขรัน / ชื่อชุด'**
+  String get pkgSearchHint;
+
+  /// No description provided for @pkgTagAll.
+  ///
+  /// In th, this message translates to:
+  /// **'ทุกป้าย'**
+  String get pkgTagAll;
+
+  /// No description provided for @pkgNoneFound.
+  ///
+  /// In th, this message translates to:
+  /// **'ไม่พบห่อในเงื่อนไขนี้'**
+  String get pkgNoneFound;
+
+  /// No description provided for @pkgSelectedOf.
+  ///
+  /// In th, this message translates to:
+  /// **'เลือกแล้ว {selected}/{total}'**
+  String pkgSelectedOf(int selected, int total);
+
+  /// No description provided for @pkgExpiryOn.
+  ///
+  /// In th, this message translates to:
+  /// **'หมดอายุ {date}'**
+  String pkgExpiryOn(String date);
+
+  /// No description provided for @pkgLocationAt.
+  ///
+  /// In th, this message translates to:
+  /// **'อยู่ที่ {location}'**
+  String pkgLocationAt(String location);
+
+  /// No description provided for @commonConfirm.
+  ///
+  /// In th, this message translates to:
+  /// **'ยืนยัน'**
+  String get commonConfirm;
+
+  /// No description provided for @commonClose.
+  ///
+  /// In th, this message translates to:
+  /// **'ปิด'**
+  String get commonClose;
+
+  /// No description provided for @commonAdd.
+  ///
+  /// In th, this message translates to:
+  /// **'เพิ่ม'**
+  String get commonAdd;
+
+  /// No description provided for @commonClear.
+  ///
+  /// In th, this message translates to:
+  /// **'ล้าง'**
+  String get commonClear;
+
+  /// No description provided for @scanModeIn.
+  ///
+  /// In th, this message translates to:
+  /// **'เข้ารอบนึ่ง'**
+  String get scanModeIn;
+
+  /// No description provided for @scanModeOut.
+  ///
+  /// In th, this message translates to:
+  /// **'เบิกออก'**
+  String get scanModeOut;
+
+  /// No description provided for @scanModeReturn.
+  ///
+  /// In th, this message translates to:
+  /// **'ส่งคืน'**
+  String get scanModeReturn;
+
+  /// No description provided for @scanModeReprocess.
+  ///
+  /// In th, this message translates to:
+  /// **'Reprocess'**
+  String get scanModeReprocess;
+
+  /// No description provided for @scanTitle.
+  ///
+  /// In th, this message translates to:
+  /// **'สแกน QR'**
+  String get scanTitle;
+
+  /// No description provided for @scanManualTooltip.
+  ///
+  /// In th, this message translates to:
+  /// **'พิมพ์เลขห่อเอง (กล้องใช้ไม่ได้)'**
+  String get scanManualTooltip;
+
+  /// No description provided for @scanSwitchCameraTooltip.
+  ///
+  /// In th, this message translates to:
+  /// **'สลับกล้องหน้า/หลัง'**
+  String get scanSwitchCameraTooltip;
+
+  /// No description provided for @scanTorchTooltip.
+  ///
+  /// In th, this message translates to:
+  /// **'ไฟฉาย'**
+  String get scanTorchTooltip;
+
+  /// No description provided for @scanSwitchCameraFailed.
+  ///
+  /// In th, this message translates to:
+  /// **'สลับกล้องไม่ได้ (อาจมีกล้องเดียว)'**
+  String get scanSwitchCameraFailed;
+
+  /// No description provided for @scanInvalidQr.
+  ///
+  /// In th, this message translates to:
+  /// **'QR นี้ไม่ใช่เลขห่อของระบบ'**
+  String get scanInvalidQr;
+
+  /// No description provided for @scanManualTitle.
+  ///
+  /// In th, this message translates to:
+  /// **'พิมพ์เลขห่อเอง'**
+  String get scanManualTitle;
+
+  /// No description provided for @scanManualHint.
+  ///
+  /// In th, this message translates to:
+  /// **'เช่น DELIV-20260630-0007'**
+  String get scanManualHint;
+
+  /// No description provided for @scanManualHelper.
+  ///
+  /// In th, this message translates to:
+  /// **'ใช้เมื่อกล้องสแกนไม่ได้ — ระบบจะบันทึกว่ากรอกเองไว้ตรวจสอบย้อนหลัง'**
+  String get scanManualHelper;
+
+  /// No description provided for @scanManualEmpty.
+  ///
+  /// In th, this message translates to:
+  /// **'กรุณากรอกเลขห่อ'**
+  String get scanManualEmpty;
+
+  /// No description provided for @scanManualTooLong.
+  ///
+  /// In th, this message translates to:
+  /// **'เลขห่อยาวเกินไป'**
+  String get scanManualTooLong;
+
+  /// No description provided for @scanManualCharset.
+  ///
+  /// In th, this message translates to:
+  /// **'ใช้ได้เฉพาะตัวอักษร ตัวเลข และขีด (-)'**
+  String get scanManualCharset;
+
+  /// No description provided for @scanBlockExpired.
+  ///
+  /// In th, this message translates to:
+  /// **'ห้ามใช้ — ห่อหมดอายุแล้ว'**
+  String get scanBlockExpired;
+
+  /// No description provided for @scanBlockStatus.
+  ///
+  /// In th, this message translates to:
+  /// **'สถานะปัจจุบัน: {status} — {mode}ไม่ได้'**
+  String scanBlockStatus(String status, String mode);
+
+  /// No description provided for @scanWarnUnsterile.
+  ///
+  /// In th, this message translates to:
+  /// **'⚠ ยังไม่ฆ่าเชื้อ — จะบันทึกเป็น \"ส่งออก (ยังไม่ฆ่าเชื้อ)\"'**
+  String get scanWarnUnsterile;
+
+  /// No description provided for @scanConfirmTitle.
+  ///
+  /// In th, this message translates to:
+  /// **'ยืนยัน{mode}'**
+  String scanConfirmTitle(String mode);
+
+  /// No description provided for @scanConfirmCount.
+  ///
+  /// In th, this message translates to:
+  /// **'{mode} {count} ห่อ'**
+  String scanConfirmCount(String mode, int count);
+
+  /// No description provided for @scanDestBatch.
+  ///
+  /// In th, this message translates to:
+  /// **'รอบ {round} · {sterilizer}'**
+  String scanDestBatch(String round, String sterilizer);
+
+  /// No description provided for @scanDestDept.
+  ///
+  /// In th, this message translates to:
+  /// **'แผนก {dept}'**
+  String scanDestDept(String dept);
+
+  /// No description provided for @scanReceiverSuffix.
+  ///
+  /// In th, this message translates to:
+  /// **' · ผู้รับ {name}'**
+  String scanReceiverSuffix(String name);
+
+  /// No description provided for @scanDestReprocess.
+  ///
+  /// In th, this message translates to:
+  /// **'กลับเป็น \"แพ็กแล้ว\" เพื่อเข้ารอบนึ่งใหม่'**
+  String get scanDestReprocess;
+
+  /// No description provided for @scanResultOkTitle.
+  ///
+  /// In th, this message translates to:
+  /// **'{mode}สำเร็จ {count} ห่อ'**
+  String scanResultOkTitle(String mode, int count);
+
+  /// No description provided for @scanResultMixedTitle.
+  ///
+  /// In th, this message translates to:
+  /// **'สำเร็จ {ok} · ไม่ผ่าน {fail} ห่อ'**
+  String scanResultMixedTitle(int ok, int fail);
+
+  /// No description provided for @scanUnknownReason.
+  ///
+  /// In th, this message translates to:
+  /// **'ไม่ทราบสาเหตุ'**
+  String get scanUnknownReason;
+
+  /// No description provided for @scanRetryFailed.
+  ///
+  /// In th, this message translates to:
+  /// **'ลองใหม่เฉพาะที่ไม่ผ่าน'**
+  String get scanRetryFailed;
+
+  /// No description provided for @scanClearTitle.
+  ///
+  /// In th, this message translates to:
+  /// **'ล้างรายการที่สแกนไว้?'**
+  String get scanClearTitle;
+
+  /// No description provided for @scanClearBody.
+  ///
+  /// In th, this message translates to:
+  /// **'จะลบห่อทั้ง {count} รายการออกจากรายการสแกน (ยังไม่กระทบข้อมูลในระบบ)'**
+  String scanClearBody(int count);
+
+  /// No description provided for @scanClearAction.
+  ///
+  /// In th, this message translates to:
+  /// **'ล้างรายการ'**
+  String get scanClearAction;
+
+  /// No description provided for @scanCameraWebBlocked.
+  ///
+  /// In th, this message translates to:
+  /// **'เบราว์เซอร์บล็อกกล้อง — กดไอคอนกล้อง/แม่กุญแจบนแถบที่อยู่ แล้วอนุญาต จากนั้นกดลองใหม่ (ต้องเปิดผ่าน https)'**
+  String get scanCameraWebBlocked;
+
+  /// No description provided for @scanCameraDenied.
+  ///
+  /// In th, this message translates to:
+  /// **'ปิดสิทธิ์กล้องไว้ — เปิดที่ ตั้งค่าเครื่อง > แอป > CSSD > สิทธิ์'**
+  String get scanCameraDenied;
+
+  /// No description provided for @scanCameraNeed.
+  ///
+  /// In th, this message translates to:
+  /// **'ต้องอนุญาตสิทธิ์กล้องเพื่อสแกน QR'**
+  String get scanCameraNeed;
+
+  /// No description provided for @scanOpenSettings.
+  ///
+  /// In th, this message translates to:
+  /// **'เปิดตั้งค่า'**
+  String get scanOpenSettings;
+
+  /// No description provided for @scanCameraWebError.
+  ///
+  /// In th, this message translates to:
+  /// **'เปิดกล้องไม่ได้ — ตรวจว่าเปิดผ่าน https และอนุญาตกล้องในเบราว์เซอร์ (ไอคอนแม่กุญแจบนแถบที่อยู่) แล้วกดลองใหม่'**
+  String get scanCameraWebError;
+
+  /// No description provided for @scanCameraError.
+  ///
+  /// In th, this message translates to:
+  /// **'เปิดกล้องไม่ได้: {code}'**
+  String scanCameraError(String code);
+
+  /// No description provided for @scanCountLabel.
+  ///
+  /// In th, this message translates to:
+  /// **'สแกนแล้ว {count} ห่อ'**
+  String scanCountLabel(int count);
+
+  /// No description provided for @scanEligibleSuffix.
+  ///
+  /// In th, this message translates to:
+  /// **'(ผ่าน {count})'**
+  String scanEligibleSuffix(int count);
+
+  /// No description provided for @scanEmptyHint.
+  ///
+  /// In th, this message translates to:
+  /// **'ชี้กล้องไปที่ QR code ของห่อ'**
+  String get scanEmptyHint;
+
+  /// No description provided for @scanSaving.
+  ///
+  /// In th, this message translates to:
+  /// **'กำลังบันทึก...'**
+  String get scanSaving;
+
+  /// No description provided for @scanReprocessHint.
+  ///
+  /// In th, this message translates to:
+  /// **'สแกนห่อที่ส่งคืนแล้ว (RETURNED) เพื่อกลับเป็น \"แพ็กแล้ว\" พร้อมเข้ารอบนึ่งใหม่'**
+  String get scanReprocessHint;
+
+  /// No description provided for @scanManualBadge.
+  ///
+  /// In th, this message translates to:
+  /// **'พิมพ์เอง'**
+  String get scanManualBadge;
+
+  /// No description provided for @scanDaysLeft.
+  ///
+  /// In th, this message translates to:
+  /// **'เหลือ {days} วัน'**
+  String scanDaysLeft(int days);
+
+  /// No description provided for @batchLoadError.
+  ///
+  /// In th, this message translates to:
+  /// **'โหลดรอบนึ่งไม่ได้: {error}'**
+  String batchLoadError(String error);
+
+  /// No description provided for @batchNonePending.
+  ///
+  /// In th, this message translates to:
+  /// **'ยังไม่มีรอบที่รอนึ่ง — กด \"รอบใหม่\"'**
+  String get batchNonePending;
+
+  /// No description provided for @batchSelectLabel.
+  ///
+  /// In th, this message translates to:
+  /// **'รอบนึ่ง (รอสแกนห่อ/รอบันทึกผล)'**
+  String get batchSelectLabel;
+
+  /// No description provided for @batchRoundLabel.
+  ///
+  /// In th, this message translates to:
+  /// **'รอบ {round} · {sterilizer}'**
+  String batchRoundLabel(String round, String sterilizer);
+
+  /// No description provided for @batchPkgCountSuffix.
+  ///
+  /// In th, this message translates to:
+  /// **' · {count} ห่อ'**
+  String batchPkgCountSuffix(int count);
+
+  /// No description provided for @batchNewButton.
+  ///
+  /// In th, this message translates to:
+  /// **'รอบใหม่'**
+  String get batchNewButton;
+
+  /// No description provided for @batchRecordResultButton.
+  ///
+  /// In th, this message translates to:
+  /// **'บันทึกผล CI/BI ของรอบ'**
+  String get batchRecordResultButton;
+
+  /// No description provided for @batchOpenTitle.
+  ///
+  /// In th, this message translates to:
+  /// **'เปิดรอบนึ่งใหม่'**
+  String get batchOpenTitle;
+
+  /// No description provided for @batchOpenSubtitle.
+  ///
+  /// In th, this message translates to:
+  /// **'เปิดรอบเพื่อสแกนห่อเข้ารอบก่อนนึ่ง — ห่อจะเข้าคลังเมื่อหัวหน้าบันทึกผล CI/BI ว่าผ่านแล้วเท่านั้น'**
+  String get batchOpenSubtitle;
+
+  /// No description provided for @batchSterilizerLabel.
+  ///
+  /// In th, this message translates to:
+  /// **'เครื่องนึ่ง'**
+  String get batchSterilizerLabel;
+
+  /// No description provided for @batchRoundNo.
+  ///
+  /// In th, this message translates to:
+  /// **'รอบที่'**
+  String get batchRoundNo;
+
+  /// No description provided for @batchOpenButton.
+  ///
+  /// In th, this message translates to:
+  /// **'เปิดรอบ (รอสแกนห่อเข้ารอบ)'**
+  String get batchOpenButton;
+
+  /// No description provided for @batchConfirmPassTitle.
+  ///
+  /// In th, this message translates to:
+  /// **'ยืนยันผล \"ผ่าน\"?'**
+  String get batchConfirmPassTitle;
+
+  /// No description provided for @batchConfirmFailTitle.
+  ///
+  /// In th, this message translates to:
+  /// **'ยืนยันผล \"ไม่ผ่าน\"?'**
+  String get batchConfirmFailTitle;
+
+  /// No description provided for @batchConfirmPassBody.
+  ///
+  /// In th, this message translates to:
+  /// **'ห่อทั้งหมดในรอบ {round} ({count} ห่อ) จะเปลี่ยนเป็น \"ปลอดเชื้อ\" และเข้าคลังทันที'**
+  String batchConfirmPassBody(String round, String count);
+
+  /// No description provided for @batchConfirmFailBody.
+  ///
+  /// In th, this message translates to:
+  /// **'ห่อทั้งหมดในรอบจะถูกปลดออกจากรอบ (ต้องนึ่งใหม่) และระบบจะ recall ของจากรอบนี้ที่หมุนเวียนอยู่'**
+  String get batchConfirmFailBody;
+
+  /// No description provided for @batchRecordedPass.
+  ///
+  /// In th, this message translates to:
+  /// **'บันทึกผลผ่าน — ห่อในรอบเข้าคลังปลอดเชื้อแล้ว'**
+  String get batchRecordedPass;
+
+  /// No description provided for @batchRecordedFail.
+  ///
+  /// In th, this message translates to:
+  /// **'บันทึกผลไม่ผ่าน — ปลดห่อออกจากรอบและ recall แล้ว'**
+  String get batchRecordedFail;
+
+  /// No description provided for @batchRecordTitle.
+  ///
+  /// In th, this message translates to:
+  /// **'บันทึกผลรอบนึ่ง (CI/BI)'**
+  String get batchRecordTitle;
+
+  /// No description provided for @batchRecordSubtitle.
+  ///
+  /// In th, this message translates to:
+  /// **'ผ่าน → ห่อทั้งรอบเป็นปลอดเชื้อเข้าคลังอัตโนมัติ'**
+  String get batchRecordSubtitle;
+
+  /// No description provided for @batchSelectToRecord.
+  ///
+  /// In th, this message translates to:
+  /// **'เลือกรอบที่จะบันทึกผล'**
+  String get batchSelectToRecord;
+
+  /// No description provided for @batchCiPass.
+  ///
+  /// In th, this message translates to:
+  /// **'Chemical Indicator (CI) ผ่าน'**
+  String get batchCiPass;
+
+  /// No description provided for @batchBiPass.
+  ///
+  /// In th, this message translates to:
+  /// **'Biological Indicator (BI) ผ่าน'**
+  String get batchBiPass;
+
+  /// No description provided for @batchRecordButton.
+  ///
+  /// In th, this message translates to:
+  /// **'บันทึกผลตรวจ'**
+  String get batchRecordButton;
+
+  /// No description provided for @deptLoadError.
+  ///
+  /// In th, this message translates to:
+  /// **'โหลดแผนกไม่ได้: {error}'**
+  String deptLoadError(String error);
+
+  /// No description provided for @deptDestRequired.
+  ///
+  /// In th, this message translates to:
+  /// **'แผนกปลายทาง (บังคับ)'**
+  String get deptDestRequired;
+
+  /// No description provided for @deptReturnRequired.
+  ///
+  /// In th, this message translates to:
+  /// **'แผนกที่ส่งของคืน (บังคับ)'**
+  String get deptReturnRequired;
+
+  /// No description provided for @deptAddPlace.
+  ///
+  /// In th, this message translates to:
+  /// **'เพิ่มสถานที่'**
+  String get deptAddPlace;
+
+  /// No description provided for @deptReceiverOptional.
+  ///
+  /// In th, this message translates to:
+  /// **'ชื่อผู้รับ (ไม่บังคับ)'**
+  String get deptReceiverOptional;
+
+  /// No description provided for @deptAddTitle.
+  ///
+  /// In th, this message translates to:
+  /// **'เพิ่มสถานที่ปลายทาง'**
+  String get deptAddTitle;
+
+  /// No description provided for @deptAddSubtitle.
+  ///
+  /// In th, this message translates to:
+  /// **'เช่น โรงพยาบาลอื่นที่ส่งชุดอุปกรณ์ไปให้'**
+  String get deptAddSubtitle;
+
+  /// No description provided for @deptCodeLabel.
+  ///
+  /// In th, this message translates to:
+  /// **'รหัส (ห้ามซ้ำ)'**
+  String get deptCodeLabel;
+
+  /// No description provided for @deptCodeHint.
+  ///
+  /// In th, this message translates to:
+  /// **'เช่น EXT-PYT'**
+  String get deptCodeHint;
+
+  /// No description provided for @deptNameLabel.
+  ///
+  /// In th, this message translates to:
+  /// **'ชื่อสถานที่'**
+  String get deptNameLabel;
+
+  /// No description provided for @deptNameHint.
+  ///
+  /// In th, this message translates to:
+  /// **'เช่น รพ.พญาไท'**
+  String get deptNameHint;
+
+  /// No description provided for @deptExternalTitle.
+  ///
+  /// In th, this message translates to:
+  /// **'สถานที่ภายนอกโรงพยาบาล'**
+  String get deptExternalTitle;
+
+  /// No description provided for @deptExternalSubtitle.
+  ///
+  /// In th, this message translates to:
+  /// **'แสดงป้าย \"(ภายนอก)\" ต่อท้ายชื่อ'**
+  String get deptExternalSubtitle;
+
+  /// No description provided for @deptSaveButton.
+  ///
+  /// In th, this message translates to:
+  /// **'บันทึกสถานที่'**
+  String get deptSaveButton;
 }
 
 class _AppLocalizationsDelegate

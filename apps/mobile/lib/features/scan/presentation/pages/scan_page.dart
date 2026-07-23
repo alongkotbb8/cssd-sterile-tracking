@@ -13,6 +13,7 @@ import '../../../../core/auth/auth_controller.dart';
 import '../../../../core/models/models.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/domain_widgets.dart';
+import '../../../../l10n/app_localizations.dart';
 
 /// ตรวจรูปแบบเลขห่อ (running number) — ใช้ร่วมกันทั้งการสแกน QR และพิมพ์เลขเอง
 ///
@@ -28,16 +29,16 @@ bool isValidPackageId(String id) {
 
 enum ScanMode { scanIn, scanOut, scanReturn, scanReprocess }
 
-extension on ScanMode {
-  // "เข้ารอบนึ่ง" (ไม่ใช่ "นำเข้าคลัง") — ห่อจะเข้าคลัง (STERILE) อัตโนมัติ
-  // เมื่อ SUPERVISOR/ADMIN บันทึกผล CI/BI ของรอบว่าผ่าน (ลำดับถูกหลัก traceability)
-  String get title => switch (this) {
-        ScanMode.scanIn => 'เข้ารอบนึ่ง',
-        ScanMode.scanOut => 'เบิกออก',
-        ScanMode.scanReturn => 'ส่งคืน',
-        ScanMode.scanReprocess => 'Reprocess',
-      };
+/// ป้ายชื่อโหมด (i18n) — "เข้ารอบนึ่ง" ห่อจะเข้าคลัง (STERILE) อัตโนมัติเมื่อ
+/// SUPERVISOR/ADMIN บันทึกผล CI/BI ว่าผ่าน (ลำดับถูกหลัก traceability)
+String scanModeTitle(AppLocalizations l10n, ScanMode m) => switch (m) {
+      ScanMode.scanIn => l10n.scanModeIn,
+      ScanMode.scanOut => l10n.scanModeOut,
+      ScanMode.scanReturn => l10n.scanModeReturn,
+      ScanMode.scanReprocess => l10n.scanModeReprocess,
+    };
 
+extension on ScanMode {
   /// สถานะห่อที่ mode นี้รับได้
   /// - เบิกออก: STERILE (ปกติ) และ PACKED (ส่งออกโดยยังไม่ฆ่าเชื้อ เช่น ส่ง รพ.อื่น)
   /// - ส่งคืน: ISSUED (ปกติ → รอ reprocess) และ PACKED_OUT (คืนแล้วกลับเป็น PACKED)
@@ -170,8 +171,8 @@ class _ScanPageState extends ConsumerState<ScanPage> with WidgetsBindingObserver
       if (_torchOn && mounted) setState(() => _torchOn = false); // ไฟฉายรีเซ็ตเมื่อสลับกล้อง
     } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('สลับกล้องไม่ได้ (อาจมีกล้องเดียว)'),
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(AppLocalizations.of(context).scanSwitchCameraFailed),
         ));
       }
     }
@@ -241,9 +242,9 @@ class _ScanPageState extends ConsumerState<ScanPage> with WidgetsBindingObserver
     }
     _lastInvalidScanNotice = now;
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-      content: Text('QR นี้ไม่ใช่เลขห่อของระบบ'),
-      duration: Duration(seconds: 1),
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(AppLocalizations.of(context).scanInvalidQr),
+      duration: const Duration(seconds: 1),
     ));
   }
 
@@ -251,31 +252,32 @@ class _ScanPageState extends ConsumerState<ScanPage> with WidgetsBindingObserver
   /// พิมพ์เลขห่อเอง ระบบจะ validate รูปแบบเบื้องต้น + backend lookup จริงอีกชั้น
   /// และ audit ทุกรายการที่มาจากทางนี้ด้วย flag `manualEntry` แยกจากการสแกน
   Future<void> _showManualEntryDialog() async {
+    final l10n = AppLocalizations.of(context);
     final ctrl = TextEditingController();
     final formKey = GlobalKey<FormState>();
     final id = await showDialog<String>(
       context: context,
       builder: (dctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('พิมพ์เลขห่อเอง'),
+        title: Text(l10n.scanManualTitle),
         content: Form(
           key: formKey,
           child: TextFormField(
             controller: ctrl,
             autofocus: true,
             textCapitalization: TextCapitalization.characters,
-            decoration: const InputDecoration(
-              hintText: 'เช่น DELIV-20260630-0007',
-              helperText: 'ใช้เมื่อกล้องสแกนไม่ได้ — ระบบจะบันทึกว่ากรอกเองไว้ตรวจสอบย้อนหลัง',
+            decoration: InputDecoration(
+              hintText: l10n.scanManualHint,
+              helperText: l10n.scanManualHelper,
               helperMaxLines: 2,
             ),
             validator: (v) {
               final s = (v ?? '').trim();
-              if (s.isEmpty) return 'กรุณากรอกเลขห่อ';
-              if (s.length > 60) return 'เลขห่อยาวเกินไป';
+              if (s.isEmpty) return l10n.scanManualEmpty;
+              if (s.length > 60) return l10n.scanManualTooLong;
               // ใช้กติกาเดียวกับตอนสแกน QR (isValidPackageId) — charset เดียวกัน
               if (!isValidPackageId(s)) {
-                return 'ใช้ได้เฉพาะตัวอักษร ตัวเลข และขีด (-)';
+                return l10n.scanManualCharset;
               }
               return null;
             },
@@ -284,14 +286,14 @@ class _ScanPageState extends ConsumerState<ScanPage> with WidgetsBindingObserver
         actions: [
           TextButton(
               onPressed: () => Navigator.of(dctx).pop(),
-              child: const Text('ยกเลิก')),
+              child: Text(l10n.actionCancel)),
           FilledButton(
             onPressed: () {
               if (formKey.currentState!.validate()) {
                 Navigator.of(dctx).pop(ctrl.text.trim().toUpperCase());
               }
             },
-            child: const Text('เพิ่ม'),
+            child: Text(l10n.commonAdd),
           ),
         ],
       ),
@@ -321,13 +323,14 @@ class _ScanPageState extends ConsumerState<ScanPage> with WidgetsBindingObserver
 
   /// กติกาบล็อกฝั่ง client (server ตรวจซ้ำอีกชั้น)
   String? _blockReason(LookupResult r) {
+    final l10n = AppLocalizations.of(context);
     if (_mode == ScanMode.scanOut && r.isExpired) {
-      return 'ห้ามใช้ — ห่อหมดอายุแล้ว';
+      return l10n.scanBlockExpired;
     }
     final st = r.package.status;
     if (!_mode.allowedStatuses.contains(st)) {
       final label = packageStatusStyle(st).label;
-      return 'สถานะปัจจุบัน: $label — ${_mode.title}ไม่ได้';
+      return l10n.scanBlockStatus(label, scanModeTitle(l10n, _mode));
     }
     return null;
   }
@@ -335,7 +338,7 @@ class _ScanPageState extends ConsumerState<ScanPage> with WidgetsBindingObserver
   /// เตือนแต่ไม่บล็อก — เบิกออกของที่แพ็กแล้วแต่ยังไม่ผ่านการฆ่าเชื้อ
   String? _warning(LookupResult r) {
     if (_mode == ScanMode.scanOut && r.package.status == 'PACKED') {
-      return '⚠ ยังไม่ฆ่าเชื้อ — จะบันทึกเป็น "ส่งออก (ยังไม่ฆ่าเชื้อ)"';
+      return AppLocalizations.of(context).scanWarnUnsterile;
     }
     return null;
   }
@@ -354,25 +357,28 @@ class _ScanPageState extends ConsumerState<ScanPage> with WidgetsBindingObserver
     final eligible = _items.where((i) => i.eligible).toList();
     if (eligible.isEmpty) return;
 
+    final l10n = AppLocalizations.of(context);
+    final modeTitle = scanModeTitle(l10n, _mode);
+    final receiver = _receiverCtrl.text.trim();
     // pop-up ยืนยันก่อนบันทึกจริง
     final destination = switch (_mode) {
-      ScanMode.scanIn =>
-        'รอบ ${_batch?.roundNo ?? '-'} · ${_batch?.sterilizerName ?? ''}',
-      ScanMode.scanOut => 'แผนก ${_department?.name ?? ''}'
-          '${_receiverCtrl.text.trim().isNotEmpty ? ' · ผู้รับ ${_receiverCtrl.text.trim()}' : ''}',
-      ScanMode.scanReturn => 'แผนก ${_department?.name ?? ''}',
-      ScanMode.scanReprocess => 'กลับเป็น "แพ็กแล้ว" เพื่อเข้ารอบนึ่งใหม่',
+      ScanMode.scanIn => l10n.scanDestBatch(
+          '${_batch?.roundNo ?? '-'}', _batch?.sterilizerName ?? ''),
+      ScanMode.scanOut => l10n.scanDestDept(_department?.name ?? '') +
+          (receiver.isNotEmpty ? l10n.scanReceiverSuffix(receiver) : ''),
+      ScanMode.scanReturn => l10n.scanDestDept(_department?.name ?? ''),
+      ScanMode.scanReprocess => l10n.scanDestReprocess,
     };
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Text('ยืนยัน${_mode.title}'),
+        title: Text(l10n.scanConfirmTitle(modeTitle)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('${_mode.title} ${eligible.length} ห่อ',
+            Text(l10n.scanConfirmCount(modeTitle, eligible.length),
                 style: const TextStyle(
                     fontWeight: FontWeight.w700, fontSize: 16)),
             const SizedBox(height: 6),
@@ -384,10 +390,10 @@ class _ScanPageState extends ConsumerState<ScanPage> with WidgetsBindingObserver
         actions: [
           TextButton(
               onPressed: () => Navigator.of(dctx).pop(false),
-              child: const Text('ยกเลิก')),
+              child: Text(l10n.actionCancel)),
           FilledButton(
             onPressed: () => Navigator.of(dctx).pop(true),
-            child: const Text('ยืนยัน'),
+            child: Text(l10n.commonConfirm),
           ),
         ],
       ),
@@ -473,13 +479,14 @@ class _ScanPageState extends ConsumerState<ScanPage> with WidgetsBindingObserver
   /// (เดิมแจ้งผ่าน SnackBar อย่างเดียว มองไม่เห็นว่าห่อไหนพลาดเพราะอะไร)
   Future<void> _showResultDialog(
       List<_AttemptResult> attempted, int okCount, int failCount) {
+    final l10n = AppLocalizations.of(context);
     return showDialog<void>(
       context: context,
       builder: (dctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Text(failCount == 0
-            ? '${_mode.title}สำเร็จ $okCount ห่อ'
-            : 'สำเร็จ $okCount · ไม่ผ่าน $failCount ห่อ'),
+            ? l10n.scanResultOkTitle(scanModeTitle(l10n, _mode), okCount)
+            : l10n.scanResultMixedTitle(okCount, failCount)),
         content: SizedBox(
           width: double.maxFinite,
           child: ConstrainedBox(
@@ -503,7 +510,7 @@ class _ScanPageState extends ConsumerState<ScanPage> with WidgetsBindingObserver
                           fontFamily: 'monospace', fontSize: 12.5)),
                   subtitle: a.success
                       ? (a.name != null ? Text(a.name!) : null)
-                      : Text(a.error ?? 'ไม่ทราบสาเหตุ',
+                      : Text(a.error ?? l10n.scanUnknownReason,
                           style:
                               const TextStyle(color: SterelisColors.danger)),
                 );
@@ -514,7 +521,7 @@ class _ScanPageState extends ConsumerState<ScanPage> with WidgetsBindingObserver
         actions: [
           TextButton(
             onPressed: () => Navigator.of(dctx).pop(),
-            child: const Text('ปิด'),
+            child: Text(l10n.commonClose),
           ),
           if (failCount > 0)
             FilledButton(
@@ -523,7 +530,7 @@ class _ScanPageState extends ConsumerState<ScanPage> with WidgetsBindingObserver
                 // รายการที่เหลือใน _items คือชุดที่ไม่ผ่านพอดี (สำเร็จถูกลบไปแล้ว)
                 _confirm();
               },
-              child: const Text('ลองใหม่เฉพาะที่ไม่ผ่าน'),
+              child: Text(l10n.scanRetryFailed),
             ),
         ],
       ),
@@ -543,22 +550,22 @@ class _ScanPageState extends ConsumerState<ScanPage> with WidgetsBindingObserver
   /// ยืนยันก่อนล้างรายการที่สแกนไว้ — กันกดโดนพลาดแล้วต้องสแกนใหม่ทั้งหมด
   Future<void> _confirmClear() async {
     if (_items.isEmpty) return;
+    final l10n = AppLocalizations.of(context);
     final ok = await showDialog<bool>(
       context: context,
       builder: (dctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('ล้างรายการที่สแกนไว้?'),
-        content: Text('จะลบห่อทั้ง ${_items.length} รายการออกจากรายการสแกน '
-            '(ยังไม่กระทบข้อมูลในระบบ)'),
+        title: Text(l10n.scanClearTitle),
+        content: Text(l10n.scanClearBody(_items.length)),
         actions: [
           TextButton(
               onPressed: () => Navigator.of(dctx).pop(false),
-              child: const Text('ยกเลิก')),
+              child: Text(l10n.actionCancel)),
           FilledButton(
             style:
                 FilledButton.styleFrom(backgroundColor: SterelisColors.danger),
             onPressed: () => Navigator.of(dctx).pop(true),
-            child: const Text('ล้างรายการ'),
+            child: Text(l10n.scanClearAction),
           ),
         ],
       ),
@@ -568,26 +575,27 @@ class _ScanPageState extends ConsumerState<ScanPage> with WidgetsBindingObserver
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Scaffold(
       appBar: AppBar(
-        title: const Text('สแกน QR'),
+        title: Text(l10n.scanTitle),
         actions: [
           IconButton(
             icon: const Icon(Icons.keyboard_alt_outlined),
-            tooltip: 'พิมพ์เลขห่อเอง (กล้องใช้ไม่ได้)',
+            tooltip: l10n.scanManualTooltip,
             onPressed: _showManualEntryDialog,
           ),
           if (_cameraGranted == true) ...[
             IconButton(
               icon: const Icon(Icons.cameraswitch_outlined),
-              tooltip: 'สลับกล้องหน้า/หลัง',
+              tooltip: l10n.scanSwitchCameraTooltip,
               onPressed: _switchCamera,
             ),
             IconButton(
               icon: Icon(_torchOn
                   ? Icons.flashlight_off_outlined
                   : Icons.flashlight_on_outlined),
-              tooltip: 'ไฟฉาย',
+              tooltip: l10n.scanTorchTooltip,
               onPressed: () {
                 setState(() => _torchOn = !_torchOn);
                 _cam.toggleTorch();
@@ -606,7 +614,7 @@ class _ScanPageState extends ConsumerState<ScanPage> with WidgetsBindingObserver
             segments: ScanMode.values
                 .map((m) => ButtonSegment(
                     value: m,
-                    label: Text(m.title,
+                    label: Text(scanModeTitle(l10n, m),
                         style: const TextStyle(fontSize: 12.5),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis)))
@@ -661,6 +669,7 @@ class _ScanPageState extends ConsumerState<ScanPage> with WidgetsBindingObserver
   }
 
   Widget _buildCameraArea() {
+    final l10n = AppLocalizations.of(context);
     // ยังไม่ตรวจสิทธิ์ → กำลังโหลด
     if (_cameraGranted == null) {
       return const Center(child: CircularProgressIndicator(color: Colors.white));
@@ -671,11 +680,12 @@ class _ScanPageState extends ConsumerState<ScanPage> with WidgetsBindingObserver
       return _CameraMessage(
         icon: Icons.no_photography_outlined,
         message: kIsWeb
-            ? 'เบราว์เซอร์บล็อกกล้อง — กดไอคอนกล้อง/แม่กุญแจบนแถบที่อยู่ แล้วอนุญาต จากนั้นกดลองใหม่ (ต้องเปิดผ่าน https)'
+            ? l10n.scanCameraWebBlocked
             : _permanentlyDenied
-                ? 'ปิดสิทธิ์กล้องไว้ — เปิดที่ ตั้งค่าเครื่อง > แอป > CSSD > สิทธิ์'
-                : 'ต้องอนุญาตสิทธิ์กล้องเพื่อสแกน QR',
-        actionLabel: (!kIsWeb && _permanentlyDenied) ? 'เปิดตั้งค่า' : 'ลองใหม่',
+                ? l10n.scanCameraDenied
+                : l10n.scanCameraNeed,
+        actionLabel:
+            (!kIsWeb && _permanentlyDenied) ? l10n.scanOpenSettings : l10n.commonRetry,
         onAction: (!kIsWeb && _permanentlyDenied) ? openAppSettings : _retry,
       );
     }
@@ -685,9 +695,9 @@ class _ScanPageState extends ConsumerState<ScanPage> with WidgetsBindingObserver
       errorBuilder: (context, error, child) => _CameraMessage(
         icon: Icons.no_photography_outlined,
         message: kIsWeb
-            ? 'เปิดกล้องไม่ได้ — ตรวจว่าเปิดผ่าน https และอนุญาตกล้องในเบราว์เซอร์ (ไอคอนแม่กุญแจบนแถบที่อยู่) แล้วกดลองใหม่'
-            : 'เปิดกล้องไม่ได้: ${error.errorCode.name}',
-        actionLabel: 'ลองใหม่',
+            ? l10n.scanCameraWebError
+            : l10n.scanCameraError(error.errorCode.name),
+        actionLabel: l10n.commonRetry,
         onAction: _retry,
       ),
     );
@@ -750,6 +760,7 @@ class _TargetSelector extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
     if (mode == ScanMode.scanIn) {
       // เฉพาะรอบ PENDING เท่านั้น — เพิ่มห่อเข้ารอบที่บันทึกผลแล้วไม่ได้ (traceability)
       final batches = ref.watch(batchesProvider('PENDING'));
@@ -760,7 +771,7 @@ class _TargetSelector extends ConsumerWidget {
         padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
         child: batches.when(
           loading: () => const LinearProgressIndicator(minHeight: 2),
-          error: (e, _) => Text('โหลดรอบนึ่งไม่ได้: ${apiErrorMessage(e)}',
+          error: (e, _) => Text(l10n.batchLoadError(apiErrorMessage(e)),
               style:
                   const TextStyle(color: SterelisColors.danger, fontSize: 12)),
           data: (list) => Column(children: [
@@ -771,9 +782,8 @@ class _TargetSelector extends ConsumerWidget {
                       list.any((b) => b.id == batch?.id) ? batch : null,
                   isExpanded: true,
                   decoration: InputDecoration(
-                    labelText: list.isEmpty
-                        ? 'ยังไม่มีรอบที่รอนึ่ง — กด "รอบใหม่"'
-                        : 'รอบนึ่ง (รอสแกนห่อ/รอบันทึกผล)',
+                    labelText:
+                        list.isEmpty ? l10n.batchNonePending : l10n.batchSelectLabel,
                     prefixIcon:
                         const Icon(Icons.local_fire_department_outlined),
                     isDense: true,
@@ -782,8 +792,13 @@ class _TargetSelector extends ConsumerWidget {
                       .map((b) => DropdownMenuItem(
                             value: b,
                             child: Text(
-                              'รอบ ${b.roundNo ?? '-'} · ${b.sterilizerName ?? b.id}'
-                              '${b.packageCount != null ? ' · ${b.packageCount} ห่อ' : ''}',
+                              l10n.batchRoundLabel(
+                                    '${b.roundNo ?? '-'}',
+                                    b.sterilizerName ?? b.id,
+                                  ) +
+                                  (b.packageCount != null
+                                      ? l10n.batchPkgCountSuffix(b.packageCount!)
+                                      : ''),
                               overflow: TextOverflow.ellipsis,
                             ),
                           ))
@@ -801,7 +816,7 @@ class _TargetSelector extends ConsumerWidget {
                   }
                 },
                 icon: const Icon(Icons.add, size: 18),
-                label: const Text('รอบใหม่'),
+                label: Text(l10n.batchNewButton),
                 style: FilledButton.styleFrom(
                     minimumSize: const Size(0, 48),
                     backgroundColor: SterelisColors.blue50,
@@ -820,7 +835,7 @@ class _TargetSelector extends ConsumerWidget {
                     }
                   },
                   icon: const Icon(Icons.fact_check_outlined, size: 18),
-                  label: const Text('บันทึกผล CI/BI ของรอบ'),
+                  label: Text(l10n.batchRecordResultButton),
                 ),
               ),
           ]),
@@ -833,14 +848,15 @@ class _TargetSelector extends ConsumerWidget {
       return Container(
         color: SterelisColors.white,
         padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
-        child: const Row(children: [
-          Icon(Icons.recycling_outlined,
+        child: Row(children: [
+          const Icon(Icons.recycling_outlined,
               size: 18, color: SterelisColors.teal500),
-          SizedBox(width: 8),
+          const SizedBox(width: 8),
           Expanded(
             child: Text(
-              'สแกนห่อที่ส่งคืนแล้ว (RETURNED) เพื่อกลับเป็น "แพ็กแล้ว" พร้อมเข้ารอบนึ่งใหม่',
-              style: TextStyle(fontSize: 12.5, color: SterelisColors.textMuted),
+              l10n.scanReprocessHint,
+              style: const TextStyle(
+                  fontSize: 12.5, color: SterelisColors.textMuted),
             ),
           ),
         ]),
@@ -857,7 +873,7 @@ class _TargetSelector extends ConsumerWidget {
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
       child: departments.when(
         loading: () => const LinearProgressIndicator(minHeight: 2),
-        error: (e, _) => Text('โหลดแผนกไม่ได้: ${apiErrorMessage(e)}',
+        error: (e, _) => Text(l10n.deptLoadError(apiErrorMessage(e)),
             style: const TextStyle(color: SterelisColors.danger, fontSize: 12)),
         data: (list) => Column(children: [
           Row(children: [
@@ -868,8 +884,8 @@ class _TargetSelector extends ConsumerWidget {
                 isExpanded: true,
                 decoration: InputDecoration(
                   labelText: mode == ScanMode.scanOut
-                      ? 'แผนกปลายทาง (บังคับ)'
-                      : 'แผนกที่ส่งของคืน (บังคับ)',
+                      ? l10n.deptDestRequired
+                      : l10n.deptReturnRequired,
                   prefixIcon: const Icon(Icons.apartment_outlined),
                 ),
                 items: list
@@ -890,7 +906,7 @@ class _TargetSelector extends ConsumerWidget {
                   }
                 },
                 icon: const Icon(Icons.add_location_alt_outlined, size: 18),
-                label: const Text('เพิ่มสถานที่'),
+                label: Text(l10n.deptAddPlace),
                 style: FilledButton.styleFrom(
                     minimumSize: const Size(0, 48),
                     backgroundColor: SterelisColors.blue50,
@@ -902,9 +918,9 @@ class _TargetSelector extends ConsumerWidget {
             const SizedBox(height: 8),
             TextField(
               controller: receiverCtrl,
-              decoration: const InputDecoration(
-                labelText: 'ชื่อผู้รับ (ไม่บังคับ)',
-                prefixIcon: Icon(Icons.person_outline),
+              decoration: InputDecoration(
+                labelText: l10n.deptReceiverOptional,
+                prefixIcon: const Icon(Icons.person_outline),
                 isDense: true,
               ),
             ),
@@ -935,32 +951,33 @@ class _ScannedPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final okCount = items.where((i) => i.eligible).length;
 
     return Column(children: [
       Padding(
         padding: const EdgeInsets.fromLTRB(16, 10, 16, 4),
         child: Row(children: [
-          Text('สแกนแล้ว ${items.length} ห่อ',
+          Text(l10n.scanCountLabel(items.length),
               style: const TextStyle(
                   fontWeight: FontWeight.w700,
                   color: SterelisColors.textStrong)),
           if (okCount != items.length) ...[
             const SizedBox(width: 6),
-            Text('(ผ่าน $okCount)',
+            Text(l10n.scanEligibleSuffix(okCount),
                 style: const TextStyle(
                     fontSize: 12, color: SterelisColors.textMuted)),
           ],
           const Spacer(),
           if (items.isNotEmpty)
-            TextButton(onPressed: onClear, child: const Text('ล้าง')),
+            TextButton(onPressed: onClear, child: Text(l10n.commonClear)),
         ]),
       ),
       Expanded(
         child: items.isEmpty
-            ? const Center(
-                child: Text('ชี้กล้องไปที่ QR code ของห่อ',
-                    style: TextStyle(color: SterelisColors.textFaint)))
+            ? Center(
+                child: Text(l10n.scanEmptyHint,
+                    style: const TextStyle(color: SterelisColors.textFaint)))
             : ListView.separated(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 itemCount: items.length,
@@ -981,8 +998,9 @@ class _ScannedPanel extends StatelessWidget {
                       strokeWidth: 2, color: Colors.white))
               : const Icon(Icons.save_outlined),
           label: Text(submitting
-              ? 'กำลังบันทึก...'
-              : 'ยืนยัน${mode.title}${okCount == 0 ? '' : ' ($okCount)'}'),
+              ? l10n.scanSaving
+              : l10n.scanConfirmTitle(scanModeTitle(l10n, mode)) +
+                  (okCount == 0 ? '' : ' ($okCount)')),
           style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(50)),
         ),
       ),
@@ -1051,6 +1069,7 @@ class _CreateDepartmentSheetState
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final bottom = MediaQuery.of(context).viewInsets.bottom;
 
     return Padding(
@@ -1069,23 +1088,24 @@ class _CreateDepartmentSheetState
             ),
           ),
           const SizedBox(height: 16),
-          const Text('เพิ่มสถานที่ปลายทาง',
-              style: TextStyle(
+          Text(l10n.deptAddTitle,
+              style: const TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.w800,
                   color: SterelisColors.textStrong)),
           const SizedBox(height: 4),
-          const Text('เช่น โรงพยาบาลอื่นที่ส่งชุดอุปกรณ์ไปให้',
-              style: TextStyle(fontSize: 13, color: SterelisColors.textMuted)),
+          Text(l10n.deptAddSubtitle,
+              style: const TextStyle(
+                  fontSize: 13, color: SterelisColors.textMuted)),
           const SizedBox(height: 18),
           TextField(
             controller: _codeCtrl,
             enabled: !_saving,
             textCapitalization: TextCapitalization.characters,
-            decoration: const InputDecoration(
-              labelText: 'รหัส (ห้ามซ้ำ)',
-              hintText: 'เช่น EXT-PYT',
-              prefixIcon: Icon(Icons.tag),
+            decoration: InputDecoration(
+              labelText: l10n.deptCodeLabel,
+              hintText: l10n.deptCodeHint,
+              prefixIcon: const Icon(Icons.tag),
             ),
             onChanged: (_) => setState(() {}),
           ),
@@ -1093,20 +1113,22 @@ class _CreateDepartmentSheetState
           TextField(
             controller: _nameCtrl,
             enabled: !_saving,
-            decoration: const InputDecoration(
-              labelText: 'ชื่อสถานที่',
-              hintText: 'เช่น รพ.พญาไท',
-              prefixIcon: Icon(Icons.apartment_outlined),
+            decoration: InputDecoration(
+              labelText: l10n.deptNameLabel,
+              hintText: l10n.deptNameHint,
+              prefixIcon: const Icon(Icons.apartment_outlined),
             ),
             onChanged: (_) => setState(() {}),
           ),
           const SizedBox(height: 8),
           SwitchListTile(
             contentPadding: EdgeInsets.zero,
-            title: const Text('สถานที่ภายนอกโรงพยาบาล',
-                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
-            subtitle: const Text('แสดงป้าย "(ภายนอก)" ต่อท้ายชื่อ',
-                style: TextStyle(fontSize: 12, color: SterelisColors.textMuted)),
+            title: Text(l10n.deptExternalTitle,
+                style:
+                    const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+            subtitle: Text(l10n.deptExternalSubtitle,
+                style: const TextStyle(
+                    fontSize: 12, color: SterelisColors.textMuted)),
             value: _isExternal,
             activeThumbColor: SterelisColors.blue500,
             onChanged: _saving ? null : (v) => setState(() => _isExternal = v),
@@ -1121,7 +1143,7 @@ class _CreateDepartmentSheetState
                     child: CircularProgressIndicator(
                         strokeWidth: 2, color: Colors.white))
                 : const Icon(Icons.check),
-            label: const Text('บันทึกสถานที่'),
+            label: Text(AppLocalizations.of(context).deptSaveButton),
             style:
                 FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
           ),
@@ -1180,6 +1202,7 @@ class _CreateBatchSheetState extends ConsumerState<_CreateBatchSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final sterilizers = ref.watch(sterilizersProvider);
     final bottom = MediaQuery.of(context).viewInsets.bottom;
 
@@ -1199,19 +1222,19 @@ class _CreateBatchSheetState extends ConsumerState<_CreateBatchSheet> {
             ),
           ),
           const SizedBox(height: 16),
-          const Text('เปิดรอบนึ่งใหม่',
-              style: TextStyle(
+          Text(l10n.batchOpenTitle,
+              style: const TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.w800,
                   color: SterelisColors.textStrong)),
           const SizedBox(height: 4),
-          const Text(
-              'เปิดรอบเพื่อสแกนห่อเข้ารอบก่อนนึ่ง — ห่อจะเข้าคลังเมื่อหัวหน้า'
-              'บันทึกผล CI/BI ว่าผ่านแล้วเท่านั้น',
-              style: TextStyle(fontSize: 13, color: SterelisColors.textMuted)),
+          Text(l10n.batchOpenSubtitle,
+              style: const TextStyle(
+                  fontSize: 13, color: SterelisColors.textMuted)),
           const SizedBox(height: 18),
-          const Text('เครื่องนึ่ง',
-              style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+          Text(l10n.batchSterilizerLabel,
+              style:
+                  const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
           const SizedBox(height: 8),
           sterilizers.when(
             loading: () => const Padding(
@@ -1235,8 +1258,9 @@ class _CreateBatchSheetState extends ConsumerState<_CreateBatchSheet> {
           ),
           const SizedBox(height: 18),
           Row(children: [
-            const Text('รอบที่',
-                style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+            Text(l10n.batchRoundNo,
+                style:
+                    const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
             const Spacer(),
             IconButton.filledTonal(
               onPressed: _roundNo > 1 && !_saving
@@ -1269,7 +1293,7 @@ class _CreateBatchSheetState extends ConsumerState<_CreateBatchSheet> {
                     child: CircularProgressIndicator(
                         strokeWidth: 2, color: Colors.white))
                 : const Icon(Icons.check),
-            label: const Text('เปิดรอบ (รอสแกนห่อเข้ารอบ)'),
+            label: Text(l10n.batchOpenButton),
             style:
                 FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
           ),
@@ -1310,29 +1334,30 @@ class _RecordResultSheetState extends ConsumerState<_RecordResultSheet> {
     final b = _batch;
     if (b == null) return;
 
+    final l10n = AppLocalizations.of(context);
     final willPass = _ciPassed && _biPassed;
     // ยืนยันซ้ำ — การบันทึกผลตัดสินสถานะห่อทั้งรอบ ย้อนกลับไม่ได้
     final ok = await showDialog<bool>(
       context: context,
       builder: (dctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Text(willPass ? 'ยืนยันผล "ผ่าน"?' : 'ยืนยันผล "ไม่ผ่าน"?'),
+        title: Text(
+            willPass ? l10n.batchConfirmPassTitle : l10n.batchConfirmFailTitle),
         content: Text(willPass
-            ? 'ห่อทั้งหมดในรอบ ${b.roundNo ?? '-'} (${b.packageCount ?? '-'} ห่อ) '
-                'จะเปลี่ยนเป็น "ปลอดเชื้อ" และเข้าคลังทันที'
-            : 'ห่อทั้งหมดในรอบจะถูกปลดออกจากรอบ (ต้องนึ่งใหม่) '
-                'และระบบจะ recall ของจากรอบนี้ที่หมุนเวียนอยู่'),
+            ? l10n.batchConfirmPassBody(
+                '${b.roundNo ?? '-'}', '${b.packageCount ?? '-'}')
+            : l10n.batchConfirmFailBody),
         actions: [
           TextButton(
               onPressed: () => Navigator.of(dctx).pop(false),
-              child: const Text('ยกเลิก')),
+              child: Text(l10n.actionCancel)),
           FilledButton(
             style: willPass
                 ? null
                 : FilledButton.styleFrom(
                     backgroundColor: SterelisColors.danger),
             onPressed: () => Navigator.of(dctx).pop(true),
-            child: const Text('ยืนยัน'),
+            child: Text(l10n.commonConfirm),
           ),
         ],
       ),
@@ -1348,9 +1373,8 @@ class _RecordResultSheetState extends ConsumerState<_RecordResultSheet> {
           );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(willPass
-            ? 'บันทึกผลผ่าน — ห่อในรอบเข้าคลังปลอดเชื้อแล้ว'
-            : 'บันทึกผลไม่ผ่าน — ปลดห่อออกจากรอบและ recall แล้ว'),
+        content: Text(
+            willPass ? l10n.batchRecordedPass : l10n.batchRecordedFail),
         backgroundColor:
             willPass ? SterelisColors.success : SterelisColors.warning,
       ));
@@ -1367,6 +1391,7 @@ class _RecordResultSheetState extends ConsumerState<_RecordResultSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final batches = ref.watch(batchesProvider('PENDING'));
     final bottom = MediaQuery.of(context).viewInsets.bottom;
 
@@ -1386,14 +1411,15 @@ class _RecordResultSheetState extends ConsumerState<_RecordResultSheet> {
             ),
           ),
           const SizedBox(height: 16),
-          const Text('บันทึกผลรอบนึ่ง (CI/BI)',
-              style: TextStyle(
+          Text(l10n.batchRecordTitle,
+              style: const TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.w800,
                   color: SterelisColors.textStrong)),
           const SizedBox(height: 4),
-          const Text('ผ่าน → ห่อทั้งรอบเป็นปลอดเชื้อเข้าคลังอัตโนมัติ',
-              style: TextStyle(fontSize: 13, color: SterelisColors.textMuted)),
+          Text(l10n.batchRecordSubtitle,
+              style: const TextStyle(
+                  fontSize: 13, color: SterelisColors.textMuted)),
           const SizedBox(height: 18),
           batches.when(
             loading: () => const Padding(
@@ -1405,16 +1431,21 @@ class _RecordResultSheetState extends ConsumerState<_RecordResultSheet> {
             data: (list) => DropdownButtonFormField<SterilizationBatch>(
               initialValue: list.any((b) => b.id == _batch?.id) ? _batch : null,
               isExpanded: true,
-              decoration: const InputDecoration(
-                labelText: 'เลือกรอบที่จะบันทึกผล',
-                prefixIcon: Icon(Icons.local_fire_department_outlined),
+              decoration: InputDecoration(
+                labelText: l10n.batchSelectToRecord,
+                prefixIcon: const Icon(Icons.local_fire_department_outlined),
               ),
               items: list
                   .map((b) => DropdownMenuItem(
                         value: b,
                         child: Text(
-                          'รอบ ${b.roundNo ?? '-'} · ${b.sterilizerName ?? b.id}'
-                          '${b.packageCount != null ? ' · ${b.packageCount} ห่อ' : ''}',
+                          l10n.batchRoundLabel(
+                                '${b.roundNo ?? '-'}',
+                                b.sterilizerName ?? b.id,
+                              ) +
+                              (b.packageCount != null
+                                  ? l10n.batchPkgCountSuffix(b.packageCount!)
+                                  : ''),
                           overflow: TextOverflow.ellipsis,
                         ),
                       ))
@@ -1425,16 +1456,18 @@ class _RecordResultSheetState extends ConsumerState<_RecordResultSheet> {
           const SizedBox(height: 8),
           SwitchListTile(
             contentPadding: EdgeInsets.zero,
-            title: const Text('Chemical Indicator (CI) ผ่าน',
-                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+            title: Text(l10n.batchCiPass,
+                style:
+                    const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
             value: _ciPassed,
             activeThumbColor: SterelisColors.success,
             onChanged: _saving ? null : (v) => setState(() => _ciPassed = v),
           ),
           SwitchListTile(
             contentPadding: EdgeInsets.zero,
-            title: const Text('Biological Indicator (BI) ผ่าน',
-                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+            title: Text(l10n.batchBiPass,
+                style:
+                    const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
             value: _biPassed,
             activeThumbColor: SterelisColors.success,
             onChanged: _saving ? null : (v) => setState(() => _biPassed = v),
@@ -1449,7 +1482,7 @@ class _RecordResultSheetState extends ConsumerState<_RecordResultSheet> {
                     child: CircularProgressIndicator(
                         strokeWidth: 2, color: Colors.white))
                 : const Icon(Icons.fact_check_outlined),
-            label: const Text('บันทึกผลตรวจ'),
+            label: Text(l10n.batchRecordButton),
             style:
                 FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
           ),
@@ -1466,6 +1499,7 @@ class _ScannedTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     // ของหมดอายุ (เบิกออก) → การ์ดแดง "ห้ามใช้" เด่นชัดตาม design system
     if (item.isExpired && item.blockReason != null) {
       return Dismissible(
@@ -1473,7 +1507,7 @@ class _ScannedTile extends StatelessWidget {
         direction: DismissDirection.endToStart,
         onDismissed: (_) => onRemove(item),
         child: BlockedCard(
-          title: 'ห้ามใช้ — หมดอายุแล้ว',
+          title: l10n.scanBlockExpired,
           detail: '${item.id}${item.name != null ? ' · ${item.name}' : ''}',
         ),
       );
@@ -1535,8 +1569,8 @@ class _ScannedTile extends StatelessWidget {
                       color: SterelisColors.surface2,
                       borderRadius: BorderRadius.circular(6),
                     ),
-                    child: const Text('พิมพ์เอง',
-                        style: TextStyle(
+                    child: Text(l10n.scanManualBadge,
+                        style: const TextStyle(
                             fontSize: 10, color: SterelisColors.textMuted)),
                   ),
                 ],
@@ -1568,7 +1602,7 @@ class _ScannedTile extends StatelessWidget {
           if (!item.loading &&
               item.daysLeft != null &&
               item.blockReason == null)
-            Text('เหลือ ${item.daysLeft} วัน',
+            Text(l10n.scanDaysLeft(item.daysLeft!),
                 style: const TextStyle(
                     fontSize: 11, color: SterelisColors.textMuted)),
         ]),

@@ -8,6 +8,7 @@ import '../../../../core/api/repositories.dart';
 import '../../../../core/models/models.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/domain_widgets.dart';
+import '../../../../l10n/app_localizations.dart';
 import '../../../print_jobs/presentation/widgets/submit_print_job_sheet.dart';
 import '../widgets/create_package_sheet.dart';
 
@@ -30,6 +31,7 @@ class PackagesPage extends ConsumerWidget {
     final packages = ref.watch(packagesProvider(query));
     final selectMode = ref.watch(_selectModeProvider);
     final selectedIds = ref.watch(_selectedIdsProvider);
+    final l10n = AppLocalizations.of(context);
 
     void exitSelectMode() {
       ref.read(_selectModeProvider.notifier).state = false;
@@ -44,11 +46,13 @@ class PackagesPage extends ConsumerWidget {
                 onPressed: exitSelectMode,
               )
             : null,
-        title: Text(selectMode ? 'เลือก ${selectedIds.length} ห่อ' : 'รายการห่อ'),
+        title: Text(selectMode
+            ? l10n.pkgSelectedCount(selectedIds.length)
+            : l10n.pkgListTitle),
         actions: [
           if (!selectMode)
             IconButton(
-              tooltip: 'เลือกเพื่อพิมพ์หลายใบ',
+              tooltip: l10n.pkgSelectToPrintTooltip,
               icon: const Icon(Icons.checklist_rounded),
               onPressed: () =>
                   ref.read(_selectModeProvider.notifier).state = true,
@@ -60,7 +64,7 @@ class PackagesPage extends ConsumerWidget {
           : FloatingActionButton.extended(
               onPressed: () => showCreatePackageSheet(context, ref),
               icon: const Icon(Icons.add),
-              label: const Text('สร้างห่อใหม่'),
+              label: Text(l10n.pkgCreateNew),
               backgroundColor: SterelisColors.blue500,
               foregroundColor: Colors.white,
             ),
@@ -86,7 +90,7 @@ class PackagesPage extends ConsumerWidget {
                 Center(
                   child: OutlinedButton(
                     onPressed: () => ref.invalidate(packagesProvider(query)),
-                    child: const Text('ลองใหม่'),
+                    child: Text(l10n.commonRetry),
                   ),
                 ),
               ]),
@@ -109,6 +113,7 @@ class _PrintSelectedBar extends ConsumerWidget {
     final selectedIds = ref.watch(_selectedIdsProvider);
     final packages = ref.watch(packagesProvider(query)).value ?? const [];
     final count = selectedIds.length;
+    final l10n = AppLocalizations.of(context);
 
     return SafeArea(
       child: Padding(
@@ -125,7 +130,9 @@ class _PrintSelectedBar extends ConsumerWidget {
                   ref.read(_selectedIdsProvider.notifier).state = {};
                 },
           icon: const Icon(Icons.print_outlined),
-          label: Text(count == 0 ? 'เลือกห่อเพื่อพิมพ์' : 'พิมพ์ที่เลือก ($count)'),
+          label: Text(count == 0
+              ? l10n.pkgSelectToPrintHint
+              : l10n.pkgPrintSelected(count)),
           style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(50)),
         ),
       ),
@@ -143,7 +150,7 @@ class _SearchBar extends ConsumerWidget {
       child: TextField(
         onChanged: (v) => ref.read(_searchProvider.notifier).state = v,
         decoration: InputDecoration(
-          hintText: 'ค้นหาเลขรัน / ชื่อชุด',
+          hintText: AppLocalizations.of(context).pkgSearchHint,
           hintStyle: const TextStyle(color: SterelisColors.textFaint),
           prefixIcon:
               const Icon(Icons.search, color: SterelisColors.textFaint),
@@ -170,24 +177,24 @@ class _SearchBar extends ConsumerWidget {
 class _StatusFilterBar extends ConsumerWidget {
   const _StatusFilterBar();
 
-  static const _filters = [
-    (null, 'ทั้งหมด'),
-    ('PACKED', 'แพ็กแล้ว'),
-    ('PACKED_OUT', 'ส่งออกไม่ฆ่าเชื้อ'),
-    ('STERILE', 'ปลอดเชื้อ'),
-    ('ISSUED', 'เบิกออก'),
-    ('RETURNED', 'รอ Reprocess'),
-    ('EXPIRED', 'หมดอายุ'),
-  ];
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
+    final filters = <(String?, String)>[
+      (null, l10n.filterAll),
+      ('PACKED', l10n.statusPacked),
+      ('PACKED_OUT', l10n.statusPackedOut),
+      ('STERILE', l10n.statusSterile),
+      ('ISSUED', l10n.statusIssued),
+      ('RETURNED', l10n.statusReturned),
+      ('EXPIRED', l10n.statusExpired),
+    ];
     final selected = ref.watch(_statusFilterProvider);
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       child: Row(
-        children: _filters.map((f) {
+        children: filters.map((f) {
           final isSel = selected == f.$1;
           return Padding(
             padding: const EdgeInsets.only(right: 8),
@@ -234,7 +241,7 @@ class _TagFilterBar extends ConsumerWidget {
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
       child: Row(children: [
         _TagChip(
-          label: 'ทุกป้าย',
+          label: AppLocalizations.of(context).pkgTagAll,
           selected: selected == null,
           color: SterelisColors.textMuted,
           onTap: () => ref.read(_tagFilterProvider.notifier).state = null,
@@ -314,14 +321,14 @@ class _PackageList extends ConsumerWidget {
             .toList();
 
     if (list.isEmpty) {
-      return ListView(children: const [
-        SizedBox(height: 120),
-        Icon(Icons.inventory_2_outlined,
+      return ListView(children: [
+        const SizedBox(height: 120),
+        const Icon(Icons.inventory_2_outlined,
             size: 44, color: SterelisColors.textFaint),
-        SizedBox(height: 12),
+        const SizedBox(height: 12),
         Center(
-            child: Text('ไม่พบห่อในเงื่อนไขนี้',
-                style: TextStyle(color: SterelisColors.textFaint))),
+            child: Text(AppLocalizations.of(context).pkgNoneFound,
+                style: const TextStyle(color: SterelisColors.textFaint))),
       ]);
     }
 
@@ -373,16 +380,17 @@ class _SelectAllRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final allSelected = selectedCount == total && total > 0;
+    final l10n = AppLocalizations.of(context);
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
       child: Row(children: [
-        Text('เลือกแล้ว $selectedCount/$total',
+        Text(l10n.pkgSelectedOf(selectedCount, total),
             style: const TextStyle(
                 fontSize: 13, color: SterelisColors.textMuted)),
         const Spacer(),
         TextButton(
           onPressed: allSelected ? onClear : onSelectAll,
-          child: Text(allSelected ? 'ล้างทั้งหมด' : 'เลือกทั้งหมด'),
+          child: Text(allSelected ? l10n.commonClearAll : l10n.commonSelectAll),
         ),
       ]),
     );
@@ -404,6 +412,7 @@ class _PackageCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final fmt = DateFormat('dd/MM/yyyy');
+    final l10n = AppLocalizations.of(context);
     final danger = pkg.isExpired || pkg.status == 'EXPIRED';
 
     return InkWell(
@@ -461,7 +470,7 @@ class _PackageCard extends StatelessWidget {
               ]),
               if (pkg.expiryDate != null) ...[
                 const SizedBox(height: 6),
-                Text('หมดอายุ ${fmt.format(pkg.expiryDate!)}',
+                Text(l10n.pkgExpiryOn(fmt.format(pkg.expiryDate!)),
                     style: TextStyle(
                         fontSize: 12,
                         color: danger
@@ -478,7 +487,7 @@ class _PackageCard extends StatelessWidget {
                       size: 14, color: SterelisColors.blue600),
                   const SizedBox(width: 3),
                   Flexible(
-                    child: Text('อยู่ที่ ${pkg.currentLocationName}',
+                    child: Text(l10n.pkgLocationAt(pkg.currentLocationName!),
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
                             fontSize: 12,

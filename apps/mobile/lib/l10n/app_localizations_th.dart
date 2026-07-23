@@ -60,4 +60,388 @@ class AppLocalizationsTh extends AppLocalizations {
 
   @override
   String get logoutAllConfirmAction => 'ออกทุกอุปกรณ์';
+
+  @override
+  String get commonRetry => 'ลองใหม่';
+
+  @override
+  String get commonSelectAll => 'เลือกทั้งหมด';
+
+  @override
+  String get commonClearAll => 'ล้างทั้งหมด';
+
+  @override
+  String get statusPacked => 'แพ็กแล้ว';
+
+  @override
+  String get statusPackedOut => 'ส่งออกไม่ฆ่าเชื้อ';
+
+  @override
+  String get statusSterile => 'ปลอดเชื้อ';
+
+  @override
+  String get statusIssued => 'เบิกออก';
+
+  @override
+  String get statusReturned => 'รอ Reprocess';
+
+  @override
+  String get statusExpired => 'หมดอายุ';
+
+  @override
+  String get filterAll => 'ทั้งหมด';
+
+  @override
+  String get pkgListTitle => 'รายการห่อ';
+
+  @override
+  String pkgSelectedCount(int count) {
+    return 'เลือก $count ห่อ';
+  }
+
+  @override
+  String get pkgSelectToPrintTooltip => 'เลือกเพื่อพิมพ์หลายใบ';
+
+  @override
+  String get pkgCreateNew => 'สร้างห่อใหม่';
+
+  @override
+  String get pkgSelectToPrintHint => 'เลือกห่อเพื่อพิมพ์';
+
+  @override
+  String pkgPrintSelected(int count) {
+    return 'พิมพ์ที่เลือก ($count)';
+  }
+
+  @override
+  String get pkgSearchHint => 'ค้นหาเลขรัน / ชื่อชุด';
+
+  @override
+  String get pkgTagAll => 'ทุกป้าย';
+
+  @override
+  String get pkgNoneFound => 'ไม่พบห่อในเงื่อนไขนี้';
+
+  @override
+  String pkgSelectedOf(int selected, int total) {
+    return 'เลือกแล้ว $selected/$total';
+  }
+
+  @override
+  String pkgExpiryOn(String date) {
+    return 'หมดอายุ $date';
+  }
+
+  @override
+  String pkgLocationAt(String location) {
+    return 'อยู่ที่ $location';
+  }
+
+  @override
+  String get commonConfirm => 'ยืนยัน';
+
+  @override
+  String get commonClose => 'ปิด';
+
+  @override
+  String get commonAdd => 'เพิ่ม';
+
+  @override
+  String get commonClear => 'ล้าง';
+
+  @override
+  String get scanModeIn => 'เข้ารอบนึ่ง';
+
+  @override
+  String get scanModeOut => 'เบิกออก';
+
+  @override
+  String get scanModeReturn => 'ส่งคืน';
+
+  @override
+  String get scanModeReprocess => 'Reprocess';
+
+  @override
+  String get scanTitle => 'สแกน QR';
+
+  @override
+  String get scanManualTooltip => 'พิมพ์เลขห่อเอง (กล้องใช้ไม่ได้)';
+
+  @override
+  String get scanSwitchCameraTooltip => 'สลับกล้องหน้า/หลัง';
+
+  @override
+  String get scanTorchTooltip => 'ไฟฉาย';
+
+  @override
+  String get scanSwitchCameraFailed => 'สลับกล้องไม่ได้ (อาจมีกล้องเดียว)';
+
+  @override
+  String get scanInvalidQr => 'QR นี้ไม่ใช่เลขห่อของระบบ';
+
+  @override
+  String get scanManualTitle => 'พิมพ์เลขห่อเอง';
+
+  @override
+  String get scanManualHint => 'เช่น DELIV-20260630-0007';
+
+  @override
+  String get scanManualHelper =>
+      'ใช้เมื่อกล้องสแกนไม่ได้ — ระบบจะบันทึกว่ากรอกเองไว้ตรวจสอบย้อนหลัง';
+
+  @override
+  String get scanManualEmpty => 'กรุณากรอกเลขห่อ';
+
+  @override
+  String get scanManualTooLong => 'เลขห่อยาวเกินไป';
+
+  @override
+  String get scanManualCharset => 'ใช้ได้เฉพาะตัวอักษร ตัวเลข และขีด (-)';
+
+  @override
+  String get scanBlockExpired => 'ห้ามใช้ — ห่อหมดอายุแล้ว';
+
+  @override
+  String scanBlockStatus(String status, String mode) {
+    return 'สถานะปัจจุบัน: $status — $modeไม่ได้';
+  }
+
+  @override
+  String get scanWarnUnsterile =>
+      '⚠ ยังไม่ฆ่าเชื้อ — จะบันทึกเป็น \"ส่งออก (ยังไม่ฆ่าเชื้อ)\"';
+
+  @override
+  String scanConfirmTitle(String mode) {
+    return 'ยืนยัน$mode';
+  }
+
+  @override
+  String scanConfirmCount(String mode, int count) {
+    return '$mode $count ห่อ';
+  }
+
+  @override
+  String scanDestBatch(String round, String sterilizer) {
+    return 'รอบ $round · $sterilizer';
+  }
+
+  @override
+  String scanDestDept(String dept) {
+    return 'แผนก $dept';
+  }
+
+  @override
+  String scanReceiverSuffix(String name) {
+    return ' · ผู้รับ $name';
+  }
+
+  @override
+  String get scanDestReprocess => 'กลับเป็น \"แพ็กแล้ว\" เพื่อเข้ารอบนึ่งใหม่';
+
+  @override
+  String scanResultOkTitle(String mode, int count) {
+    return '$modeสำเร็จ $count ห่อ';
+  }
+
+  @override
+  String scanResultMixedTitle(int ok, int fail) {
+    return 'สำเร็จ $ok · ไม่ผ่าน $fail ห่อ';
+  }
+
+  @override
+  String get scanUnknownReason => 'ไม่ทราบสาเหตุ';
+
+  @override
+  String get scanRetryFailed => 'ลองใหม่เฉพาะที่ไม่ผ่าน';
+
+  @override
+  String get scanClearTitle => 'ล้างรายการที่สแกนไว้?';
+
+  @override
+  String scanClearBody(int count) {
+    return 'จะลบห่อทั้ง $count รายการออกจากรายการสแกน (ยังไม่กระทบข้อมูลในระบบ)';
+  }
+
+  @override
+  String get scanClearAction => 'ล้างรายการ';
+
+  @override
+  String get scanCameraWebBlocked =>
+      'เบราว์เซอร์บล็อกกล้อง — กดไอคอนกล้อง/แม่กุญแจบนแถบที่อยู่ แล้วอนุญาต จากนั้นกดลองใหม่ (ต้องเปิดผ่าน https)';
+
+  @override
+  String get scanCameraDenied =>
+      'ปิดสิทธิ์กล้องไว้ — เปิดที่ ตั้งค่าเครื่อง > แอป > CSSD > สิทธิ์';
+
+  @override
+  String get scanCameraNeed => 'ต้องอนุญาตสิทธิ์กล้องเพื่อสแกน QR';
+
+  @override
+  String get scanOpenSettings => 'เปิดตั้งค่า';
+
+  @override
+  String get scanCameraWebError =>
+      'เปิดกล้องไม่ได้ — ตรวจว่าเปิดผ่าน https และอนุญาตกล้องในเบราว์เซอร์ (ไอคอนแม่กุญแจบนแถบที่อยู่) แล้วกดลองใหม่';
+
+  @override
+  String scanCameraError(String code) {
+    return 'เปิดกล้องไม่ได้: $code';
+  }
+
+  @override
+  String scanCountLabel(int count) {
+    return 'สแกนแล้ว $count ห่อ';
+  }
+
+  @override
+  String scanEligibleSuffix(int count) {
+    return '(ผ่าน $count)';
+  }
+
+  @override
+  String get scanEmptyHint => 'ชี้กล้องไปที่ QR code ของห่อ';
+
+  @override
+  String get scanSaving => 'กำลังบันทึก...';
+
+  @override
+  String get scanReprocessHint =>
+      'สแกนห่อที่ส่งคืนแล้ว (RETURNED) เพื่อกลับเป็น \"แพ็กแล้ว\" พร้อมเข้ารอบนึ่งใหม่';
+
+  @override
+  String get scanManualBadge => 'พิมพ์เอง';
+
+  @override
+  String scanDaysLeft(int days) {
+    return 'เหลือ $days วัน';
+  }
+
+  @override
+  String batchLoadError(String error) {
+    return 'โหลดรอบนึ่งไม่ได้: $error';
+  }
+
+  @override
+  String get batchNonePending => 'ยังไม่มีรอบที่รอนึ่ง — กด \"รอบใหม่\"';
+
+  @override
+  String get batchSelectLabel => 'รอบนึ่ง (รอสแกนห่อ/รอบันทึกผล)';
+
+  @override
+  String batchRoundLabel(String round, String sterilizer) {
+    return 'รอบ $round · $sterilizer';
+  }
+
+  @override
+  String batchPkgCountSuffix(int count) {
+    return ' · $count ห่อ';
+  }
+
+  @override
+  String get batchNewButton => 'รอบใหม่';
+
+  @override
+  String get batchRecordResultButton => 'บันทึกผล CI/BI ของรอบ';
+
+  @override
+  String get batchOpenTitle => 'เปิดรอบนึ่งใหม่';
+
+  @override
+  String get batchOpenSubtitle =>
+      'เปิดรอบเพื่อสแกนห่อเข้ารอบก่อนนึ่ง — ห่อจะเข้าคลังเมื่อหัวหน้าบันทึกผล CI/BI ว่าผ่านแล้วเท่านั้น';
+
+  @override
+  String get batchSterilizerLabel => 'เครื่องนึ่ง';
+
+  @override
+  String get batchRoundNo => 'รอบที่';
+
+  @override
+  String get batchOpenButton => 'เปิดรอบ (รอสแกนห่อเข้ารอบ)';
+
+  @override
+  String get batchConfirmPassTitle => 'ยืนยันผล \"ผ่าน\"?';
+
+  @override
+  String get batchConfirmFailTitle => 'ยืนยันผล \"ไม่ผ่าน\"?';
+
+  @override
+  String batchConfirmPassBody(String round, String count) {
+    return 'ห่อทั้งหมดในรอบ $round ($count ห่อ) จะเปลี่ยนเป็น \"ปลอดเชื้อ\" และเข้าคลังทันที';
+  }
+
+  @override
+  String get batchConfirmFailBody =>
+      'ห่อทั้งหมดในรอบจะถูกปลดออกจากรอบ (ต้องนึ่งใหม่) และระบบจะ recall ของจากรอบนี้ที่หมุนเวียนอยู่';
+
+  @override
+  String get batchRecordedPass =>
+      'บันทึกผลผ่าน — ห่อในรอบเข้าคลังปลอดเชื้อแล้ว';
+
+  @override
+  String get batchRecordedFail =>
+      'บันทึกผลไม่ผ่าน — ปลดห่อออกจากรอบและ recall แล้ว';
+
+  @override
+  String get batchRecordTitle => 'บันทึกผลรอบนึ่ง (CI/BI)';
+
+  @override
+  String get batchRecordSubtitle =>
+      'ผ่าน → ห่อทั้งรอบเป็นปลอดเชื้อเข้าคลังอัตโนมัติ';
+
+  @override
+  String get batchSelectToRecord => 'เลือกรอบที่จะบันทึกผล';
+
+  @override
+  String get batchCiPass => 'Chemical Indicator (CI) ผ่าน';
+
+  @override
+  String get batchBiPass => 'Biological Indicator (BI) ผ่าน';
+
+  @override
+  String get batchRecordButton => 'บันทึกผลตรวจ';
+
+  @override
+  String deptLoadError(String error) {
+    return 'โหลดแผนกไม่ได้: $error';
+  }
+
+  @override
+  String get deptDestRequired => 'แผนกปลายทาง (บังคับ)';
+
+  @override
+  String get deptReturnRequired => 'แผนกที่ส่งของคืน (บังคับ)';
+
+  @override
+  String get deptAddPlace => 'เพิ่มสถานที่';
+
+  @override
+  String get deptReceiverOptional => 'ชื่อผู้รับ (ไม่บังคับ)';
+
+  @override
+  String get deptAddTitle => 'เพิ่มสถานที่ปลายทาง';
+
+  @override
+  String get deptAddSubtitle => 'เช่น โรงพยาบาลอื่นที่ส่งชุดอุปกรณ์ไปให้';
+
+  @override
+  String get deptCodeLabel => 'รหัส (ห้ามซ้ำ)';
+
+  @override
+  String get deptCodeHint => 'เช่น EXT-PYT';
+
+  @override
+  String get deptNameLabel => 'ชื่อสถานที่';
+
+  @override
+  String get deptNameHint => 'เช่น รพ.พญาไท';
+
+  @override
+  String get deptExternalTitle => 'สถานที่ภายนอกโรงพยาบาล';
+
+  @override
+  String get deptExternalSubtitle => 'แสดงป้าย \"(ภายนอก)\" ต่อท้ายชื่อ';
+
+  @override
+  String get deptSaveButton => 'บันทึกสถานที่';
 }
