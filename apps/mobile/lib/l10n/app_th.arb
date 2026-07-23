@@ -1,0 +1,24 @@
+{
+  "@@locale": "th",
+  "appTitle": "CSSD Sterile Tracking",
+  "@appTitle": { "description": "ชื่อแอป (title bar / task switcher)" },
+
+  "settingsTitle": "ตั้งค่า",
+  "settingsAccount": "บัญชีผู้ใช้",
+  "settingsPrinter": "เครื่องพิมพ์",
+  "settingsSystem": "ระบบ",
+  "settingsPrinterInUse": "เครื่องพิมพ์ที่ใช้",
+  "settingsServerUrl": "ที่อยู่ Server API",
+
+  "actionCancel": "ยกเลิก",
+  "actionSave": "บันทึก",
+  "actionLogout": "ออกจากระบบ",
+  "actionLogoutAll": "ออกจากระบบทุกอุปกรณ์",
+  "actionLogoutAllSubtitle": "เพิกถอนการเข้าสู่ระบบทั้งหมด (เช่น ทำโทรศัพท์หาย)",
+
+  "logoutConfirmTitle": "ออกจากระบบ?",
+  "logoutConfirmBody": "ต้องเข้าสู่ระบบใหม่ในการใช้งานครั้งถัดไป",
+  "logoutAllConfirmTitle": "ออกจากระบบทุกอุปกรณ์?",
+  "logoutAllConfirmBody": "ทุกอุปกรณ์ที่เข้าสู่ระบบด้วยบัญชีนี้จะถูกบังคับออกทันที ต้องเข้าสู่ระบบใหม่ทั้งหมด",
+  "logoutAllConfirmAction": "ออกทุกอุปกรณ์"
+}

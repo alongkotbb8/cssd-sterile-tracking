@@ -99,4 +99,15 @@ class AuthController extends Notifier<AuthState> {
     await ref.read(secureStorageProvider).delete(key: kTokenKey);
     await ref.read(sharedPreferencesProvider).remove(kUserKey);
   }
+
+  /// ออกจากระบบทุกอุปกรณ์ — เพิกถอน token ทั้งหมดฝั่ง server (เพิ่ม tokenVersion)
+  /// แล้วเคลียร์ session เครื่องนี้ ทุกเครื่องอื่นจะโดน 401 → auto-logout ตอน request ถัดไป
+  Future<void> logoutAllDevices() async {
+    try {
+      await ref.read(dioProvider).post<Map<String, dynamic>>('/auth/logout-all');
+    } catch (_) {
+      // ต่อ server ไม่ได้ก็ยังออกจากระบบเครื่องนี้ต่อ (best-effort)
+    }
+    await logout();
+  }
 }

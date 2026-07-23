@@ -75,6 +75,7 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  generate: true # เปิด gen-l10n (สร้าง AppLocalizations จาก lib/l10n/*.arb)
   assets:
     - assets/images/
     - assets/icons/

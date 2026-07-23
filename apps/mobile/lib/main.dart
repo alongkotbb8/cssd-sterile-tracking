@@ -8,6 +8,7 @@ import 'core/auth/auth_controller.dart';
 import 'core/notifications/fcm_service.dart';
 import 'core/router/app_router.dart';
 import 'core/theme/app_theme.dart';
+import 'l10n/app_localizations.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -38,12 +39,13 @@ class CssdApp extends ConsumerWidget {
       theme: AppTheme.light,
       routerConfig: router,
       localizationsDelegates: const [
+        AppLocalizations.delegate, // ข้อความ user-facing (gen-l10n จาก lib/l10n/*.arb)
         GlobalMaterialLocalizations.delegate,
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
       ],
-      supportedLocales: const [Locale('th')],
-      locale: const Locale('th'),
+      supportedLocales: AppLocalizations.supportedLocales, // th (หลัก) + en
+      locale: const Locale('th'), // บังคับไทยเป็นค่าเริ่มต้น (เปลี่ยนได้ภายหลัง)
     );
   }
 }

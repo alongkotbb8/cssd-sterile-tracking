@@ -15,6 +15,7 @@ import '../../../../core/auth/auth_controller.dart';
 import '../../../../core/printer/printer_provider.dart';
 import '../../../../core/printer/system_print_adapter.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../l10n/app_localizations.dart';
 
 /// โฮสต์ production ที่อนุญาต (allowlist/pin) — กำหนดตอน build ด้วย
 /// `--dart-define=CSSD_ALLOWED_HOSTS=host-a.example.com,host-b.example.com`
@@ -102,12 +103,13 @@ class SettingsPage extends ConsumerWidget {
     final serverUrl = ref.watch(serverUrlProvider);
     final printer = ref.watch(printerAdapterProvider);
     final user = ref.watch(authControllerProvider).user;
+    final l10n = AppLocalizations.of(context);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('ตั้งค่า')),
+      appBar: AppBar(title: Text(l10n.settingsTitle)),
       body: ListView(children: [
         if (user != null) ...[
-          const _SectionHeader('บัญชีผู้ใช้'),
+          _SectionHeader(l10n.settingsAccount),
           ListTile(
             leading: const CircleAvatar(
               backgroundColor: SterelisColors.blue50,
@@ -120,11 +122,11 @@ class SettingsPage extends ConsumerWidget {
           ),
           const Divider(),
         ],
-        const _SectionHeader('เครื่องพิมพ์'),
+        _SectionHeader(l10n.settingsPrinter),
         ListTile(
           leading:
               const Icon(Icons.print_outlined, color: SterelisColors.blue500),
-          title: const Text('เครื่องพิมพ์ที่ใช้'),
+          title: Text(l10n.settingsPrinterInUse),
           subtitle: Text(printer.displayName,
               style: const TextStyle(color: SterelisColors.textMuted)),
           trailing:
@@ -139,11 +141,11 @@ class SettingsPage extends ConsumerWidget {
               style: TextStyle(color: SterelisColors.textMuted)),
         ),
         const Divider(),
-        const _SectionHeader('ระบบ'),
+        _SectionHeader(l10n.settingsSystem),
         ListTile(
           leading: const Icon(Icons.cloud_sync_outlined,
               color: SterelisColors.teal500),
-          title: const Text('ที่อยู่ Server API'),
+          title: Text(l10n.settingsServerUrl),
           subtitle: Text(serverUrl,
               style: const TextStyle(
                   color: SterelisColors.textMuted, fontFamily: 'monospace')),
@@ -154,9 +156,19 @@ class SettingsPage extends ConsumerWidget {
         ListTile(
           leading:
               const Icon(Icons.logout_outlined, color: SterelisColors.danger),
-          title: const Text('ออกจากระบบ',
-              style: TextStyle(color: SterelisColors.danger)),
+          title: Text(l10n.actionLogout,
+              style: const TextStyle(color: SterelisColors.danger)),
           onTap: () => _confirmLogout(context, ref),
+        ),
+        ListTile(
+          leading: const Icon(Icons.devices_other_outlined,
+              color: SterelisColors.danger),
+          title: Text(l10n.actionLogoutAll,
+              style: const TextStyle(color: SterelisColors.danger)),
+          subtitle: Text(l10n.actionLogoutAllSubtitle,
+              style: const TextStyle(
+                  color: SterelisColors.textMuted, fontSize: 12)),
+          onTap: () => _confirmLogoutAll(context, ref),
         ),
       ]),
     );
@@ -215,27 +227,54 @@ class SettingsPage extends ConsumerWidget {
   }
 
   Future<void> _confirmLogout(BuildContext context, WidgetRef ref) async {
+    final l10n = AppLocalizations.of(context);
     final ok = await showDialog<bool>(
       context: context,
       builder: (dctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('ออกจากระบบ?'),
-        content: const Text('ต้องเข้าสู่ระบบใหม่ในการใช้งานครั้งถัดไป'),
+        title: Text(l10n.logoutConfirmTitle),
+        content: Text(l10n.logoutConfirmBody),
         actions: [
           TextButton(
               onPressed: () => Navigator.of(dctx).pop(false),
-              child: const Text('ยกเลิก')),
+              child: Text(l10n.actionCancel)),
           FilledButton(
             style: FilledButton.styleFrom(
                 backgroundColor: SterelisColors.danger),
             onPressed: () => Navigator.of(dctx).pop(true),
-            child: const Text('ออกจากระบบ'),
+            child: Text(l10n.actionLogout),
           ),
         ],
       ),
     );
     if (ok == true) {
       await ref.read(authControllerProvider.notifier).logout();
+    }
+  }
+
+  Future<void> _confirmLogoutAll(BuildContext context, WidgetRef ref) async {
+    final l10n = AppLocalizations.of(context);
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (dctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text(l10n.logoutAllConfirmTitle),
+        content: Text(l10n.logoutAllConfirmBody),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.of(dctx).pop(false),
+              child: Text(l10n.actionCancel)),
+          FilledButton(
+            style: FilledButton.styleFrom(
+                backgroundColor: SterelisColors.danger),
+            onPressed: () => Navigator.of(dctx).pop(true),
+            child: Text(l10n.logoutAllConfirmAction),
+          ),
+        ],
+      ),
+    );
+    if (ok == true) {
+      await ref.read(authControllerProvider.notifier).logoutAllDevices();
     }
   }
 }

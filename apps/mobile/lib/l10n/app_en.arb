@@ -1,0 +1,22 @@
+{
+  "@@locale": "en",
+  "appTitle": "CSSD Sterile Tracking",
+  "settingsTitle": "Settings",
+  "settingsAccount": "Account",
+  "settingsPrinter": "Printer",
+  "settingsSystem": "System",
+  "settingsPrinterInUse": "Printer in use",
+  "settingsServerUrl": "API server address",
+
+  "actionCancel": "Cancel",
+  "actionSave": "Save",
+  "actionLogout": "Log out",
+  "actionLogoutAll": "Log out of all devices",
+  "actionLogoutAllSubtitle": "Revoke all sessions (e.g. lost phone)",
+
+  "logoutConfirmTitle": "Log out?",
+  "logoutConfirmBody": "You will need to sign in again next time.",
+  "logoutAllConfirmTitle": "Log out of all devices?",
+  "logoutAllConfirmBody": "Every device signed in with this account will be signed out immediately and must log in again.",
+  "logoutAllConfirmAction": "Log out all"
+}
