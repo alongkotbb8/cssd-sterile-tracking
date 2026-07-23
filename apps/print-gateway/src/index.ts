@@ -3,6 +3,7 @@ import { ApiClient } from './api-client';
 import { processOneJob } from './poll-loop';
 import { ConsoleTransport } from './transports/console-transport';
 import { SerialTransport } from './transports/serial-transport';
+import { UsbSpoolTransport } from './transports/usb-spool-transport';
 import { PrinterTransport } from './transports/transport';
 
 function makeTransport(name: string): PrinterTransport {
@@ -15,9 +16,12 @@ function makeTransport(name: string): PrinterTransport {
       }
       return new SerialTransport(config.serialPath, config.serialBaudRate);
     }
+    case 'usb_spool':
+      // Xprinter XP-420B USB (printer-class) → ส่ง raw TSPL เข้า OS printer queue
+      return new UsbSpoolTransport(config.printerQueueName, config.spoolTimeoutMs);
     default:
       throw new Error(
-        `Unknown PRINTER_TRANSPORT "${name}" — รองรับ "console" (mock) หรือ "serial" (จริง) เท่านั้น`,
+        `Unknown PRINTER_TRANSPORT "${name}" — รองรับ "console" (mock), "serial", "usb_spool" เท่านั้น`,
       );
   }
 }

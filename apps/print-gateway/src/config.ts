@@ -50,12 +50,36 @@ if (nodeEnv === 'production' && printerTransport === 'console') {
   );
 }
 
+// usb_spool: ต้องมีชื่อ printer queue (RAW) — fail fast ถ้าไม่ตั้ง
+const printerQueueName = process.env.PRINTER_QUEUE_NAME ?? '';
+if (printerTransport === 'usb_spool' && printerQueueName.trim() === '') {
+  throw new Error('PRINTER_TRANSPORT=usb_spool ต้องตั้ง PRINTER_QUEUE_NAME (ชื่อ printer queue แบบ RAW)');
+}
+
+// renderer ปัจจุบัน layout ตายตัวที่ 60×40mm @203DPI (bitmap 480×320) — ถ้า config
+// ระบุขนาด/DPI ต่างจากนี้ ให้ fail fast กันพิมพ์เพี้ยนเงียบ ๆ (ต้องแก้ layout ก่อน)
+const printerDpi = Number(process.env.PRINTER_DPI ?? 203);
+const labelWidthMm = Number(process.env.LABEL_WIDTH_MM ?? 60);
+const labelHeightMm = Number(process.env.LABEL_HEIGHT_MM ?? 40);
+if (printerDpi !== 203 || labelWidthMm !== 60 || labelHeightMm !== 40) {
+  throw new Error(
+    `ตอนนี้ renderer รองรับเฉพาะ 60×40mm @203DPI (ได้ ${labelWidthMm}×${labelHeightMm}mm @${printerDpi}DPI) — ` +
+      'ต้องปรับ layout ใน label-renderer.ts ก่อนเปลี่ยนขนาด/ความละเอียด',
+  );
+}
+
 export const config = {
   apiBaseUrl,
   gatewayApiKey: requireEnv('GATEWAY_API_KEY'),
   pollIntervalMs: Number(process.env.POLL_INTERVAL_MS ?? 3000),
   heartbeatIntervalMs: Number(process.env.HEARTBEAT_INTERVAL_MS ?? 30_000),
   printerTransport,
+  printerModel: process.env.PRINTER_MODEL ?? 'XP-420B',
   serialPath: process.env.PRINTER_SERIAL_PATH ?? '',
   serialBaudRate: Number(process.env.PRINTER_SERIAL_BAUD_RATE ?? 9600),
+  printerQueueName,
+  spoolTimeoutMs: Number(process.env.PRINTER_SPOOL_TIMEOUT_MS ?? 15_000),
+  printerDpi,
+  labelWidthMm,
+  labelHeightMm,
 };

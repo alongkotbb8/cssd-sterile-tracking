@@ -266,6 +266,12 @@ Idempotency record ต้องผูกกับ:
 
 ## 8. Offline-first
 
+> ⚠️ **ยกเลิกตามการตัดสินใจล่าสุด (23 ก.ค. 2026) — ระบบเป็น Online-only**
+> (ดู `ONLINE_ONLY_XPRINTER_REMAINING_WORK.md`) ไม่พัฒนา offline-first แล้ว: ไม่มี
+> drift/IndexedDB, mutation queue, sync worker, conflict UI, reserved number pool ฝั่ง client
+> เน็ตหลุด = **fail closed** (ห้ามทำ mutation, ห้ามแสดงสำเร็จก่อน backend ตอบ, retry รักษา
+> Idempotency-Key เดิม) หัวข้อด้านล่างเก็บไว้เป็นบันทึกอ้างอิงเดิมเท่านั้น
+
 ห้ามเรียกว่ารองรับ Offline จนกว่าจะมีครบ:
 
 - IndexedDB/Drift storage
@@ -422,7 +428,7 @@ Mutation หลักและ Audit Log ต้องอยู่ใน transact
 
 ### Hardware tests
 
-- A318BT connection
+- Xprinter XP-420B connection (USB printer-class → `usb_spool`; ดู `HARDWARE_VERIFICATION.md`)
 - Label 60 × 40 mm
 - Thai text
 - QR readability

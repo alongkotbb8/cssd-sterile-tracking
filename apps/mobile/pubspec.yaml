@@ -26,9 +26,7 @@ dependencies:
   mobile_scanner: ^5.1.1
   qr_flutter: ^4.1.0
 
-  # Offline storage (SQLite)
-  drift: ^2.18.0
-  drift_flutter: ^0.2.0
+  # (ตัด offline storage: ระบบเป็น online-only — ไม่มี drift/SQLite/sync queue)
 
   # Bluetooth printer
   # - print_bluetooth_thermal: Bluetooth Classic SPP (ทางหลัก — A318BT เป็น BT Classic)
@@ -74,7 +72,6 @@ dev_dependencies:
   freezed: ^2.5.2
   json_serializable: ^6.8.0
   retrofit_generator: ^8.1.0
-  drift_dev: ^2.18.0
 
 flutter:
   uses-material-design: true

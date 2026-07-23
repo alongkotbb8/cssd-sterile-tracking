@@ -183,8 +183,9 @@ enum GatewayEnvironment {
 
 enum GatewayTransportMode {
   CONSOLE   // mock (dev/test) — พิมพ์จริงไม่ได้
-  SERIAL    // ต่อ USB/Serial จริง
+  SERIAL    // ต่อ USB/Serial (virtual COM) จริง
   BLUETOOTH // ต่อ Bluetooth จริง
+  USB_SPOOL // ส่ง raw TSPL เข้า OS printer queue (Xprinter XP-420B USB printer-class)
 }
 
 // เครื่องพิมพ์/gateway 1 ตัว = 1 credential แยกจาก user JWT โดยสิ้นเชิง

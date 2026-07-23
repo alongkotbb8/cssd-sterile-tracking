@@ -60,9 +60,15 @@ backend ให้ job ค้างแล้วกลายเป็น `ACK_UNKN
   `SIMULATED` เสมอ **ไม่ใช่** `PRINTED` (กันสับสนว่าพิมพ์จริงทั้งที่เป็นแค่ทดสอบ
   pipeline) — **ห้ามใช้บน production**: `config.ts` จะปฏิเสธการสตาร์ททันทีถ้า
   `NODE_ENV=production` และ `PRINTER_TRANSPORT=console`
-- **`serial`** — ส่ง TSPL จริงผ่าน USB/Serial (`serialport` npm package) ต้องตั้ง
-  `PRINTER_SERIAL_PATH` (เช่น `/dev/tty.usbserial-xxxx`) และ
-  `PRINTER_SERIAL_BAUD_RATE` (ให้ตรงกับเครื่องพิมพ์ ค่าเริ่มต้นทั่วไป 9600)
+- **`usb_spool`** — ส่ง raw TSPL เข้า OS printer queue สำหรับ **Xprinter XP-420B USB**
+  (printer-class ไม่ใช่ COM/serial) ต้องตั้ง `PRINTER_QUEUE_NAME` (ชื่อ queue ที่ติดตั้ง
+  ไว้บน OS) — posix ใช้ CUPS `lp -o raw`, windows ใช้ `lpr` (ยังไม่ทดสอบบน Windows จริง
+  ต้องยืนยันตอน hardware verification) ไม่ใช้ shell + validate ชื่อ queue กัน injection
+- **`serial`** — ส่ง TSPL ผ่าน virtual COM/serial (`serialport` npm) ถ้า driver สร้าง COM
+  ให้ ต้องตั้ง `PRINTER_SERIAL_PATH` + `PRINTER_SERIAL_BAUD_RATE`
+
+`usb_spool`/`serial` classify ผลเป็น NOT_SENT (สั่งไม่ได้/ไม่ได้ส่ง → retry ได้) /
+MAYBE_SENT (ส่งแล้วแต่จบไม่สำเร็จ/timeout → ACK_UNKNOWN ห้าม auto-retry) / SENT (สำเร็จ)
 
 เพิ่ม transport อื่น (เช่น network/IP printer) โดย implement `PrinterTransport`
 (`src/transports/transport.ts`) — ต้องตั้ง `isSimulated=false` เสมอสำหรับ

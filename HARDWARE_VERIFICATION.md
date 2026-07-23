@@ -11,9 +11,10 @@
 ## 0. เตรียมก่อนทดสอบ
 
 - ติดตั้ง Print Gateway บนเครื่องที่ต่อเครื่องพิมพ์จริง (`apps/print-gateway`)
-- `PRINTER_TRANSPORT=serial`, ตั้ง `PRINTER_SERIAL_PATH` + `PRINTER_SERIAL_BAUD_RATE` ให้ตรงเครื่อง
+- `PRINTER_TRANSPORT=usb_spool` + `PRINTER_QUEUE_NAME=<ชื่อ OS printer queue ที่ติดตั้งไว้>`
+  (XP-420B USB มักเป็น printer-class → ใช้ usb_spool; ถ้า driver สร้าง virtual COM ค่อยใช้ serial)
 - ลงทะเบียน gateway ผ่าน ADMIN โดยตั้ง capability จริง:
-  `POST /print-jobs/gateways { name, environment: "PRODUCTION", transportMode: "SERIAL", canConfirmRealPrint: true }`
+  `POST /print-jobs/gateways { name, environment: "PRODUCTION", transportMode: "USB_SPOOL", canConfirmRealPrint: true }`
 - ยืนยันว่า `NODE_ENV=production` + `API_BASE_URL` เป็น `https://` (ไม่งั้น gateway จะไม่สตาร์ท)
 
 ## 0.1 ยืนยันรุ่น/โปรโตคอล Xprinter ก่อน (สำคัญ — ต่างจาก A318BT เดิม)
