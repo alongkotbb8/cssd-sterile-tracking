@@ -78,6 +78,65 @@ class AppLocalizationsTh extends AppLocalizations {
   String get commonRetry => 'ลองใหม่';
 
   @override
+  String get navDashboard => 'แดชบอร์ด';
+
+  @override
+  String get navScan => 'สแกน';
+
+  @override
+  String get navPackages => 'รายการ';
+
+  @override
+  String get navPrintJobs => 'งานพิมพ์';
+
+  @override
+  String get navSettings => 'ตั้งค่า';
+
+  @override
+  String get deptExternalSuffix => ' (ภายนอก)';
+
+  @override
+  String get errLoginInvalid => 'รหัสพนักงานหรือรหัสผ่านไม่ถูกต้อง';
+
+  @override
+  String get errTimeout => 'เชื่อมต่อ server ไม่ทัน กรุณาลองใหม่';
+
+  @override
+  String get errConnection =>
+      'เชื่อมต่อ server ไม่ได้ ตรวจสอบที่อยู่ server ในหน้าตั้งค่า';
+
+  @override
+  String errGeneric(String code) {
+    return 'เกิดข้อผิดพลาด ($code)';
+  }
+
+  @override
+  String get errUnknown => 'เกิดข้อผิดพลาดไม่ทราบสาเหตุ';
+
+  @override
+  String get urlErrFormat =>
+      'รูปแบบ URL ไม่ถูกต้อง (ต้องขึ้นต้นด้วย http:// หรือ https://)';
+
+  @override
+  String urlErrAllowlist(String hosts) {
+    return 'production ต้องชี้ไปเซิร์ฟเวอร์ที่อนุมัติเท่านั้น ($hosts)';
+  }
+
+  @override
+  String get urlErrHttpsOnly =>
+      'production ต้องใช้ https:// เท่านั้น (http:// ใช้ไม่ได้แม้เป็น LAN)';
+
+  @override
+  String get urlErrExternalHttps =>
+      'server ภายนอกต้องใช้ https:// (http:// ใช้ได้เฉพาะ localhost/LAN ตอน dev)';
+
+  @override
+  String get fcmChannelName => 'แจ้งเตือน CSSD';
+
+  @override
+  String get fcmChannelDesc => 'แจ้งเตือนใกล้หมดอายุและสรุปประจำวัน';
+
+  @override
   String get commonSelectAll => 'เลือกทั้งหมด';
 
   @override

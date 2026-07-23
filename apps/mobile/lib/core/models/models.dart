@@ -2,6 +2,8 @@
 /// (เขียนมือ ไม่ใช้ codegen เพื่อให้อ่าน/แก้ง่าย)
 library;
 
+import '../../l10n/app_localizations.dart';
+
 // server ส่งเวลาเป็น UTC (ISO + Z) — แปลงเป็นเวลาท้องถิ่นก่อนเสมอ
 // ไม่งั้นหน้าจอจะแสดงเวลาเพี้ยนไป 7 ชั่วโมง (UTC vs เวลาไทย)
 DateTime? _date(dynamic v) =>
@@ -42,8 +44,9 @@ class Department {
 
   bool get isExternal => type == 'external';
 
-  /// ชื่อที่ใช้แสดงใน dropdown — ต่อท้าย "(ภายนอก)" ให้เห็นชัดว่าออกนอกโรงพยาบาล
-  String get displayName => isExternal ? '$name (ภายนอก)' : name;
+  /// ชื่อที่ใช้แสดงใน dropdown — ต่อท้าย "(ภายนอก)" ให้เห็นชัดว่าออกนอกโรงพยาบาล (i18n)
+  String displayName(AppLocalizations l10n) =>
+      isExternal ? '$name${l10n.deptExternalSuffix}' : name;
 
   factory Department.fromJson(Map<String, dynamic> j) => Department(
         id: j['id'] as String,

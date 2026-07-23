@@ -184,6 +184,7 @@ class _CreatePackageSheetState extends ConsumerState<_CreatePackageSheet> {
   Future<void> _submit() async {
     final template = _template;
     if (template == null) return;
+    final l10n = AppLocalizations.of(context);
     setState(() {
       _saving = true;
       _savedCount = 0;
@@ -216,7 +217,7 @@ class _CreatePackageSheetState extends ConsumerState<_CreatePackageSheet> {
       }
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-            content: Text(apiErrorMessage(e)),
+            content: Text(apiErrorMessage(l10n, e)),
             backgroundColor: SterelisColors.danger),
       );
     }
@@ -275,7 +276,7 @@ class _CreatePackageSheetState extends ConsumerState<_CreatePackageSheet> {
               padding: EdgeInsets.all(24),
               child: Center(child: CircularProgressIndicator()),
             ),
-            error: (e, _) => Text(apiErrorMessage(e),
+            error: (e, _) => Text(apiErrorMessage(l10n, e),
                 style: const TextStyle(color: SterelisColors.danger)),
             data: (list) => ConstrainedBox(
               constraints: const BoxConstraints(maxHeight: 220),
@@ -453,6 +454,7 @@ class _CreateTemplateSheetState extends ConsumerState<_CreateTemplateSheet> {
   }
 
   Future<void> _submit() async {
+    final l10n = AppLocalizations.of(context);
     final code = _codeCtrl.text.trim();
     final name = _nameCtrl.text.trim();
     final items = _itemCtrls
@@ -460,7 +462,7 @@ class _CreateTemplateSheetState extends ConsumerState<_CreateTemplateSheet> {
         .where((s) => s.isNotEmpty)
         .toList();
     if (code.isEmpty || name.isEmpty || items.isEmpty) {
-      setState(() => _error = AppLocalizations.of(context).ctValidationError);
+      setState(() => _error = l10n.ctValidationError);
       return;
     }
     setState(() {
@@ -481,7 +483,7 @@ class _CreateTemplateSheetState extends ConsumerState<_CreateTemplateSheet> {
       if (!mounted) return;
       setState(() {
         _saving = false;
-        _error = apiErrorMessage(e);
+        _error = apiErrorMessage(l10n, e);
       });
     }
   }

@@ -25,6 +25,30 @@
   "logoutAllConfirmAction": "Log out all",
 
   "commonRetry": "Retry",
+
+  "navDashboard": "Dashboard",
+  "navScan": "Scan",
+  "navPackages": "Packages",
+  "navPrintJobs": "Print jobs",
+  "navSettings": "Settings",
+
+  "deptExternalSuffix": " (external)",
+
+  "errLoginInvalid": "Incorrect employee code or password",
+  "errTimeout": "Server timed out — please try again",
+  "errConnection": "Can't reach the server — check the server address in settings",
+  "errGeneric": "An error occurred ({code})",
+  "@errGeneric": { "placeholders": { "code": { "type": "String" } } },
+  "errUnknown": "An unknown error occurred",
+
+  "urlErrFormat": "Invalid URL (must start with http:// or https://)",
+  "urlErrAllowlist": "Production must point to an approved server only ({hosts})",
+  "@urlErrAllowlist": { "placeholders": { "hosts": { "type": "String" } } },
+  "urlErrHttpsOnly": "Production must use https:// only (http:// not allowed even on LAN)",
+  "urlErrExternalHttps": "External servers must use https:// (http:// only for localhost/LAN in dev)",
+
+  "fcmChannelName": "CSSD alerts",
+  "fcmChannelDesc": "Near-expiry and daily-summary alerts",
   "commonSelectAll": "Select all",
   "commonClearAll": "Clear all",
 

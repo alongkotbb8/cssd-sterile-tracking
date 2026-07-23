@@ -40,7 +40,7 @@ class PackageDetailPage extends ConsumerWidget {
           child: Padding(
             padding: const EdgeInsets.all(24),
             child: Column(mainAxisSize: MainAxisSize.min, children: [
-              Text(apiErrorMessage(e),
+              Text(apiErrorMessage(l10n, e),
                   textAlign: TextAlign.center,
                   style: const TextStyle(color: SterelisColors.textMuted)),
               const SizedBox(height: 12),
@@ -477,6 +477,7 @@ class _EditTagsSheetState extends ConsumerState<_EditTagsSheet> {
   bool _saving = false;
 
   Future<void> _save() async {
+    final l10n = AppLocalizations.of(context);
     setState(() => _saving = true);
     try {
       await ref
@@ -488,7 +489,7 @@ class _EditTagsSheetState extends ConsumerState<_EditTagsSheet> {
       if (!mounted) return;
       setState(() => _saving = false);
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(apiErrorMessage(e)),
+        content: Text(apiErrorMessage(l10n, e)),
         backgroundColor: SterelisColors.danger,
       ));
     }
@@ -531,7 +532,7 @@ class _EditTagsSheetState extends ConsumerState<_EditTagsSheet> {
               padding: EdgeInsets.all(16),
               child: Center(child: CircularProgressIndicator()),
             ),
-            error: (e, _) => Text(apiErrorMessage(e),
+            error: (e, _) => Text(apiErrorMessage(l10n, e),
                 style: const TextStyle(color: SterelisColors.danger)),
             data: (tags) => tags.isEmpty
                 ? Padding(

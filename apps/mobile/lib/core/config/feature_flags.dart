@@ -15,8 +15,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 const bool _legacyPrintOptIn =
     bool.fromEnvironment('CSSD_ENABLE_LEGACY_PRINT', defaultValue: false);
 
+/// ตรรกะบริสุทธิ์ (unit-test ได้): legacy เปิดเมื่อ **ไม่ใช่ release** หรือ opt-in ชัดเจน
+/// → release/Pilot (releaseMode=true, optIn=false) = **ปิด** เสมอ
+bool computeLegacyDirectPrintEnabled(
+        {required bool releaseMode, bool optIn = _legacyPrintOptIn}) =>
+    optIn || !releaseMode;
+
 /// true = แสดง UI legacy direct-print ให้ผู้ใช้ (debug หรือ opt-in ชัดเจน)
-const bool kLegacyDirectPrintEnabled = _legacyPrintOptIn || !kReleaseMode;
+final bool kLegacyDirectPrintEnabled =
+    computeLegacyDirectPrintEnabled(releaseMode: kReleaseMode);
 
 /// provider ครอบ [kLegacyDirectPrintEnabled] เพื่อ override ได้ในเทส
 /// (feature-flag test ยืนยันว่า Pilot production build ไม่โชว์ตัวเลือกเครื่องพิมพ์ legacy)

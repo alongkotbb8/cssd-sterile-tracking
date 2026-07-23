@@ -40,7 +40,7 @@ class PrintJobsPage extends ConsumerWidget {
         error: (e, _) => Center(
           child: Padding(
             padding: const EdgeInsets.all(24),
-            child: Text(apiErrorMessage(e),
+            child: Text(apiErrorMessage(l10n, e),
                 textAlign: TextAlign.center,
                 style: const TextStyle(color: SterelisColors.danger)),
           ),

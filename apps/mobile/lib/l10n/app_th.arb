@@ -27,6 +27,30 @@
   "logoutAllConfirmAction": "ออกทุกอุปกรณ์",
 
   "commonRetry": "ลองใหม่",
+
+  "navDashboard": "แดชบอร์ด",
+  "navScan": "สแกน",
+  "navPackages": "รายการ",
+  "navPrintJobs": "งานพิมพ์",
+  "navSettings": "ตั้งค่า",
+
+  "deptExternalSuffix": " (ภายนอก)",
+
+  "errLoginInvalid": "รหัสพนักงานหรือรหัสผ่านไม่ถูกต้อง",
+  "errTimeout": "เชื่อมต่อ server ไม่ทัน กรุณาลองใหม่",
+  "errConnection": "เชื่อมต่อ server ไม่ได้ ตรวจสอบที่อยู่ server ในหน้าตั้งค่า",
+  "errGeneric": "เกิดข้อผิดพลาด ({code})",
+  "@errGeneric": { "placeholders": { "code": { "type": "String" } } },
+  "errUnknown": "เกิดข้อผิดพลาดไม่ทราบสาเหตุ",
+
+  "urlErrFormat": "รูปแบบ URL ไม่ถูกต้อง (ต้องขึ้นต้นด้วย http:// หรือ https://)",
+  "urlErrAllowlist": "production ต้องชี้ไปเซิร์ฟเวอร์ที่อนุมัติเท่านั้น ({hosts})",
+  "@urlErrAllowlist": { "placeholders": { "hosts": { "type": "String" } } },
+  "urlErrHttpsOnly": "production ต้องใช้ https:// เท่านั้น (http:// ใช้ไม่ได้แม้เป็น LAN)",
+  "urlErrExternalHttps": "server ภายนอกต้องใช้ https:// (http:// ใช้ได้เฉพาะ localhost/LAN ตอน dev)",
+
+  "fcmChannelName": "แจ้งเตือน CSSD",
+  "fcmChannelDesc": "แจ้งเตือนใกล้หมดอายุและสรุปประจำวัน",
   "commonSelectAll": "เลือกทั้งหมด",
   "commonClearAll": "ล้างทั้งหมด",
 

@@ -77,6 +77,65 @@ class AppLocalizationsEn extends AppLocalizations {
   String get commonRetry => 'Retry';
 
   @override
+  String get navDashboard => 'Dashboard';
+
+  @override
+  String get navScan => 'Scan';
+
+  @override
+  String get navPackages => 'Packages';
+
+  @override
+  String get navPrintJobs => 'Print jobs';
+
+  @override
+  String get navSettings => 'Settings';
+
+  @override
+  String get deptExternalSuffix => ' (external)';
+
+  @override
+  String get errLoginInvalid => 'Incorrect employee code or password';
+
+  @override
+  String get errTimeout => 'Server timed out — please try again';
+
+  @override
+  String get errConnection =>
+      'Can\'t reach the server — check the server address in settings';
+
+  @override
+  String errGeneric(String code) {
+    return 'An error occurred ($code)';
+  }
+
+  @override
+  String get errUnknown => 'An unknown error occurred';
+
+  @override
+  String get urlErrFormat =>
+      'Invalid URL (must start with http:// or https://)';
+
+  @override
+  String urlErrAllowlist(String hosts) {
+    return 'Production must point to an approved server only ($hosts)';
+  }
+
+  @override
+  String get urlErrHttpsOnly =>
+      'Production must use https:// only (http:// not allowed even on LAN)';
+
+  @override
+  String get urlErrExternalHttps =>
+      'External servers must use https:// (http:// only for localhost/LAN in dev)';
+
+  @override
+  String get fcmChannelName => 'CSSD alerts';
+
+  @override
+  String get fcmChannelDesc => 'Near-expiry and daily-summary alerts';
+
+  @override
   String get commonSelectAll => 'Select all';
 
   @override

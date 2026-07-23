@@ -104,7 +104,7 @@ class _SubmitPrintJobSheetState extends ConsumerState<_SubmitPrintJobSheet> {
       if (!mounted) return;
       setState(() => _submitting = false);
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(apiErrorMessage(e)),
+        content: Text(apiErrorMessage(l10n, e)),
         backgroundColor: SterelisColors.danger,
       ));
     }

@@ -56,7 +56,7 @@ class DashboardPage extends ConsumerWidget {
         child: dash.when(
           loading: () => const Center(child: CircularProgressIndicator()),
           error: (e, _) => _ErrorView(
-            message: apiErrorMessage(e),
+            message: apiErrorMessage(l10n, e),
             onRetry: () => ref.invalidate(dashboardProvider),
           ),
           data: (d) => ListView(

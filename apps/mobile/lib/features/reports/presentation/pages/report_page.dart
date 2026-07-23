@@ -110,7 +110,7 @@ class ReportPage extends ConsumerWidget {
               child: Padding(
                 padding: const EdgeInsets.all(24),
                 child: Column(mainAxisSize: MainAxisSize.min, children: [
-                  Text(apiErrorMessage(e),
+                  Text(apiErrorMessage(l10n, e),
                       textAlign: TextAlign.center,
                       style:
                           const TextStyle(color: SterelisColors.textMuted)),
@@ -505,7 +505,7 @@ class _CleanupCardState extends ConsumerState<_CleanupCard> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(apiErrorMessage(e)),
+        content: Text(apiErrorMessage(l10n, e)),
         backgroundColor: SterelisColors.danger,
       ));
     } finally {

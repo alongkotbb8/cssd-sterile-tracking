@@ -6,6 +6,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../auth/auth_controller.dart';
+import '../../l10n/app_localizations.dart';
 
 /// สร้าง Idempotency-Key ใหม่ต่อ "การกดยืนยัน 1 ครั้ง" — ตาม
 /// AI_DEVELOPMENT_GUARDRAILS.md ข้อ 6: ทุก mutation สำคัญ (scan in/out/return,
@@ -129,8 +130,11 @@ final dioProvider = Provider<Dio>((ref) {
   return dio;
 });
 
-/// แปลง DioException เป็นข้อความภาษาไทยที่ผู้ใช้อ่านรู้เรื่อง
-String apiErrorMessage(Object error) {
+/// แปลง DioException เป็นข้อความ error ที่ผู้ใช้อ่านรู้เรื่อง (i18n)
+///
+/// ข้อความจาก backend (`data['message']`) ส่งต่อตามที่ server กำหนด (server เป็นผู้แปล
+/// — ไม่ใช่ client hardcode) ; fallback ฝั่ง client แปลผ่าน [l10n]
+String apiErrorMessage(AppLocalizations l10n, Object error) {
   if (error is DioException) {
     final data = error.response?.data;
     if (data is Map && data['message'] != null) {
@@ -141,12 +145,12 @@ String apiErrorMessage(Object error) {
       case DioExceptionType.connectionTimeout:
       case DioExceptionType.receiveTimeout:
       case DioExceptionType.sendTimeout:
-        return 'เชื่อมต่อ server ไม่ทัน กรุณาลองใหม่';
+        return l10n.errTimeout;
       case DioExceptionType.connectionError:
-        return 'เชื่อมต่อ server ไม่ได้ ตรวจสอบที่อยู่ server ในหน้าตั้งค่า';
+        return l10n.errConnection;
       default:
-        return 'เกิดข้อผิดพลาด (${error.response?.statusCode ?? 'network'})';
+        return l10n.errGeneric('${error.response?.statusCode ?? 'network'}');
     }
   }
-  return 'เกิดข้อผิดพลาดไม่ทราบสาเหตุ';
+  return l10n.errUnknown;
 }

@@ -66,7 +66,7 @@ class _PrintJobDetailPageState extends ConsumerState<PrintJobDetailPage> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: Text(apiErrorMessage(e)), backgroundColor: SterelisColors.danger));
+            content: Text(apiErrorMessage(l10n, e)), backgroundColor: SterelisColors.danger));
       }
     }
   }
@@ -116,7 +116,7 @@ class _PrintJobDetailPageState extends ConsumerState<PrintJobDetailPage> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: Text(apiErrorMessage(e)), backgroundColor: SterelisColors.danger));
+            content: Text(apiErrorMessage(l10n, e)), backgroundColor: SterelisColors.danger));
       }
     }
   }
@@ -135,7 +135,7 @@ class _PrintJobDetailPageState extends ConsumerState<PrintJobDetailPage> {
         error: (e, _) => Center(
           child: Padding(
             padding: const EdgeInsets.all(24),
-            child: Text(apiErrorMessage(e),
+            child: Text(apiErrorMessage(l10n, e),
                 textAlign: TextAlign.center,
                 style: const TextStyle(color: SterelisColors.danger)),
           ),

@@ -35,7 +35,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     });
     final err = await ref
         .read(authControllerProvider.notifier)
-        .login(_codeCtrl.text, _passCtrl.text);
+        .login(_codeCtrl.text, _passCtrl.text, AppLocalizations.of(context));
     if (!mounted) return;
     setState(() {
       _loading = false;

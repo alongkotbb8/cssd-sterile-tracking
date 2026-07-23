@@ -39,12 +39,7 @@ Set<String> productionAllowedHosts() {
   return hosts;
 }
 
-/// ตรวจ server URL — คืน `null` ถ้าใช้ได้ หรือข้อความ error (ไทย) ถ้าไม่ผ่าน
-///
-/// i18n-allowlist (Gate 1): ข้อความ error เหล่านี้จงใจไม่ผ่าน gen-l10n เพราะเป็น pure
-/// function (unit-test ได้ ไม่มี BuildContext) และใช้เฉพาะ dialog ตั้งค่า **server URL
-/// สำหรับ admin/ผู้ติดตั้ง** ไม่ใช่ workflow ประจำวันของ CSSD — ถ้าต้องรองรับ en เต็มรูปแบบ
-/// ให้ refactor เป็นคืน enum แล้ว localize ที่ call site
+/// ตรวจ server URL — คืน `null` ถ้าใช้ได้ หรือข้อความ error (i18n ผ่าน [l10n]) ถ้าไม่ผ่าน
 ///
 /// กติกา:
 /// - **release/production = https:// เท่านั้น** (ให้ตรง FIX-06 ฝั่ง Gateway — แม้
@@ -54,34 +49,34 @@ Set<String> productionAllowedHosts() {
 /// - **debug/dev = http:// ได้เฉพาะ localhost/LAN** (ทดสอบในตึก) ; ปลายทาง
 ///   สาธารณะต้อง https ; dev ไม่บังคับ allowlist (นักพัฒนาชี้ไปที่ไหนก็ได้)
 ///
-/// แยกเป็น pure function เพื่อ unit-test ได้ (ดู server_url_validation_test.dart)
+/// unit-test ได้โดยโหลด l10n ผ่าน AppLocalizations.delegate.load (ดู server_url_validation_test.dart)
 /// [allowedHosts] override ได้ในเทส ; ถ้าไม่ส่งจะใช้ [productionAllowedHosts]
 String? serverUrlValidationError(
   String url, {
   required bool isRelease,
+  required AppLocalizations l10n,
   Set<String>? allowedHosts,
 }) {
   final uri = Uri.tryParse(url);
   if (uri == null || !(uri.isScheme('http') || uri.isScheme('https'))) {
-    return 'รูปแบบ URL ไม่ถูกต้อง (ต้องขึ้นต้นด้วย http:// หรือ https://)';
+    return l10n.urlErrFormat;
   }
   if (uri.isScheme('https')) {
     // release: บังคับ pin ไปโฮสต์ที่อนุมัติเท่านั้น (dev ข้ามได้)
     if (isRelease) {
       final allow = allowedHosts ?? productionAllowedHosts();
       if (allow.isNotEmpty && !allow.contains(uri.host.toLowerCase())) {
-        return 'production ต้องชี้ไปเซิร์ฟเวอร์ที่อนุมัติเท่านั้น '
-            '(${allow.join(', ')})';
+        return l10n.urlErrAllowlist(allow.join(', '));
       }
     }
     return null;
   }
   // ถึงตรงนี้ = http://
   if (isRelease) {
-    return 'production ต้องใช้ https:// เท่านั้น (http:// ใช้ไม่ได้แม้เป็น LAN)';
+    return l10n.urlErrHttpsOnly;
   }
   if (!_isPrivateHost(uri.host)) {
-    return 'server ภายนอกต้องใช้ https:// (http:// ใช้ได้เฉพาะ localhost/LAN ตอน dev)';
+    return l10n.urlErrExternalHttps;
   }
   return null;
 }
@@ -222,7 +217,8 @@ class SettingsPage extends ConsumerWidget {
     );
     if (result == null) return;
     final url = result.trim();
-    final err = serverUrlValidationError(url, isRelease: kReleaseMode);
+    final err =
+        serverUrlValidationError(url, isRelease: kReleaseMode, l10n: l10n);
     if (err != null) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

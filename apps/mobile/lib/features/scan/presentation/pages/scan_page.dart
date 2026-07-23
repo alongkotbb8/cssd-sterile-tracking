@@ -303,6 +303,7 @@ class _ScanPageState extends ConsumerState<ScanPage> with WidgetsBindingObserver
   }
 
   Future<void> _lookup(_ScannedItem item) async {
+    final l10n = AppLocalizations.of(context);
     try {
       final r = await ref.read(scanRepositoryProvider).lookup(item.id);
       item
@@ -316,7 +317,7 @@ class _ScanPageState extends ConsumerState<ScanPage> with WidgetsBindingObserver
     } catch (e) {
       item
         ..loading = false
-        ..blockReason = apiErrorMessage(e);
+        ..blockReason = apiErrorMessage(l10n, e);
     }
     if (mounted) setState(() {});
   }
@@ -469,7 +470,7 @@ class _ScanPageState extends ConsumerState<ScanPage> with WidgetsBindingObserver
       setState(() => _submitting = false);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(apiErrorMessage(e)),
+        content: Text(apiErrorMessage(l10n, e)),
         backgroundColor: SterelisColors.danger,
       ));
     }
@@ -771,7 +772,7 @@ class _TargetSelector extends ConsumerWidget {
         padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
         child: batches.when(
           loading: () => const LinearProgressIndicator(minHeight: 2),
-          error: (e, _) => Text(l10n.batchLoadError(apiErrorMessage(e)),
+          error: (e, _) => Text(l10n.batchLoadError(apiErrorMessage(l10n, e)),
               style:
                   const TextStyle(color: SterelisColors.danger, fontSize: 12)),
           data: (list) => Column(children: [
@@ -873,7 +874,7 @@ class _TargetSelector extends ConsumerWidget {
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
       child: departments.when(
         loading: () => const LinearProgressIndicator(minHeight: 2),
-        error: (e, _) => Text(l10n.deptLoadError(apiErrorMessage(e)),
+        error: (e, _) => Text(l10n.deptLoadError(apiErrorMessage(l10n, e)),
             style: const TextStyle(color: SterelisColors.danger, fontSize: 12)),
         data: (list) => Column(children: [
           Row(children: [
@@ -890,7 +891,7 @@ class _TargetSelector extends ConsumerWidget {
                 ),
                 items: list
                     .map((d) => DropdownMenuItem(
-                        value: d, child: Text(d.displayName)))
+                        value: d, child: Text(d.displayName(l10n))))
                     .toList(),
                 onChanged: onDepartment,
               ),
@@ -1048,6 +1049,7 @@ class _CreateDepartmentSheetState
       _codeCtrl.text.trim().length >= 2 && _nameCtrl.text.trim().isNotEmpty;
 
   Future<void> _submit() async {
+    final l10n = AppLocalizations.of(context);
     setState(() => _saving = true);
     try {
       final created = await ref.read(departmentRepositoryProvider).create(
@@ -1061,7 +1063,7 @@ class _CreateDepartmentSheetState
       if (!mounted) return;
       setState(() => _saving = false);
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(apiErrorMessage(e)),
+        content: Text(apiErrorMessage(l10n, e)),
         backgroundColor: SterelisColors.danger,
       ));
     }
@@ -1181,6 +1183,7 @@ class _CreateBatchSheetState extends ConsumerState<_CreateBatchSheet> {
   Future<void> _submit() async {
     final st = _sterilizer;
     if (st == null) return;
+    final l10n = AppLocalizations.of(context);
     setState(() => _saving = true);
     try {
       // เปิดรอบเป็น PENDING เท่านั้น — ผล CI/BI บันทึกทีหลังโดย SUPERVISOR/ADMIN
@@ -1194,7 +1197,7 @@ class _CreateBatchSheetState extends ConsumerState<_CreateBatchSheet> {
       if (!mounted) return;
       setState(() => _saving = false);
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(apiErrorMessage(e)),
+        content: Text(apiErrorMessage(l10n, e)),
         backgroundColor: SterelisColors.danger,
       ));
     }
@@ -1241,7 +1244,7 @@ class _CreateBatchSheetState extends ConsumerState<_CreateBatchSheet> {
               padding: EdgeInsets.all(16),
               child: Center(child: CircularProgressIndicator()),
             ),
-            error: (e, _) => Text(apiErrorMessage(e),
+            error: (e, _) => Text(apiErrorMessage(l10n, e),
                 style: const TextStyle(color: SterelisColors.danger)),
             data: (list) => DropdownButtonFormField<Sterilizer>(
               initialValue: _sterilizer,
@@ -1383,7 +1386,7 @@ class _RecordResultSheetState extends ConsumerState<_RecordResultSheet> {
       if (!mounted) return;
       setState(() => _saving = false);
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(apiErrorMessage(e)),
+        content: Text(apiErrorMessage(l10n, e)),
         backgroundColor: SterelisColors.danger,
       ));
     }
@@ -1426,7 +1429,7 @@ class _RecordResultSheetState extends ConsumerState<_RecordResultSheet> {
               padding: EdgeInsets.all(16),
               child: Center(child: CircularProgressIndicator()),
             ),
-            error: (e, _) => Text(apiErrorMessage(e),
+            error: (e, _) => Text(apiErrorMessage(l10n, e),
                 style: const TextStyle(color: SterelisColors.danger)),
             data: (list) => DropdownButtonFormField<SterilizationBatch>(
               initialValue: list.any((b) => b.id == _batch?.id) ? _batch : null,

@@ -66,12 +66,14 @@ void main() {
     expect(find.text('พิมพ์ผ่าน Print Gateway (XP-420B)'), findsOneWidget);
   });
 
-  test('ค่าเริ่มต้น flag = ปิดใน release build (Pilot)', () {
-    // kLegacyDirectPrintEnabled = optIn || !kReleaseMode ; ในเทส (debug) = true,
-    // แต่ default dart-define optIn ต้องเป็น false → release build จะปิด
-    // (ตรวจว่าไม่ได้เผลอ hardcode เปิด)
-    const optIn =
-        bool.fromEnvironment('CSSD_ENABLE_LEGACY_PRINT', defaultValue: false);
-    expect(optIn, isFalse);
+  test('release build (Pilot) ปิด legacy printer เสมอ (ตรรกะบริสุทธิ์)', () {
+    // release + ไม่ opt-in → ปิด (นี่คือ Pilot production build จริง)
+    expect(
+        computeLegacyDirectPrintEnabled(releaseMode: true, optIn: false), isFalse);
+    // debug → เปิด (สะดวกพัฒนา) ; opt-in ชัดเจน → เปิดได้แม้ release (เก็บ fallback)
+    expect(
+        computeLegacyDirectPrintEnabled(releaseMode: false, optIn: false), isTrue);
+    expect(
+        computeLegacyDirectPrintEnabled(releaseMode: true, optIn: true), isTrue);
   });
 }

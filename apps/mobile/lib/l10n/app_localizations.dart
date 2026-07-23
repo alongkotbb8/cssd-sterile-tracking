@@ -230,6 +230,108 @@ abstract class AppLocalizations {
   /// **'ลองใหม่'**
   String get commonRetry;
 
+  /// No description provided for @navDashboard.
+  ///
+  /// In th, this message translates to:
+  /// **'แดชบอร์ด'**
+  String get navDashboard;
+
+  /// No description provided for @navScan.
+  ///
+  /// In th, this message translates to:
+  /// **'สแกน'**
+  String get navScan;
+
+  /// No description provided for @navPackages.
+  ///
+  /// In th, this message translates to:
+  /// **'รายการ'**
+  String get navPackages;
+
+  /// No description provided for @navPrintJobs.
+  ///
+  /// In th, this message translates to:
+  /// **'งานพิมพ์'**
+  String get navPrintJobs;
+
+  /// No description provided for @navSettings.
+  ///
+  /// In th, this message translates to:
+  /// **'ตั้งค่า'**
+  String get navSettings;
+
+  /// No description provided for @deptExternalSuffix.
+  ///
+  /// In th, this message translates to:
+  /// **' (ภายนอก)'**
+  String get deptExternalSuffix;
+
+  /// No description provided for @errLoginInvalid.
+  ///
+  /// In th, this message translates to:
+  /// **'รหัสพนักงานหรือรหัสผ่านไม่ถูกต้อง'**
+  String get errLoginInvalid;
+
+  /// No description provided for @errTimeout.
+  ///
+  /// In th, this message translates to:
+  /// **'เชื่อมต่อ server ไม่ทัน กรุณาลองใหม่'**
+  String get errTimeout;
+
+  /// No description provided for @errConnection.
+  ///
+  /// In th, this message translates to:
+  /// **'เชื่อมต่อ server ไม่ได้ ตรวจสอบที่อยู่ server ในหน้าตั้งค่า'**
+  String get errConnection;
+
+  /// No description provided for @errGeneric.
+  ///
+  /// In th, this message translates to:
+  /// **'เกิดข้อผิดพลาด ({code})'**
+  String errGeneric(String code);
+
+  /// No description provided for @errUnknown.
+  ///
+  /// In th, this message translates to:
+  /// **'เกิดข้อผิดพลาดไม่ทราบสาเหตุ'**
+  String get errUnknown;
+
+  /// No description provided for @urlErrFormat.
+  ///
+  /// In th, this message translates to:
+  /// **'รูปแบบ URL ไม่ถูกต้อง (ต้องขึ้นต้นด้วย http:// หรือ https://)'**
+  String get urlErrFormat;
+
+  /// No description provided for @urlErrAllowlist.
+  ///
+  /// In th, this message translates to:
+  /// **'production ต้องชี้ไปเซิร์ฟเวอร์ที่อนุมัติเท่านั้น ({hosts})'**
+  String urlErrAllowlist(String hosts);
+
+  /// No description provided for @urlErrHttpsOnly.
+  ///
+  /// In th, this message translates to:
+  /// **'production ต้องใช้ https:// เท่านั้น (http:// ใช้ไม่ได้แม้เป็น LAN)'**
+  String get urlErrHttpsOnly;
+
+  /// No description provided for @urlErrExternalHttps.
+  ///
+  /// In th, this message translates to:
+  /// **'server ภายนอกต้องใช้ https:// (http:// ใช้ได้เฉพาะ localhost/LAN ตอน dev)'**
+  String get urlErrExternalHttps;
+
+  /// No description provided for @fcmChannelName.
+  ///
+  /// In th, this message translates to:
+  /// **'แจ้งเตือน CSSD'**
+  String get fcmChannelName;
+
+  /// No description provided for @fcmChannelDesc.
+  ///
+  /// In th, this message translates to:
+  /// **'แจ้งเตือนใกล้หมดอายุและสรุปประจำวัน'**
+  String get fcmChannelDesc;
+
   /// No description provided for @commonSelectAll.
   ///
   /// In th, this message translates to:

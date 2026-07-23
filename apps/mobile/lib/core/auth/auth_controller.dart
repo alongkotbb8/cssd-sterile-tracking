@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../api/api_client.dart';
 import '../models/models.dart';
 import '../notifications/fcm_service.dart';
+import '../../l10n/app_localizations.dart';
 
 const kTokenKey = 'access_token';
 const kUserKey = 'auth_user';
@@ -61,8 +62,9 @@ class AuthController extends Notifier<AuthState> {
     }
   }
 
-  /// คืน null เมื่อสำเร็จ, คืนข้อความ error เมื่อล้มเหลว
-  Future<String?> login(String employeeCode, String password) async {
+  /// คืน null เมื่อสำเร็จ, คืนข้อความ error (แปลผ่าน [l10n]) เมื่อล้มเหลว
+  Future<String?> login(
+      String employeeCode, String password, AppLocalizations l10n) async {
     try {
       final res = await ref.read(dioProvider).post<Map<String, dynamic>>(
         '/auth/login',
@@ -84,11 +86,11 @@ class AuthController extends Notifier<AuthState> {
       return null;
     } on DioException catch (e) {
       if (e.response?.statusCode == 401) {
-        return 'รหัสพนักงานหรือรหัสผ่านไม่ถูกต้อง';
+        return l10n.errLoginInvalid;
       }
-      return apiErrorMessage(e);
+      return apiErrorMessage(l10n, e);
     } catch (e) {
-      return apiErrorMessage(e);
+      return apiErrorMessage(l10n, e);
     }
   }
 

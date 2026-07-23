@@ -82,7 +82,7 @@ class PackagesPage extends ConsumerWidget {
               error: (e, _) => ListView(children: [
                 const SizedBox(height: 100),
                 Center(
-                  child: Text(apiErrorMessage(e),
+                  child: Text(apiErrorMessage(l10n, e),
                       textAlign: TextAlign.center,
                       style: const TextStyle(color: SterelisColors.textMuted)),
                 ),

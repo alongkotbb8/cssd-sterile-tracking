@@ -1,5 +1,7 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:cssd_mobile/core/api/api_client.dart';
 import 'package:cssd_mobile/l10n/app_localizations.dart';
 
 // Gate 1 — i18n: ยืนยันว่ามีทั้ง th/en และ domain-critical messages แปลครบทั้งสองภาษา
@@ -58,6 +60,46 @@ void main() {
       expect(en.scanDaysLeft(5), contains('5'));
       expect(th.pkgSelectedCount(3), contains('3'));
       expect(en.pkgSelectedCount(3), contains('3'));
+    });
+  });
+
+  group('error messages i18n (login + apiErrorMessage)', () {
+    test('login invalid — แปลทั้งสองภาษา ต่างกันจริง', () {
+      expect(th.errLoginInvalid, contains('รหัส'));
+      expect(en.errLoginInvalid.toLowerCase(), contains('incorrect'));
+      expect(th.errLoginInvalid, isNot(equals(en.errLoginInvalid)));
+    });
+
+    test('apiErrorMessage — connection/timeout/generic เป็นภาษาอังกฤษเมื่อ locale en', () {
+      final conn = DioException(
+        requestOptions: RequestOptions(path: '/x'),
+        type: DioExceptionType.connectionError,
+      );
+      expect(apiErrorMessage(en, conn), equals(en.errConnection));
+      expect(apiErrorMessage(th, conn), equals(th.errConnection));
+      expect(apiErrorMessage(en, conn), isNot(equals(apiErrorMessage(th, conn))));
+
+      final timeout = DioException(
+        requestOptions: RequestOptions(path: '/x'),
+        type: DioExceptionType.connectionTimeout,
+      );
+      expect(apiErrorMessage(en, timeout), equals(en.errTimeout));
+
+      // non-Dio → unknown (แปลตาม locale)
+      expect(apiErrorMessage(en, Exception('boom')), equals(en.errUnknown));
+    });
+
+    test('apiErrorMessage — ข้อความจาก backend ส่งต่อตามเดิม (server เป็นผู้แปล)', () {
+      final serverErr = DioException(
+        requestOptions: RequestOptions(path: '/x'),
+        type: DioExceptionType.badResponse,
+        response: Response(
+          requestOptions: RequestOptions(path: '/x'),
+          statusCode: 400,
+          data: {'message': 'ห่อนี้อยู่ในรอบนึ่งอื่นอยู่แล้ว'},
+        ),
+      );
+      expect(apiErrorMessage(en, serverErr), 'ห่อนี้อยู่ในรอบนึ่งอื่นอยู่แล้ว');
     });
   });
 }
