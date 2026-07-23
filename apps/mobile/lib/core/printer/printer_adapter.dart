@@ -25,16 +25,22 @@ class LabelData {
   final String packageId;      // running number = QR content
   final String setName;        // ชื่อชุด
   final String wrapType;       // 'ห่อซีล' | 'ห่อผ้า'
-  final DateTime sterilizeDate;
-  final DateTime expiryDate;
+
+  /// วันนึ่ง/วันหมดอายุ **จริงจาก backend เท่านั้น** — ห่อที่ยังไม่ผ่านการนึ่ง
+  /// ต้องเป็น null แล้ว label จะพิมพ์แถบ "ยังไม่ผ่านการฆ่าเชื้อ" แทนวันที่
+  /// (ห้าม fabricate วันที่โดยประมาณเด็ดขาด — ความปลอดภัยผู้ป่วย)
+  final DateTime? sterilizeDate;
+  final DateTime? expiryDate;
 
   const LabelData({
     required this.packageId,
     required this.setName,
     required this.wrapType,
-    required this.sterilizeDate,
-    required this.expiryDate,
+    this.sterilizeDate,
+    this.expiryDate,
   });
+
+  bool get isSterilized => sterilizeDate != null;
 }
 
 class PrinterException implements Exception {

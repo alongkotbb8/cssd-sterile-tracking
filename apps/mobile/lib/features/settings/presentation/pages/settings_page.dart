@@ -123,7 +123,35 @@ class SettingsPage extends ConsumerWidget {
       }
       return;
     }
+    // บังคับ HTTPS ยกเว้นเครือข่ายภายใน (localhost/LAN สำหรับ dev/ทดสอบในตึก)
+    // — กันส่ง JWT/ข้อมูลผ่านอินเทอร์เน็ตแบบไม่เข้ารหัส (ผล security audit)
+    if (uri.isScheme('http') && !_isPrivateHost(uri.host)) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text(
+              'server ภายนอกต้องใช้ https:// เท่านั้น (http:// ใช้ได้เฉพาะ '
+              'localhost หรือ IP ภายในองค์กร เช่น 192.168.x.x)'),
+          backgroundColor: SterelisColors.danger,
+        ));
+      }
+      return;
+    }
     await ref.read(serverUrlProvider.notifier).set(url);
+  }
+
+  /// host ที่ถือว่าเป็นเครือข่ายภายใน — อนุญาต http:// ได้ (dev/LAN เท่านั้น)
+  static bool _isPrivateHost(String host) {
+    if (host == 'localhost' || host == '127.0.0.1' || host == '10.0.2.2') {
+      return true; // 10.0.2.2 = host loopback ของ Android emulator
+    }
+    final octets = host.split('.').map(int.tryParse).toList();
+    if (octets.length == 4 && octets.every((o) => o != null && o >= 0 && o <= 255)) {
+      final a = octets[0]!, b = octets[1]!;
+      if (a == 10) return true; // 10.0.0.0/8
+      if (a == 192 && b == 168) return true; // 192.168.0.0/16
+      if (a == 172 && b >= 16 && b <= 31) return true; // 172.16.0.0/12
+    }
+    return false;
   }
 
   Future<void> _choosePrinter(BuildContext context, WidgetRef ref) async {

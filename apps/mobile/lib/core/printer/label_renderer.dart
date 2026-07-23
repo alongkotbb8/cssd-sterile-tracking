@@ -127,10 +127,36 @@ class LabelRenderer {
     drawText(d.packageId, 175, 150,
         fontSize: 22, weight: FontWeight.w700, maxWidth: widthDots - 175 - 8);
 
-    // วันที่
-    final fmt = DateFormat('dd/MM/yyyy');
-    drawText('นึ่ง: ${fmt.format(d.sterilizeDate)}', 12, 258, fontSize: 20);
-    drawText('หมดอายุ: ${fmt.format(d.expiryDate)}', 12, 286, fontSize: 20);
+    if (d.isSterilized) {
+      // วันที่จริงจาก backend (หลังผ่านรอบนึ่งแล้วเท่านั้น)
+      final fmt = DateFormat('dd/MM/yyyy');
+      drawText('นึ่ง: ${fmt.format(d.sterilizeDate!)}', 12, 258, fontSize: 20);
+      drawText('หมดอายุ: ${fmt.format(d.expiryDate!)}', 12, 286, fontSize: 20);
+    } else {
+      // ห่อยังไม่ผ่านการนึ่ง — ห้ามพิมพ์วันที่โดยประมาณ (ความปลอดภัยผู้ป่วย)
+      // พิมพ์แถบดำตัวหนังสือขาวให้เห็นชัดว่าห่อนี้ยังใช้กับผู้ป่วยไม่ได้
+      canvas.drawRect(
+        Rect.fromLTWH(12, 254, widthDots - 24, 60),
+        Paint()..color = Colors.black,
+      );
+      final tp = TextPainter(
+        text: const TextSpan(
+          text: 'ยังไม่ผ่านการฆ่าเชื้อ',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 26,
+            fontWeight: FontWeight.w800,
+            height: 1.0,
+          ),
+        ),
+        textDirection: ui.TextDirection.ltr,
+        maxLines: 1,
+      )..layout(maxWidth: widthDots - 24);
+      tp.paint(
+        canvas,
+        Offset(12 + (widthDots - 24 - tp.width) / 2, 254 + (60 - tp.height) / 2),
+      );
+    }
 
     final picture = recorder.endRecording();
     return picture.toImage(widthDots, heightDots);

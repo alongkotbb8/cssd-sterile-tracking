@@ -1,9 +1,20 @@
+import 'dart:math';
+
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../auth/auth_controller.dart';
+
+/// สร้าง Idempotency-Key ใหม่ต่อ "การกดยืนยัน 1 ครั้ง" — ตาม
+/// AI_DEVELOPMENT_GUARDRAILS.md ข้อ 6: ทุก mutation สำคัญ (scan in/out/return,
+/// สร้าง package, บันทึกผล batch ฯลฯ) ต้องส่ง key นี้กันยิงซ้ำจาก retry/offline sync
+/// (128 บิตสุ่ม พอสำหรับกันชนโดยไม่ต้องพึ่ง package uuid เพิ่ม)
+String newIdempotencyKey() {
+  final rnd = Random.secure();
+  return List.generate(16, (_) => rnd.nextInt(256).toRadixString(16).padLeft(2, '0')).join();
+}
 
 const kPrefServerUrl = 'server_url';
 // ค่าเริ่มต้น production (Render) — เปลี่ยนได้ที่หน้าตั้งค่าถ้า URL จริงต่างจากนี้

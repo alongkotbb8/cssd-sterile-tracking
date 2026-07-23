@@ -81,3 +81,7 @@ flutter:
   assets:
     - assets/images/
     - assets/icons/
+    # ฟอนต์ไทยสำหรับ PDF รายงาน — bundle ในแอปเพื่อให้สร้างรายงานได้ตอน offline
+    # (เดิมใช้ PdfGoogleFonts ดาวน์โหลดจากเน็ตตอนสร้าง → offline พัง)
+    - assets/fonts/Sarabun-Regular.ttf
+    - assets/fonts/Sarabun-Bold.ttf

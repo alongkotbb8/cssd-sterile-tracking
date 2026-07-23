@@ -7,7 +7,7 @@ import '../../../../core/api/repositories.dart';
 import '../../../../core/models/models.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/domain_widgets.dart';
-import '../widgets/create_package_sheet.dart';
+import '../../../print_jobs/presentation/widgets/submit_print_job_sheet.dart';
 
 class PackageDetailPage extends ConsumerWidget {
   const PackageDetailPage({super.key, required this.id});
@@ -26,7 +26,7 @@ class PackageDetailPage extends ConsumerWidget {
             data: (pkg) => IconButton(
               tooltip: 'พิมพ์ label ซ้ำ',
               icon: const Icon(Icons.print_outlined),
-              onPressed: () => printPackageLabel(context, ref, pkg),
+              onPressed: () => submitPrintJobs(context, ref, [pkg]),
             ),
             orElse: () => const SizedBox.shrink(),
           ),
@@ -310,6 +310,13 @@ class _InfoCard extends StatelessWidget {
       if (pkg.daysLeft != null && !pkg.isExpired)
         ('เหลืออีก', '${pkg.daysLeft} วัน', false),
       if (pkg.batchId != null) ('รอบนึ่ง', pkg.batchId!, false),
+      if (pkg.printedAt != null)
+        (
+          'พิมพ์ label',
+          '${fmt.format(pkg.printedAt!)}'
+              '${pkg.reprintCount > 0 ? ' · พิมพ์ซ้ำ ${pkg.reprintCount} ครั้ง' : ''}',
+          false
+        ),
       if (pkg.notes != null && pkg.notes!.isNotEmpty)
         ('หมายเหตุ', pkg.notes!, false),
     ];

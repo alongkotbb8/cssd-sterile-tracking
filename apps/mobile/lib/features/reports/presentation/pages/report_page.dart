@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show rootBundle;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
@@ -146,8 +147,11 @@ class ReportPage extends ConsumerWidget {
       BuildContext context, ReportPeriod period, WeeklyReport r) async {
     final messenger = ScaffoldMessenger.of(context);
     try {
-      final font = await PdfGoogleFonts.sarabunRegular();
-      final fontBold = await PdfGoogleFonts.sarabunBold();
+      // ฟอนต์ bundle ในแอป (ไม่โหลดจากเน็ต) — สร้างรายงานได้แม้ offline
+      final font = pw.Font.ttf(
+          await rootBundle.load('assets/fonts/Sarabun-Regular.ttf'));
+      final fontBold =
+          pw.Font.ttf(await rootBundle.load('assets/fonts/Sarabun-Bold.ttf'));
       final dfmt = DateFormat('dd/MM/yyyy');
       final tfmt = DateFormat('dd/MM/yyyy HH:mm');
       final (from, to) = period.range;

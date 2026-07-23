@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/models.dart';
@@ -168,6 +169,7 @@ class PackageRepository {
         if (wrapType != null) 'wrapType': wrapType,
         if (notes != null && notes.isNotEmpty) 'notes': notes,
       },
+      options: Options(headers: {'Idempotency-Key': newIdempotencyKey()}),
     );
     return PackageModel.fromJson(res.data!);
   }
@@ -189,10 +191,18 @@ class ScanRepository {
   }
 
   Future<List<ScanResultItem>> scanIn(
-      List<String> packageIds, String batchId) async {
+    List<String> packageIds,
+    String batchId, {
+    bool manualEntry = false,
+  }) async {
     final res = await _ref.read(dioProvider).post<List<dynamic>>(
       '/scan/in',
-      data: {'packageIds': packageIds, 'batchId': batchId},
+      data: {
+        'packageIds': packageIds,
+        'batchId': batchId,
+        if (manualEntry) 'manualEntry': true,
+      },
+      options: Options(headers: {'Idempotency-Key': newIdempotencyKey()}),
     );
     return _results(res.data!);
   }
@@ -201,6 +211,7 @@ class ScanRepository {
     List<String> packageIds,
     String departmentId, {
     String? receiverName,
+    bool manualEntry = false,
   }) async {
     final res = await _ref.read(dioProvider).post<List<dynamic>>(
       '/scan/out',
@@ -209,16 +220,26 @@ class ScanRepository {
         'departmentId': departmentId,
         if (receiverName != null && receiverName.isNotEmpty)
           'receiverName': receiverName,
+        if (manualEntry) 'manualEntry': true,
       },
+      options: Options(headers: {'Idempotency-Key': newIdempotencyKey()}),
     );
     return _results(res.data!);
   }
 
   Future<List<ScanResultItem>> scanReturn(
-      List<String> packageIds, String departmentId) async {
+    List<String> packageIds,
+    String departmentId, {
+    bool manualEntry = false,
+  }) async {
     final res = await _ref.read(dioProvider).post<List<dynamic>>(
       '/scan/return',
-      data: {'packageIds': packageIds, 'departmentId': departmentId},
+      data: {
+        'packageIds': packageIds,
+        'departmentId': departmentId,
+        if (manualEntry) 'manualEntry': true,
+      },
+      options: Options(headers: {'Idempotency-Key': newIdempotencyKey()}),
     );
     return _results(res.data!);
   }
@@ -248,27 +269,116 @@ class BatchRepository {
   BatchRepository(this._ref);
   final Ref _ref;
 
-  /// เปิดรอบนึ่งใหม่ + บันทึกผล CI/BI ผ่าน (batch พร้อมใช้นำเข้าคลังทันที)
-  Future<SterilizationBatch> createPassed({
+  /// เปิดรอบนึ่งใหม่ (สถานะ PENDING) — สแกนห่อเข้ารอบก่อน แล้วค่อยบันทึกผล
+  /// CI/BI ทีหลังตามลำดับที่ถูกหลัก traceability (ห้ามเปิดรอบพร้อมผลผ่านทันที)
+  Future<SterilizationBatch> create({
     required String sterilizerId,
     required int roundNo,
-    bool biResult = true,
   }) async {
-    final dio = _ref.read(dioProvider);
-    final created = await dio.post<Map<String, dynamic>>(
+    final res = await _ref.read(dioProvider).post<Map<String, dynamic>>(
       '/batches',
       data: {
         'sterilizerId': sterilizerId,
         'roundNo': roundNo,
         'startedAt': DateTime.now().toUtc().toIso8601String(),
       },
+      options: Options(headers: {'Idempotency-Key': newIdempotencyKey()}),
     );
-    final id = created.data!['id'] as String;
-    // บันทึกผลตรวจ CI (+BI) ผ่าน → backend เปลี่ยนสถานะเป็น PASSED
-    final result = await dio.post<Map<String, dynamic>>(
-      '/batches/$id/result',
-      data: {'ciResult': true, 'biResult': biResult},
+    return SterilizationBatch.fromJson(res.data!);
+  }
+
+  /// บันทึกผล CI/BI ของรอบ (SUPERVISOR/ADMIN เท่านั้น — backend บังคับ)
+  /// ผ่าน → ห่อทุกใบในรอบเป็น STERILE อัตโนมัติ, ไม่ผ่าน → ห่อถูกปลดออกจากรอบ
+  Future<SterilizationBatch> recordResult(
+    String batchId, {
+    required bool ciResult,
+    bool? biResult,
+  }) async {
+    final res = await _ref.read(dioProvider).post<Map<String, dynamic>>(
+      '/batches/$batchId/result',
+      data: {
+        'ciResult': ciResult,
+        if (biResult != null) 'biResult': biResult,
+      },
+      options: Options(headers: {'Idempotency-Key': newIdempotencyKey()}),
     );
-    return SterilizationBatch.fromJson(result.data!);
+    return SterilizationBatch.fromJson(res.data!);
+  }
+}
+
+/// ---------- Print Jobs (M2 — Print Job Queue + Gateway) ----------
+
+/// รายการงานพิมพ์ (ของตัวเอง; SUPERVISOR/ADMIN เห็นทั้งหมด) — กรองตาม packageId ได้
+final printJobsProvider =
+    FutureProvider.autoDispose.family<List<PrintJob>, String?>((ref, packageId) async {
+  final res = await ref.watch(dioProvider).get<List<dynamic>>(
+    '/print-jobs',
+    queryParameters: {if (packageId != null) 'packageId': packageId},
+  );
+  return res.data!.map((e) => PrintJob.fromJson(e as Map<String, dynamic>)).toList();
+});
+
+/// สถานะงานพิมพ์รายตัว — poll ซ้ำได้เรื่อยๆ ผ่าน ref.invalidate/refresh
+final printJobDetailProvider =
+    FutureProvider.autoDispose.family<PrintJob, String>((ref, id) async {
+  final res = await ref
+      .watch(dioProvider)
+      .get<Map<String, dynamic>>('/print-jobs/${Uri.encodeComponent(id)}');
+  return PrintJob.fromJson(res.data!);
+});
+
+/// รายการ gateway ที่ลงทะเบียน (SUPERVISOR/ADMIN) — ใช้เลือกปลายทางพิมพ์
+final gatewaysProvider = FutureProvider.autoDispose<List<PrinterGateway>>((ref) async {
+  final res = await ref.watch(dioProvider).get<List<dynamic>>('/print-jobs/gateways/list');
+  return res.data!.map((e) => PrinterGateway.fromJson(e as Map<String, dynamic>)).toList();
+});
+
+final printJobRepositoryProvider =
+    Provider<PrintJobRepository>((ref) => PrintJobRepository(ref));
+
+class PrintJobRepository {
+  PrintJobRepository(this._ref);
+  final Ref _ref;
+
+  /// สร้างงานพิมพ์ label ของห่อ — backend ตัดสิน isReprint เอง (จาก package.printedAt)
+  /// ถ้าห่อเคยพิมพ์แล้ว **ต้อง** ส่ง [reprintReason] (ไม่งั้น backend ตอบ 400)
+  /// [requestedPrinterId] = gateway ที่ระบุ (null = เครื่องไหนก็ claim ได้)
+  Future<PrintJob> create(
+    String packageId, {
+    String? requestedPrinterId,
+    String? reprintReason,
+  }) async {
+    final res = await _ref.read(dioProvider).post<Map<String, dynamic>>(
+      '/print-jobs',
+      data: {
+        'packageId': packageId,
+        if (requestedPrinterId != null) 'requestedPrinterId': requestedPrinterId,
+        if (reprintReason != null && reprintReason.isNotEmpty) 'reprintReason': reprintReason,
+      },
+      options: Options(headers: {'Idempotency-Key': newIdempotencyKey()}),
+    );
+    _ref.invalidate(printJobsProvider);
+    return PrintJob.fromJson(res.data!);
+  }
+
+  /// ยกเลิกงานพิมพ์ — backend อนุญาตเฉพาะสถานะ QUEUED (claim แล้วยกเลิกไม่ได้)
+  Future<void> cancel(String jobId) async {
+    await _ref
+        .read(dioProvider)
+        .post<Map<String, dynamic>>('/print-jobs/${Uri.encodeComponent(jobId)}/cancel');
+    _ref.invalidate(printJobsProvider);
+    _ref.invalidate(printJobDetailProvider(jobId));
+  }
+
+  /// SUPERVISOR/ADMIN ตัดสินงานที่ค้าง ACK_UNKNOWN
+  /// [decision] = 'CONFIRM_PRINTED' (ยืนยันพิมพ์จริง) | 'REQUEUE' (เปิดงานใหม่)
+  Future<PrintJob> resolve(String jobId, String decision, String note) async {
+    final res = await _ref.read(dioProvider).post<Map<String, dynamic>>(
+      '/print-jobs/${Uri.encodeComponent(jobId)}/resolve',
+      data: {'decision': decision, 'note': note},
+    );
+    _ref.invalidate(printJobsProvider);
+    _ref.invalidate(printJobDetailProvider(jobId));
+    return PrintJob.fromJson(res.data!);
   }
 }

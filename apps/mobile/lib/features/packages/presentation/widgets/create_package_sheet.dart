@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -8,6 +10,7 @@ import '../../../../core/models/models.dart';
 import '../../../../core/printer/printer_adapter.dart';
 import '../../../../core/printer/printer_provider.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../print_jobs/presentation/widgets/submit_print_job_sheet.dart';
 
 /// เปิด sheet สร้างห่อ (สร้างได้ทีละหลายห่อ) — เมื่อสำเร็จแสดง dialog สรุป + ปุ่มพิมพ์ทั้งหมด
 Future<void> showCreatePackageSheet(BuildContext context, WidgetRef ref) async {
@@ -89,16 +92,25 @@ Future<void> showCreatePackageSheet(BuildContext context, WidgetRef ref) async {
   );
 
   if (shouldPrint == true && context.mounted) {
-    await printPackageLabels(context, ref, created);
+    // ใช้ Print Job Queue เป็นทางหลัก (สร้างงานผ่าน backend → Gateway พิมพ์/ACK)
+    // ไม่พิมพ์ตรงจาก client อีกต่อไป — printedAt/reprintCount อัปเดตจาก Gateway ACK เท่านั้น
+    await submitPrintJobs(context, ref, created);
   }
 }
 
-/// พิมพ์ label ของห่อเดียว (ใช้จากหน้ารายละเอียด)
+// ─────────────────────────────────────────────────────────────────────────
+// ⚠️ Legacy direct-print (Bluetooth/System) — **ไม่ได้ผูกกับปุ่มพิมพ์ใน UI แล้ว**
+// เก็บไว้เป็น fallback ฉุกเฉินระดับโค้ดเท่านั้น (เช่นกรณีไม่มี Gateway เลย) ห้ามใช้
+// เป็นทางพิมพ์ปกติ เพราะไม่บันทึกประวัติ (printedAt/reprintCount) และไม่มีการยืนยัน
+// ว่าพิมพ์จริงผ่าน Gateway ACK — ดู submitPrintJobs / Print Job Queue แทน
+// ─────────────────────────────────────────────────────────────────────────
+
+/// (legacy) พิมพ์ตรงห่อเดียว — ไม่ผูกกับ UI แล้ว ดู submitPrintJobs
 Future<void> printPackageLabel(
         BuildContext context, WidgetRef ref, PackageModel pkg) =>
     printPackageLabels(context, ref, [pkg]);
 
-/// พิมพ์ label หลายห่อ — เชื่อมต่อเครื่องพิมพ์ครั้งเดียว แล้วส่งทีละใบ
+/// (legacy) พิมพ์ตรงหลายห่อ — ไม่ผูกกับ UI แล้ว ดู submitPrintJobs
 Future<void> printPackageLabels(
     BuildContext context, WidgetRef ref, List<PackageModel> pkgs) async {
   if (pkgs.isEmpty) return;
@@ -108,19 +120,25 @@ Future<void> printPackageLabels(
     if (!printer.isConnected) await printer.connect();
     var ok = 0;
     for (final pkg in pkgs) {
-      // ห่อที่ยังไม่นึ่งยังไม่มีวันหมดอายุจริง (backend คำนวณตอนสแกนเข้าคลัง)
-      // ใช้วันโดยประมาณ = แพ็กวันนี้ + อายุตามชนิดห่อ
-      final sterilize = pkg.sterilizeDate ?? DateTime.now();
-      final expiry =
-          pkg.expiryDate ?? sterilize.add(Duration(days: pkg.shelfLifeDays));
+      // ใช้วันที่จริงจาก backend เท่านั้น — ห่อที่ยังไม่นึ่ง (null) label จะ
+      // พิมพ์แถบ "ยังไม่ผ่านการฆ่าเชื้อ" แทนวันที่ ห้ามคำนวณวันโดยประมาณ
+      // เด็ดขาด (ความปลอดภัยผู้ป่วย — ผล audit ระดับ Critical)
       await printer.printLabel(LabelData(
         packageId: pkg.id,
         setName: pkg.templateName,
         wrapType: pkg.wrapType == 'SEAL' ? 'ห่อซีล' : 'ห่อผ้า',
-        sterilizeDate: sterilize,
-        expiryDate: expiry,
+        sterilizeDate: pkg.sterilizeDate,
+        expiryDate: pkg.expiryDate,
       ));
       ok++;
+      // หมายเหตุ (AI_DEVELOPMENT_GUARDRAILS.md ข้อ 2): "ห้ามถือว่าเปิด Print
+      // Dialog เท่ากับพิมพ์สำเร็จ" และ "ห้ามให้ PWA ตั้งสถานะ Print Job เป็น
+      // PRINTED" — printer.printLabel() ที่สำเร็จแปลว่าส่งข้อมูลออกไปเท่านั้น
+      // ไม่ใช่หลักฐานว่าเครื่องพิมพ์จริง เดิมโค้ดนี้เรียก
+      // POST /packages/:id/printed ให้ตัวเองทันทีหลังบรรทัดนี้ ซึ่งเป็นการที่
+      // client ยืนยันความสำเร็จเอง ตอนนี้ตัดออกแล้ว — printedAt/reprintCount
+      // ที่เป็นทางการจะถูกอัปเดตเฉพาะผ่าน Print Job Queue + Gateway ACK
+      // (ดู apps/api/src/modules/print-jobs) ซึ่งยังไม่ได้ผูกกับปุ่มพิมพ์นี้ในรอบนี้
     }
     messenger.showSnackBar(SnackBar(
       content: Text(pkgs.length == 1

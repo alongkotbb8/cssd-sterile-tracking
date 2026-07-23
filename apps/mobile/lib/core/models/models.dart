@@ -131,6 +131,8 @@ class PackageModel {
   final bool isExpired;
   final String templateName;
   final List<Movement> movements;
+  final DateTime? printedAt; // พิมพ์ label ล่าสุดเมื่อไหร่
+  final int reprintCount; // จำนวนครั้งที่พิมพ์ซ้ำ (ไม่นับครั้งแรก)
 
   const PackageModel({
     required this.id,
@@ -143,6 +145,8 @@ class PackageModel {
     this.isExpired = false,
     this.templateName = '',
     this.movements = const [],
+    this.printedAt,
+    this.reprintCount = 0,
   });
 
   factory PackageModel.fromJson(Map<String, dynamic> j) => PackageModel(
@@ -159,6 +163,8 @@ class PackageModel {
         movements: ((j['movements'] as List?) ?? const [])
             .map((m) => Movement.fromJson(m as Map<String, dynamic>))
             .toList(),
+        printedAt: _date(j['printedAt']),
+        reprintCount: (j['reprintCount'] ?? 0) as int,
       );
 
   int? get daysLeft => expiryDate?.difference(DateTime.now()).inDays;
@@ -222,12 +228,16 @@ class SterilizationBatch {
   final DateTime? startedAt;
   final String? sterilizerName;
 
+  /// จำนวนห่อที่ผูกกับรอบนี้ (จาก _count ของ backend) — ใช้ตอนบันทึกผล
+  final int? packageCount;
+
   const SterilizationBatch({
     required this.id,
     required this.status,
     this.roundNo,
     this.startedAt,
     this.sterilizerName,
+    this.packageCount,
   });
 
   factory SterilizationBatch.fromJson(Map<String, dynamic> j) =>
@@ -238,6 +248,8 @@ class SterilizationBatch {
         startedAt: _date(j['startedAt']),
         sterilizerName:
             (j['sterilizer'] as Map<String, dynamic>?)?['name'] as String?,
+        packageCount:
+            ((j['_count'] as Map<String, dynamic>?)?['packages']) as int?,
       );
 
   // เทียบด้วย id เพื่อให้ dropdown จับคู่ค่าที่เลือกกับ list ที่ refetch มาได้ถูก
@@ -358,4 +370,134 @@ class DashboardData {
 
   int get sterileTotal => sterileStock.fold(0, (a, b) => a + b.count);
   int get issuedTotal => issuedByDept.fold(0, (a, b) => a + b.count);
+}
+
+/// ---------- Print Job Queue (M2) ----------
+///
+/// PWA ไม่พิมพ์ตรงและไม่ตั้งสถานะ PRINTED เอง — สร้าง PrintJob แล้ว poll สถานะ
+/// จนกว่า Print Gateway จะ claim/พิมพ์/ACK (ดู apps/print-gateway)
+/// สถานะ (ตรงกับ PrintJobStatus enum ฝั่ง backend):
+///   QUEUED → CLAIMED → PRINTING → SENT → PRINTED
+///   FAILED → RETRYING → (QUEUED | DEAD_LETTER)
+///   ACK_UNKNOWN → (RESOLVED_PRINTED | RESOLVED_REQUEUED)  ← หัวหน้าตัดสิน
+///   SIMULATED (dev/console เท่านั้น) · CANCELLED (ยกเลิกตอน QUEUED)
+class PrintJob {
+  final String id;
+  final String packageId;
+  final String status;
+  final String? requestedPrinterId; // เครื่องที่ผู้ใช้ระบุ (null = เครื่องไหนก็ได้)
+  final String? printerId; // เครื่องที่ claim ไปจริง
+  final int attemptCount;
+  final bool isReprint;
+  final String? reprintReason;
+  final String? errorCode;
+  final String? resolutionNote;
+  final String? requeuedFromJobId;
+  final DateTime createdAt;
+  final DateTime? claimedAt;
+  final DateTime? printingAt;
+  final DateTime? sentAt;
+  final DateTime? printedAt;
+  final DateTime? failedAt;
+  final DateTime? resolvedAt;
+
+  const PrintJob({
+    required this.id,
+    required this.packageId,
+    required this.status,
+    required this.attemptCount,
+    required this.isReprint,
+    required this.createdAt,
+    this.requestedPrinterId,
+    this.printerId,
+    this.reprintReason,
+    this.errorCode,
+    this.resolutionNote,
+    this.requeuedFromJobId,
+    this.claimedAt,
+    this.printingAt,
+    this.sentAt,
+    this.printedAt,
+    this.failedAt,
+    this.resolvedAt,
+  });
+
+  factory PrintJob.fromJson(Map<String, dynamic> j) => PrintJob(
+        id: j['id'] as String,
+        packageId: j['packageId'] as String,
+        status: (j['status'] ?? 'QUEUED') as String,
+        requestedPrinterId: j['requestedPrinterId'] as String?,
+        printerId: j['printerId'] as String?,
+        attemptCount: (j['attemptCount'] ?? 0) as int,
+        isReprint: (j['isReprint'] ?? false) as bool,
+        reprintReason: j['reprintReason'] as String?,
+        errorCode: j['errorCode'] as String?,
+        resolutionNote: j['resolutionNote'] as String?,
+        requeuedFromJobId: j['requeuedFromJobId'] as String?,
+        createdAt: _date(j['createdAt']) ?? DateTime.now(),
+        claimedAt: _date(j['claimedAt']),
+        printingAt: _date(j['printingAt']),
+        sentAt: _date(j['sentAt']),
+        printedAt: _date(j['printedAt']),
+        failedAt: _date(j['failedAt']),
+        resolvedAt: _date(j['resolvedAt']),
+      );
+
+  /// จบงานแล้ว (ไม่ต้อง poll ต่อ)
+  bool get isTerminal => const {
+        'PRINTED', 'SIMULATED', 'CANCELLED', 'DEAD_LETTER',
+        'RESOLVED_PRINTED', 'RESOLVED_REQUEUED',
+      }.contains(status);
+
+  /// ยกเลิกได้เฉพาะตอนยังไม่ถูก claim
+  bool get canCancel => status == 'QUEUED';
+
+  /// ต้องให้ SUPERVISOR/ADMIN เข้ามาตัดสิน
+  bool get needsSupervisor => status == 'ACK_UNKNOWN';
+
+  bool get isSuccess => status == 'PRINTED' || status == 'RESOLVED_PRINTED';
+  bool get isSimulated => status == 'SIMULATED';
+}
+
+/// Gateway (เครื่องพิมพ์) ที่ลงทะเบียนไว้ — ใช้เลือกปลายทางตอนสร้าง PrintJob
+/// มาจาก GET /print-jobs/gateways/list (SUPERVISOR/ADMIN)
+class PrinterGateway {
+  final String id;
+  final String name;
+  final bool isActive;
+  final String environment; // DEVELOPMENT | TEST | PRODUCTION
+  final String transportMode; // CONSOLE | SERIAL | BLUETOOTH
+  final bool canConfirmRealPrint;
+  final DateTime? lastHeartbeatAt;
+  final DateTime? revokedAt;
+
+  const PrinterGateway({
+    required this.id,
+    required this.name,
+    required this.isActive,
+    required this.environment,
+    required this.transportMode,
+    required this.canConfirmRealPrint,
+    this.lastHeartbeatAt,
+    this.revokedAt,
+  });
+
+  factory PrinterGateway.fromJson(Map<String, dynamic> j) => PrinterGateway(
+        id: j['id'] as String,
+        name: (j['name'] ?? '') as String,
+        isActive: (j['isActive'] ?? false) as bool,
+        environment: (j['environment'] ?? 'DEVELOPMENT') as String,
+        transportMode: (j['transportMode'] ?? 'CONSOLE') as String,
+        canConfirmRealPrint: (j['canConfirmRealPrint'] ?? false) as bool,
+        lastHeartbeatAt: _date(j['lastHeartbeatAt']),
+        revokedAt: _date(j['revokedAt']),
+      );
+
+  /// ออนไลน์ = active, ไม่ถูก revoke, และ heartbeat ภายใน 90 วินาที
+  bool get isOnline {
+    if (!isActive || revokedAt != null) return false;
+    final hb = lastHeartbeatAt;
+    if (hb == null) return false;
+    return DateTime.now().difference(hb).inSeconds < 90;
+  }
 }

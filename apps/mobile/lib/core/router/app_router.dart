@@ -6,6 +6,8 @@ import '../../features/auth/presentation/pages/login_page.dart';
 import '../../features/dashboard/presentation/pages/dashboard_page.dart';
 import '../../features/packages/presentation/pages/package_detail_page.dart';
 import '../../features/packages/presentation/pages/packages_page.dart';
+import '../../features/print_jobs/presentation/pages/print_job_detail_page.dart';
+import '../../features/print_jobs/presentation/pages/print_jobs_page.dart';
 import '../../features/reports/presentation/pages/report_page.dart';
 import '../../features/scan/presentation/pages/scan_page.dart';
 import '../../features/settings/presentation/pages/settings_page.dart';
@@ -45,6 +47,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         routes: [
           GoRoute(path: '/scan', builder: (c, s) => const ScanPage()),
           GoRoute(path: '/packages', builder: (c, s) => const PackagesPage()),
+          GoRoute(path: '/print-jobs', builder: (c, s) => const PrintJobsPage()),
           GoRoute(path: '/dashboard', builder: (c, s) => const DashboardPage()),
           GoRoute(path: '/settings', builder: (c, s) => const SettingsPage()),
         ],
@@ -53,6 +56,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/packages/:id',
         builder: (c, s) => PackageDetailPage(id: s.pathParameters['id']!),
+      ),
+      GoRoute(
+        path: '/print-jobs/:id',
+        builder: (c, s) => PrintJobDetailPage(id: s.pathParameters['id']!),
       ),
       GoRoute(path: '/reports', builder: (c, s) => const ReportPage()),
     ],
@@ -67,6 +74,7 @@ class AppShell extends StatelessWidget {
     ('/dashboard', Icons.bar_chart_rounded, 'แดชบอร์ด'),
     ('/scan', Icons.qr_code_scanner_rounded, 'สแกน'),
     ('/packages', Icons.inventory_2_outlined, 'รายการ'),
+    ('/print-jobs', Icons.print_outlined, 'งานพิมพ์'),
     ('/settings', Icons.settings_outlined, 'ตั้งค่า'),
   ];
 

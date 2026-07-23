@@ -8,6 +8,7 @@ import '../../../../core/api/repositories.dart';
 import '../../../../core/models/models.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/domain_widgets.dart';
+import '../../../print_jobs/presentation/widgets/submit_print_job_sheet.dart';
 import '../widgets/create_package_sheet.dart';
 
 final _statusFilterProvider = StateProvider<String?>((ref) => null);
@@ -115,7 +116,7 @@ class _PrintSelectedBar extends ConsumerWidget {
                   final selected = packages
                       .where((p) => selectedIds.contains(p.id))
                       .toList();
-                  await printPackageLabels(context, ref, selected);
+                  await submitPrintJobs(context, ref, selected);
                   ref.read(_selectModeProvider.notifier).state = false;
                   ref.read(_selectedIdsProvider.notifier).state = {};
                 },
