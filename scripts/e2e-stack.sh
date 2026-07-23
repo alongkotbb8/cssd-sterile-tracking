@@ -14,6 +14,8 @@ PID_FILE="$ROOT/.e2e-stack.pids"
 export DATABASE_URL="${DATABASE_URL:-postgresql://cssd:cssd_dev_pw@localhost:5432/cssd_db?schema=public}"
 export JWT_SECRET="${JWT_SECRET:-e2e-local-secret-not-for-prod}"
 export NODE_ENV=development   # seed ใช้รหัส default (ADMIN001/Admin@1234 ฯลฯ) + CORS เปิด
+# E2E ทุก request มาจาก IP เดียว — ยกเพดาน per-IP login throttle เฉพาะตอนรันเทส
+export LOGIN_THROTTLE_MAX="${LOGIN_THROTTLE_MAX:-1000}"
 
 dc() { if docker compose version >/dev/null 2>&1; then docker compose "$@"; else docker-compose "$@"; fi; }
 

@@ -22,16 +22,24 @@ const API = process.env.E2E_API_URL ?? 'http://localhost:3000/api/v1';
 
 const idem = () => crypto.randomUUID();
 
+// cache token ต่อ worker — ลดจำนวน POST /auth/login (มี per-IP throttle;
+// ใน CI ทุกเทสแชร์ IP เดียว) ยกเว้นเทส revocation ที่ต้องการ token สดเสมอ
+const tokenCache = new Map<string, string>();
+
 async function apiLogin(
   request: APIRequestContext,
   employeeCode: string,
   password: string,
+  { fresh = false }: { fresh?: boolean } = {},
 ): Promise<string> {
+  if (!fresh && tokenCache.has(employeeCode)) return tokenCache.get(employeeCode)!;
   const res = await request.post(`${API}/auth/login`, {
     data: { employeeCode, password },
   });
   expect(res.ok(), `login ${employeeCode}: ${res.status()}`).toBeTruthy();
-  return (await res.json()).accessToken as string;
+  const token = (await res.json()).accessToken as string;
+  if (!fresh) tokenCache.set(employeeCode, token);
+  return token;
 }
 
 const auth = (token: string, extra: Record<string, string> = {}) => ({
@@ -273,7 +281,9 @@ test.describe('package lifecycle (API จริง + Postgres จริง)', ()
 test.describe('authz + idempotency + print job (API จริง)', () => {
   test('RBAC: CSSD บันทึกผลรอบนึ่ง/resolve print job ไม่ได้ (403)', async ({ request }) => {
     const admin = await apiLogin(request, 'ADMIN001', 'Admin@1234');
-    const staff = await apiLogin(request, 'STAFF001', 'Staff@1234');
+    // token สดเสมอ — เทส revocation (ด้านล่าง) ทำ token เก่าของ STAFF001 ใช้ไม่ได้
+    // ถ้าใช้ cache อาจได้ 401 แทน 403 ตามลำดับรัน (flaky)
+    const staff = await apiLogin(request, 'STAFF001', 'Staff@1234', { fresh: true });
     const batch = await createBatch(request, admin);
 
     const result = await request.post(`${API}/batches/${batch}/result`, {
@@ -322,7 +332,8 @@ test.describe('authz + idempotency + print job (API จริง)', () => {
   });
 
   test('token เก่าถูกปฏิเสธหลัง logout-all (session revocation)', async ({ request }) => {
-    const token = await apiLogin(request, 'STAFF001', 'Staff@1234');
+    // token สด (ห้ามใช้/ห้ามลง cache — เทสนี้ทำให้ token ของ user นี้ตายทั้งหมด)
+    const token = await apiLogin(request, 'STAFF001', 'Staff@1234', { fresh: true });
     // token ใช้ได้ก่อน revoke
     expect((await request.get(`${API}/packages`, auth(token))).ok()).toBeTruthy();
 
@@ -331,5 +342,6 @@ test.describe('authz + idempotency + print job (API จริง)', () => {
 
     const after = await request.get(`${API}/packages`, auth(token));
     expect(after.status(), 'token รุ่นเก่าต้องถูกปฏิเสธ').toBe(401);
+    tokenCache.delete('STAFF001'); // กัน token ค้าง cache หลัง revocation
   });
 });

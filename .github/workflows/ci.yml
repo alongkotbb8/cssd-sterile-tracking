@@ -99,6 +99,9 @@ jobs:
       DATABASE_URL: postgresql://cssd:cssd_dev_pw@localhost:5432/cssd_db
       JWT_SECRET: e2e-ci-secret-not-for-prod
       NODE_ENV: development # seed ใช้รหัส default + CORS เปิด
+      # E2E ทุก request มาจาก 127.0.0.1 เดียวกัน — per-IP login throttle (10/นาที)
+      # จะปัดตกทั้งชุด จึงยกเพดานเฉพาะ CI (guard ยังทำงาน; ค่า production ไม่เปลี่ยน)
+      LOGIN_THROTTLE_MAX: "1000"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

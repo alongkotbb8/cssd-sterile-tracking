@@ -7,8 +7,11 @@ import {
 } from '@nestjs/common';
 import { Request } from 'express';
 
-const WINDOW_MS = 60_000; // 1 minute
-const MAX_ATTEMPTS = 10; // per IP per window
+// ค่า default = พฤติกรรม production เดิม; override ได้ผ่าน env เฉพาะสภาพแวดล้อม
+// ทดสอบ (E2E ทุก request มาจาก IP เดียวกัน — per-IP throttle จะปัดตกเทสทั้งชุด)
+// การ override ไม่ได้ปิด guard: logic เดิมยังทำงานครบทุก request
+const WINDOW_MS = Number(process.env.LOGIN_THROTTLE_WINDOW_MS) || 60_000; // 1 minute
+const MAX_ATTEMPTS = Number(process.env.LOGIN_THROTTLE_MAX) || 10; // per IP per window
 
 interface Bucket {
   count: number;

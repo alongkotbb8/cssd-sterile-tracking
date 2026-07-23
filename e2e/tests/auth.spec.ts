@@ -23,7 +23,9 @@ test.describe('authentication', () => {
   test('login ผิด → แสดง error และยังอยู่หน้า login', async ({ page }) => {
     await page.goto('/');
     await enableFlutterSemantics(page);
-    await fillLogin(page, 'ADMIN001', 'wrong-password');
+    // ใช้รหัสพนักงานที่ไม่มีจริง — ข้อความ error เดียวกัน (timing-safe) และไม่ไป
+    // เพิ่ม failedLoginCount ของบัญชีจริงที่เทสอื่นใช้อยู่
+    await fillLogin(page, 'NOSUCH999', 'wrong-password');
     await expect(byLabel(page, 'ไม่ถูกต้อง').first()).toBeVisible({
       timeout: 15_000,
     });
