@@ -35,7 +35,7 @@ Chrome PWA
 - Tagging
 - Dashboard และ Reports
 - Audit Log
-- Offline queue ในเฟสที่ได้รับอนุมัติ
+- ~~Offline queue~~ — **ยกเลิก: ระบบเป็น online-only** (ดู §8)
 
 ## 2. หลักการที่ห้ามละเมิด
 
@@ -66,7 +66,7 @@ Chrome PWA
 - สร้างจาก backend เท่านั้น
 - รูปแบบ `{SET_CODE}-{YYYYMMDD}-{SEQ4}`
 - ห้ามสุ่มหรือสร้างเลขบน client
-- Offline ต้องใช้เลขจาก pool ที่ backend จองไว้เท่านั้น
+- (online-only: ออกเลขตอนสร้างจริงเท่านั้น — ไม่มี offline pool แล้ว)
 - ต้องมี unique constraint และ concurrency test
 
 ### 3.3 QR
@@ -132,7 +132,7 @@ STERILE ที่เกิน expiry → ถือว่า EXPIRED สำหร
 - แสดงผลสำเร็จ/ล้มเหลวรายห่อ
 - สร้าง Print Job request
 - แสดงสถานะ Print Job จาก backend
-- Offline queue เมื่อได้รับอนุมัติให้พัฒนาเฟสนั้น
+- (online-only: ไม่มี offline queue — เน็ตหลุด = fail closed)
 
 PWA ห้าม:
 
@@ -181,13 +181,18 @@ Gateway ห้าม:
 
 ## 5. Print Job Design บังคับ
 
-สถานะขั้นต่ำ:
+สถานะที่ implement จริง (ขยายจากขั้นต่ำเดิม เพื่อกันพิมพ์ซ้ำหลัง send — ดู FIX-04):
 
 ```text
-QUEUED → CLAIMED → PRINTING → PRINTED
-                     ↘ FAILED → RETRYING → DEAD_LETTER
-QUEUED/CLAIMED → CANCELLED
+QUEUED → CLAIMED → PRINTING → SENT → PRINTED
+                     ↘ FAILED → RETRYING → (QUEUED | DEAD_LETTER)
+PRINTING/SENT ที่ผลไม่แน่นอน → ACK_UNKNOWN → (RESOLVED_PRINTED | RESOLVED_REQUEUED)  ← หัวหน้าตัดสิน
+SIMULATED = ACK จาก console/mock (dev) ไม่ใช่พิมพ์จริง
+QUEUED → CANCELLED (ยกเลิกได้เฉพาะ QUEUED เท่านั้น)
 ```
+
+- `SENT` = transport ยืนยันส่งข้อมูลถึง queue/เครื่องแล้ว (ยังไม่ ACK) — หลังจุดนี้ **ห้าม auto-retry**
+- `MAYBE_SENT` จาก transport → `ACK_UNKNOWN` (ให้ SUPERVISOR/ADMIN ตัดสิน ห้ามพิมพ์ซ้ำเอง)
 
 ข้อมูลขั้นต่ำ:
 
@@ -518,19 +523,15 @@ AI ต้องหยุดและขออนุมัติก่อน:
 2. Print Job APIs
 3. Gateway authentication/heartbeat
 4. Atomic claim and lease
-5. A318BT adapter
-6. ACK/failure/retry/dead-letter
+5. Xprinter XP-420B transport (`usb_spool` → OS printer queue; console/serial ด้วย)
+6. ACK/failure/retry/dead-letter (+ SENT/ACK_UNKNOWN, MAYBE_SENT ไม่ auto-retry)
 7. Print audit/reprint reason
-8. Hardware soak test
+8. Hardware soak test (ดู `HARDWARE_VERIFICATION.md`)
 
-### Milestone 3 — Offline
+### Milestone 3 — Offline — ❌ **ยกเลิก (ระบบเป็น online-only)**
 
-1. IndexedDB/local database
-2. Cached master data
-3. Mutation queue
-4. Sync/conflict UI
-5. Reserved number pool
-6. Offline security and concurrency tests
+> ตัดทั้ง milestone ตามการตัดสินใจล่าสุด — ไม่พัฒนา IndexedDB/mutation queue/sync/
+> reserved pool (ดู §8 และ `ONLINE_ONLY_XPRINTER_REMAINING_WORK.md`)
 
 ### Milestone 4 — Reports/Operations
 
