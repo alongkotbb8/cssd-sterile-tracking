@@ -27,6 +27,19 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsPrinterInUse => 'Printer in use';
 
   @override
+  String get settingsLabelSize => 'Label size';
+
+  @override
+  String get settingsGatewayPrimaryTitle => 'Print via Print Gateway (XP-420B)';
+
+  @override
+  String get settingsGatewayPrimarySubtitle =>
+      'All print jobs go through the Gateway → track status in the \"Print jobs\" tab';
+
+  @override
+  String get settingsLegacyPrinterTitle => 'Direct printer (legacy)';
+
+  @override
   String get settingsServerUrl => 'API server address';
 
   @override
@@ -88,7 +101,294 @@ class AppLocalizationsEn extends AppLocalizations {
   String get statusExpired => 'Expired';
 
   @override
+  String get statusDiscarded => 'Discarded/damaged';
+
+  @override
   String get filterAll => 'All';
+
+  @override
+  String get dmQrForScan => 'QR for scanning';
+
+  @override
+  String get dmWrapSeal => 'Seal · 180 days';
+
+  @override
+  String get dmWrapCloth => 'Cloth · 7 days';
+
+  @override
+  String get dmDaysShort => 'days';
+
+  @override
+  String get brandTagline => 'Sterile surgical instrument tracking (CSSD)';
+
+  @override
+  String get loginTitle => 'Sign in';
+
+  @override
+  String get loginSubtitle =>
+      'Use the employee code issued by your administrator';
+
+  @override
+  String get loginEmployeeCode => 'Employee code';
+
+  @override
+  String get loginEmployeeCodeRequired => 'Enter your employee code';
+
+  @override
+  String get loginPassword => 'Password';
+
+  @override
+  String get loginPasswordRequired => 'Enter your password';
+
+  @override
+  String get loginSubmit => 'Sign in';
+
+  @override
+  String get dashTitle => 'Dashboard';
+
+  @override
+  String dashGreeting(String name) {
+    return 'Hello $name';
+  }
+
+  @override
+  String get dashReportTooltip => 'Summary report / print';
+
+  @override
+  String get dashSterileStockTitle => 'Sterile stock (by set)';
+
+  @override
+  String get dashSterileStockCenter => 'ready packages';
+
+  @override
+  String get dashIssuedByDeptTitle => 'Issued by department (30 days)';
+
+  @override
+  String get dashIssuedCenter => 'issues';
+
+  @override
+  String get dashExpiringSoon => 'Expiring soon';
+
+  @override
+  String get dashNoData => 'No data yet';
+
+  @override
+  String get cpCreatedOne => 'Package created';
+
+  @override
+  String cpCreatedMany(int count) {
+    return 'Created $count packages';
+  }
+
+  @override
+  String cpPrintAll(int count) {
+    return 'Print all ($count)';
+  }
+
+  @override
+  String cpPrintSentOne(String printer) {
+    return 'Sent to print at $printer';
+  }
+
+  @override
+  String cpPrintSentMany(int ok, String printer) {
+    return 'Sent $ok labels to print at $printer';
+  }
+
+  @override
+  String get cpPrintFailed => 'Print failed — check the printer';
+
+  @override
+  String get cpTitle => 'New package';
+
+  @override
+  String get cpSubtitle => 'A running number is issued automatically on save';
+
+  @override
+  String get cpSetLabel => 'Instrument set';
+
+  @override
+  String get cpNewSet => 'New set';
+
+  @override
+  String get cpWrapType => 'Wrap type';
+
+  @override
+  String get cpQuantity => 'Quantity';
+
+  @override
+  String get cpMaxQty => 'Up to 50 packages at a time';
+
+  @override
+  String get cpNotes => 'Notes (optional)';
+
+  @override
+  String cpSavingProgress(int done, int total) {
+    return 'Creating $done/$total...';
+  }
+
+  @override
+  String get cpSaveOne => 'Save + issue number';
+
+  @override
+  String cpSaveMany(int count) {
+    return 'Save $count packages + issue numbers';
+  }
+
+  @override
+  String get ctTitle => 'New instrument set';
+
+  @override
+  String get ctSubtitle => 'Define what one instrument set contains';
+
+  @override
+  String get ctCode => 'Set code (prefixes the running number)';
+
+  @override
+  String get ctCodeHint => 'e.g. DELIV';
+
+  @override
+  String get ctName => 'Set name';
+
+  @override
+  String get ctNameHint => 'e.g. Delivery set';
+
+  @override
+  String get ctDefaultWrap => 'Default wrap type';
+
+  @override
+  String get ctItems => 'Items in the set';
+
+  @override
+  String ctItemN(int n) {
+    return 'Item $n';
+  }
+
+  @override
+  String get ctAddItem => 'Add item';
+
+  @override
+  String get ctValidationError => 'Enter code, set name and at least one item';
+
+  @override
+  String get ctSave => 'Save set';
+
+  @override
+  String get commonEdit => 'Edit';
+
+  @override
+  String get pdReprintTooltip => 'Reprint label';
+
+  @override
+  String get pdExpiredDetail => 'Return to CSSD for reprocessing only';
+
+  @override
+  String get pdStepPacked => 'Packed';
+
+  @override
+  String get pdStepSterile => 'Sterile';
+
+  @override
+  String get pdStepIssued => 'Issued';
+
+  @override
+  String get pdStepReturned => 'Returned';
+
+  @override
+  String get pdPackedOutTitle => 'Sent out unsterilized';
+
+  @override
+  String pdLocationNotReturned(String location) {
+    return 'At $location · not yet returned';
+  }
+
+  @override
+  String get pdNotReturned => 'Not yet returned';
+
+  @override
+  String get pdPackedOutHint =>
+      'When scanned back in, the status returns to \"packed\", ready for a sterilization round';
+
+  @override
+  String get pdLifecycleTitle => 'Lifecycle';
+
+  @override
+  String get pdTerminalExpired => 'Current status: expired — do not use';
+
+  @override
+  String get pdTerminalDiscarded => 'Current status: discarded/damaged';
+
+  @override
+  String get pdFieldSterilizeDate => 'Sterilized on';
+
+  @override
+  String get pdFieldExpiryDate => 'Expires on';
+
+  @override
+  String get pdFieldDaysLeft => 'Remaining';
+
+  @override
+  String pdDaysValue(int days) {
+    return '$days days';
+  }
+
+  @override
+  String get pdFieldBatch => 'Sterilization round';
+
+  @override
+  String pdReprintSuffix(int count) {
+    return ' · reprinted $count times';
+  }
+
+  @override
+  String get pdFieldNotes => 'Notes';
+
+  @override
+  String get pdInfoTitle => 'Package info';
+
+  @override
+  String get pdTagsTitle => 'Tags';
+
+  @override
+  String get pdNoTags => 'No tags yet';
+
+  @override
+  String get pdEditTagsTitle => 'Package tags';
+
+  @override
+  String get pdEditTagsSubtitle =>
+      'Choose the tags for this package (tap to toggle)';
+
+  @override
+  String get pdNoTagsInSystem =>
+      'No tags in the system yet — add them in Master data (SUPERVISOR/ADMIN)';
+
+  @override
+  String get pdSaveTags => 'Save tags';
+
+  @override
+  String get pdMoveIn => 'Scanned into sterile stock';
+
+  @override
+  String get pdHistoryTitle => 'Movement history';
+
+  @override
+  String get pdNoHistory => 'No movements yet';
+
+  @override
+  String pdMoveDept(String dept) {
+    return 'Dept: $dept';
+  }
+
+  @override
+  String pdMoveReceiver(String name) {
+    return 'Receiver: $name';
+  }
+
+  @override
+  String pdMoveBy(String name) {
+    return 'By: $name';
+  }
 
   @override
   String get pkgListTitle => 'Packages';

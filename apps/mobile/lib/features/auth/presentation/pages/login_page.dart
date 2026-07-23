@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/auth/auth_controller.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../l10n/app_localizations.dart';
 
 class LoginPage extends ConsumerStatefulWidget {
   const LoginPage({super.key});
@@ -45,6 +46,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Scaffold(
       backgroundColor: SterelisColors.surface,
       body: SafeArea(
@@ -57,7 +59,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const _BrandHeader(),
+                  _BrandHeader(tagline: l10n.brandTagline),
                   const SizedBox(height: 24),
                   Container(
                     padding: const EdgeInsets.all(24),
@@ -78,26 +80,26 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          const Text('เข้าสู่ระบบ',
-                              style: TextStyle(
+                          Text(l10n.loginTitle,
+                              style: const TextStyle(
                                   fontSize: 22,
                                   fontWeight: FontWeight.w700,
                                   color: SterelisColors.textStrong)),
                           const SizedBox(height: 4),
-                          const Text('ใช้รหัสพนักงานที่ได้รับจากผู้ดูแลระบบ',
-                              style: TextStyle(
+                          Text(l10n.loginSubtitle,
+                              style: const TextStyle(
                                   fontSize: 13, color: SterelisColors.textMuted)),
                           const SizedBox(height: 20),
                           TextFormField(
                             controller: _codeCtrl,
                             textInputAction: TextInputAction.next,
                             autofillHints: const [AutofillHints.username],
-                            decoration: const InputDecoration(
-                              labelText: 'รหัสพนักงาน',
-                              prefixIcon: Icon(Icons.badge_outlined),
+                            decoration: InputDecoration(
+                              labelText: l10n.loginEmployeeCode,
+                              prefixIcon: const Icon(Icons.badge_outlined),
                             ),
                             validator: (v) => (v == null || v.trim().isEmpty)
-                                ? 'กรอกรหัสพนักงาน'
+                                ? l10n.loginEmployeeCodeRequired
                                 : null,
                           ),
                           const SizedBox(height: 14),
@@ -107,7 +109,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                             autofillHints: const [AutofillHints.password],
                             onFieldSubmitted: (_) => _loading ? null : _submit(),
                             decoration: InputDecoration(
-                              labelText: 'รหัสผ่าน',
+                              labelText: l10n.loginPassword,
                               prefixIcon: const Icon(Icons.lock_outline),
                               suffixIcon: IconButton(
                                 icon: Icon(_obscure
@@ -117,8 +119,9 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                                     setState(() => _obscure = !_obscure),
                               ),
                             ),
-                            validator: (v) =>
-                                (v == null || v.isEmpty) ? 'กรอกรหัสผ่าน' : null,
+                            validator: (v) => (v == null || v.isEmpty)
+                                ? l10n.loginPasswordRequired
+                                : null,
                           ),
                           if (_error != null) ...[
                             const SizedBox(height: 14),
@@ -158,7 +161,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                                     height: 22,
                                     child: CircularProgressIndicator(
                                         strokeWidth: 2.5, color: Colors.white))
-                                : const Text('เข้าสู่ระบบ'),
+                                : Text(l10n.loginSubmit),
                           ),
                         ],
                       ),
@@ -175,7 +178,8 @@ class _LoginPageState extends ConsumerState<LoginPage> {
 }
 
 class _BrandHeader extends StatelessWidget {
-  const _BrandHeader();
+  const _BrandHeader({required this.tagline});
+  final String tagline;
 
   @override
   Widget build(BuildContext context) {
@@ -219,8 +223,8 @@ class _BrandHeader extends StatelessWidget {
                   fontWeight: FontWeight.w800,
                   letterSpacing: -.5)),
           const SizedBox(height: 4),
-          const Text('ระบบตามรอยอุปกรณ์หัตถการปลอดเชื้อ (CSSD)',
-              style: TextStyle(color: Color(0xFFDCE8FD), fontSize: 14)),
+          Text(tagline,
+              style: const TextStyle(color: Color(0xFFDCE8FD), fontSize: 14)),
         ],
       ),
     );

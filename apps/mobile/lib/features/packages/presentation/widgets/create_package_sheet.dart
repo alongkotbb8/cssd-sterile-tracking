@@ -10,6 +10,7 @@ import '../../../../core/models/models.dart';
 import '../../../../core/printer/printer_adapter.dart';
 import '../../../../core/printer/printer_provider.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../l10n/app_localizations.dart';
 import '../../../print_jobs/presentation/widgets/submit_print_job_sheet.dart';
 
 /// เปิด sheet สร้างห่อ (สร้างได้ทีละหลายห่อ) — เมื่อสำเร็จแสดง dialog สรุป + ปุ่มพิมพ์ทั้งหมด
@@ -25,6 +26,7 @@ Future<void> showCreatePackageSheet(BuildContext context, WidgetRef ref) async {
   );
   if (created == null || created.isEmpty || !context.mounted) return;
 
+  final l10n = AppLocalizations.of(context);
   final shouldPrint = await showDialog<bool>(
     context: context,
     builder: (dctx) => AlertDialog(
@@ -42,8 +44,8 @@ Future<void> showCreatePackageSheet(BuildContext context, WidgetRef ref) async {
         Expanded(
           child: Text(
             created.length == 1
-                ? 'สร้างห่อสำเร็จ'
-                : 'สร้าง ${created.length} ห่อสำเร็จ',
+                ? l10n.cpCreatedOne
+                : l10n.cpCreatedMany(created.length),
             style: const TextStyle(fontSize: 18),
           ),
         ),
@@ -78,14 +80,14 @@ Future<void> showCreatePackageSheet(BuildContext context, WidgetRef ref) async {
       actions: [
         TextButton(
           onPressed: () => Navigator.of(dctx).pop(false),
-          child: const Text('ปิด'),
+          child: Text(l10n.commonClose),
         ),
         FilledButton.icon(
           onPressed: () => Navigator.of(dctx).pop(true),
           icon: const Icon(Icons.print_outlined, size: 18),
           label: Text(created.length == 1
-              ? 'พิมพ์ label'
-              : 'พิมพ์ทั้งหมด (${created.length})'),
+              ? l10n.pjPrintLabel
+              : l10n.cpPrintAll(created.length)),
         ),
       ],
     ),
@@ -114,6 +116,7 @@ Future<void> printPackageLabel(
 Future<void> printPackageLabels(
     BuildContext context, WidgetRef ref, List<PackageModel> pkgs) async {
   if (pkgs.isEmpty) return;
+  final l10n = AppLocalizations.of(context);
   final messenger = ScaffoldMessenger.of(context);
   final printer = ref.read(printerAdapterProvider);
   try {
@@ -142,16 +145,16 @@ Future<void> printPackageLabels(
     }
     messenger.showSnackBar(SnackBar(
       content: Text(pkgs.length == 1
-          ? 'ส่งพิมพ์ไปยัง ${printer.displayName} แล้ว'
-          : 'ส่งพิมพ์ $ok label ไปยัง ${printer.displayName} แล้ว'),
+          ? l10n.cpPrintSentOne(printer.displayName)
+          : l10n.cpPrintSentMany(ok, printer.displayName)),
       backgroundColor: SterelisColors.success,
     ));
   } on PrinterException catch (e) {
     messenger.showSnackBar(SnackBar(
         content: Text(e.message), backgroundColor: SterelisColors.danger));
   } catch (_) {
-    messenger.showSnackBar(const SnackBar(
-        content: Text('พิมพ์ไม่สำเร็จ ตรวจสอบเครื่องพิมพ์'),
+    messenger.showSnackBar(SnackBar(
+        content: Text(l10n.cpPrintFailed),
         backgroundColor: SterelisColors.danger));
   }
 }
@@ -231,6 +234,7 @@ class _CreatePackageSheetState extends ConsumerState<_CreatePackageSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final templates = ref.watch(templatesProvider);
     final bottom = MediaQuery.of(context).viewInsets.bottom;
     final role = ref.watch(authControllerProvider).user?.role;
@@ -253,17 +257,18 @@ class _CreatePackageSheetState extends ConsumerState<_CreatePackageSheet> {
             ),
           ),
           const SizedBox(height: 16),
-          const Text('สร้างห่อใหม่',
-              style: TextStyle(
+          Text(l10n.cpTitle,
+              style: const TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.w800,
                   color: SterelisColors.textStrong)),
           const SizedBox(height: 4),
-          const Text('ระบบจะออกเลขรันให้อัตโนมัติเมื่อบันทึก',
-              style: TextStyle(fontSize: 13, color: SterelisColors.textMuted)),
+          Text(l10n.cpSubtitle,
+              style: const TextStyle(
+                  fontSize: 13, color: SterelisColors.textMuted)),
           const SizedBox(height: 18),
-          const Text('ชุดอุปกรณ์',
-              style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+          Text(l10n.cpSetLabel,
+              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
           const SizedBox(height: 8),
           templates.when(
             loading: () => const Padding(
@@ -311,7 +316,7 @@ class _CreatePackageSheetState extends ConsumerState<_CreatePackageSheet> {
                       ActionChip(
                         avatar: const Icon(Icons.add,
                             size: 16, color: SterelisColors.blue600),
-                        label: const Text('ชุดใหม่'),
+                        label: Text(l10n.cpNewSet),
                         onPressed: _saving ? null : _createTemplate,
                         backgroundColor: SterelisColors.blue50,
                         shape: RoundedRectangleBorder(
@@ -325,13 +330,13 @@ class _CreatePackageSheetState extends ConsumerState<_CreatePackageSheet> {
             ),
           ),
           const SizedBox(height: 18),
-          const Text('ชนิดห่อ',
-              style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+          Text(l10n.cpWrapType,
+              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
           const SizedBox(height: 8),
           SegmentedButton<String>(
-            segments: const [
-              ButtonSegment(value: 'SEAL', label: Text('ห่อซีล · 180 วัน')),
-              ButtonSegment(value: 'CLOTH', label: Text('ห่อผ้า · 7 วัน')),
+            segments: [
+              ButtonSegment(value: 'SEAL', label: Text(l10n.dmWrapSeal)),
+              ButtonSegment(value: 'CLOTH', label: Text(l10n.dmWrapCloth)),
             ],
             selected: {_wrapType},
             onSelectionChanged: (s) => setState(() => _wrapType = s.first),
@@ -349,8 +354,8 @@ class _CreatePackageSheetState extends ConsumerState<_CreatePackageSheet> {
           const SizedBox(height: 18),
           // จำนวนห่อที่จะสร้างพร้อมกัน
           Row(children: [
-            const Text('จำนวน',
-                style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+            Text(l10n.cpQuantity,
+                style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
             const Spacer(),
             _QtyButton(
               icon: Icons.remove,
@@ -375,13 +380,13 @@ class _CreatePackageSheetState extends ConsumerState<_CreatePackageSheet> {
             ),
           ]),
           const SizedBox(height: 6),
-          const Text('สร้างได้สูงสุด 50 ห่อต่อครั้ง',
-              style: TextStyle(fontSize: 12, color: SterelisColors.textFaint)),
+          Text(l10n.cpMaxQty,
+              style: const TextStyle(fontSize: 12, color: SterelisColors.textFaint)),
           const SizedBox(height: 18),
           TextField(
             controller: _notesCtrl,
             enabled: !_saving,
-            decoration: const InputDecoration(labelText: 'หมายเหตุ (ไม่บังคับ)'),
+            decoration: InputDecoration(labelText: l10n.cpNotes),
           ),
           const SizedBox(height: 20),
           FilledButton.icon(
@@ -394,10 +399,10 @@ class _CreatePackageSheetState extends ConsumerState<_CreatePackageSheet> {
                         strokeWidth: 2, color: Colors.white))
                 : const Icon(Icons.qr_code_2),
             label: Text(_saving
-                ? 'กำลังสร้าง $_savedCount/$_quantity...'
+                ? l10n.cpSavingProgress(_savedCount, _quantity)
                 : _quantity == 1
-                    ? 'บันทึก + ออกเลขรัน'
-                    : 'บันทึก $_quantity ห่อ + ออกเลขรัน'),
+                    ? l10n.cpSaveOne
+                    : l10n.cpSaveMany(_quantity)),
             style:
                 FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
           ),
@@ -455,7 +460,7 @@ class _CreateTemplateSheetState extends ConsumerState<_CreateTemplateSheet> {
         .where((s) => s.isNotEmpty)
         .toList();
     if (code.isEmpty || name.isEmpty || items.isEmpty) {
-      setState(() => _error = 'กรอกรหัส ชื่อชุด และรายการอุปกรณ์อย่างน้อย 1 รายการ');
+      setState(() => _error = AppLocalizations.of(context).ctValidationError);
       return;
     }
     setState(() {
@@ -483,6 +488,7 @@ class _CreateTemplateSheetState extends ConsumerState<_CreateTemplateSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final bottom = MediaQuery.of(context).viewInsets.bottom;
     return Padding(
       padding: EdgeInsets.fromLTRB(20, 16, 20, 20 + bottom),
@@ -501,14 +507,15 @@ class _CreateTemplateSheetState extends ConsumerState<_CreateTemplateSheet> {
             ),
           ),
           const SizedBox(height: 16),
-          const Text('สร้างชุดอุปกรณ์ใหม่',
-              style: TextStyle(
+          Text(l10n.ctTitle,
+              style: const TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.w800,
                   color: SterelisColors.textStrong)),
           const SizedBox(height: 4),
-          const Text('ระบุว่าในอุปกรณ์ 1 ชุดมีอะไรบ้าง',
-              style: TextStyle(fontSize: 13, color: SterelisColors.textMuted)),
+          Text(l10n.ctSubtitle,
+              style: const TextStyle(
+                  fontSize: 13, color: SterelisColors.textMuted)),
           const SizedBox(height: 18),
           ConstrainedBox(
             constraints: const BoxConstraints(maxHeight: 420),
@@ -520,31 +527,30 @@ class _CreateTemplateSheetState extends ConsumerState<_CreateTemplateSheet> {
                     controller: _codeCtrl,
                     enabled: !_saving,
                     textCapitalization: TextCapitalization.characters,
-                    decoration: const InputDecoration(
-                      labelText: 'รหัสชุด (ใช้ขึ้นต้นเลขรัน)',
-                      hintText: 'เช่น DELIV',
+                    decoration: InputDecoration(
+                      labelText: l10n.ctCode,
+                      hintText: l10n.ctCodeHint,
                     ),
                   ),
                   const SizedBox(height: 14),
                   TextField(
                     controller: _nameCtrl,
                     enabled: !_saving,
-                    decoration: const InputDecoration(
-                      labelText: 'ชื่อชุดอุปกรณ์',
-                      hintText: 'เช่น ชุดทำคลอด',
+                    decoration: InputDecoration(
+                      labelText: l10n.ctName,
+                      hintText: l10n.ctNameHint,
                     ),
                   ),
                   const SizedBox(height: 18),
-                  const Text('ชนิดห่อเริ่มต้น',
-                      style:
-                          TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                  Text(l10n.ctDefaultWrap,
+                      style: const TextStyle(
+                          fontWeight: FontWeight.w600, fontSize: 14)),
                   const SizedBox(height: 8),
                   SegmentedButton<String>(
-                    segments: const [
+                    segments: [
+                      ButtonSegment(value: 'SEAL', label: Text(l10n.dmWrapSeal)),
                       ButtonSegment(
-                          value: 'SEAL', label: Text('ห่อซีล · 180 วัน')),
-                      ButtonSegment(
-                          value: 'CLOTH', label: Text('ห่อผ้า · 7 วัน')),
+                          value: 'CLOTH', label: Text(l10n.dmWrapCloth)),
                     ],
                     selected: {_wrapType},
                     onSelectionChanged: _saving
@@ -552,9 +558,9 @@ class _CreateTemplateSheetState extends ConsumerState<_CreateTemplateSheet> {
                         : (s) => setState(() => _wrapType = s.first),
                   ),
                   const SizedBox(height: 18),
-                  const Text('รายการอุปกรณ์ในชุด',
-                      style:
-                          TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                  Text(l10n.ctItems,
+                      style: const TextStyle(
+                          fontWeight: FontWeight.w600, fontSize: 14)),
                   const SizedBox(height: 8),
                   for (var i = 0; i < _itemCtrls.length; i++)
                     Padding(
@@ -565,7 +571,7 @@ class _CreateTemplateSheetState extends ConsumerState<_CreateTemplateSheet> {
                             controller: _itemCtrls[i],
                             enabled: !_saving,
                             decoration: InputDecoration(
-                              labelText: 'อุปกรณ์ชิ้นที่ ${i + 1}',
+                              labelText: l10n.ctItemN(i + 1),
                             ),
                           ),
                         ),
@@ -587,7 +593,7 @@ class _CreateTemplateSheetState extends ConsumerState<_CreateTemplateSheet> {
                         : () => setState(
                             () => _itemCtrls.add(TextEditingController())),
                     icon: const Icon(Icons.add),
-                    label: const Text('เพิ่มรายการอุปกรณ์'),
+                    label: Text(l10n.ctAddItem),
                   ),
                   if (_error != null) ...[
                     const SizedBox(height: 8),
@@ -608,7 +614,7 @@ class _CreateTemplateSheetState extends ConsumerState<_CreateTemplateSheet> {
                     child: CircularProgressIndicator(
                         strokeWidth: 2, color: Colors.white))
                 : const Icon(Icons.save_outlined),
-            label: Text(_saving ? 'กำลังบันทึก...' : 'บันทึกชุดอุปกรณ์'),
+            label: Text(_saving ? l10n.scanSaving : l10n.ctSave),
             style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
           ),
         ],

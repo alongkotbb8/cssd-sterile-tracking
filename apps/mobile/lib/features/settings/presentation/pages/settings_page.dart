@@ -12,6 +12,7 @@ import 'package:print_bluetooth_thermal/print_bluetooth_thermal.dart';
 
 import '../../../../core/api/api_client.dart';
 import '../../../../core/auth/auth_controller.dart';
+import '../../../../core/config/feature_flags.dart';
 import '../../../../core/printer/printer_provider.dart';
 import '../../../../core/printer/system_print_adapter.dart';
 import '../../../../core/theme/app_theme.dart';
@@ -39,6 +40,11 @@ Set<String> productionAllowedHosts() {
 }
 
 /// ตรวจ server URL — คืน `null` ถ้าใช้ได้ หรือข้อความ error (ไทย) ถ้าไม่ผ่าน
+///
+/// i18n-allowlist (Gate 1): ข้อความ error เหล่านี้จงใจไม่ผ่าน gen-l10n เพราะเป็น pure
+/// function (unit-test ได้ ไม่มี BuildContext) และใช้เฉพาะ dialog ตั้งค่า **server URL
+/// สำหรับ admin/ผู้ติดตั้ง** ไม่ใช่ workflow ประจำวันของ CSSD — ถ้าต้องรองรับ en เต็มรูปแบบ
+/// ให้ refactor เป็นคืน enum แล้ว localize ที่ call site
 ///
 /// กติกา:
 /// - **release/production = https:// เท่านั้น** (ให้ตรง FIX-06 ฝั่ง Gateway — แม้
@@ -104,6 +110,7 @@ class SettingsPage extends ConsumerWidget {
     final printer = ref.watch(printerAdapterProvider);
     final user = ref.watch(authControllerProvider).user;
     final l10n = AppLocalizations.of(context);
+    final legacyPrint = ref.watch(legacyDirectPrintEnabledProvider);
 
     return Scaffold(
       appBar: AppBar(title: Text(l10n.settingsTitle)),
@@ -123,23 +130,34 @@ class SettingsPage extends ConsumerWidget {
           const Divider(),
         ],
         _SectionHeader(l10n.settingsPrinter),
+        // เส้นทางพิมพ์หลักของ Pilot = Print Gateway → XP-420B (สื่อชัด ไม่กำกวม)
         ListTile(
-          leading:
-              const Icon(Icons.print_outlined, color: SterelisColors.blue500),
-          title: Text(l10n.settingsPrinterInUse),
-          subtitle: Text(printer.displayName,
+          leading: const Icon(Icons.cloud_done_outlined,
+              color: SterelisColors.teal500),
+          title: Text(l10n.settingsGatewayPrimaryTitle),
+          subtitle: Text(l10n.settingsGatewayPrimarySubtitle,
               style: const TextStyle(color: SterelisColors.textMuted)),
-          trailing:
-              const Icon(Icons.chevron_right, color: SterelisColors.textFaint),
-          onTap: () => _choosePrinter(context, ref),
         ),
-        const ListTile(
-          leading: Icon(Icons.receipt_long_outlined,
+        ListTile(
+          leading: const Icon(Icons.receipt_long_outlined,
               color: SterelisColors.blue500),
-          title: Text('ขนาดฉลาก'),
-          subtitle: Text('60 × 40 mm · TSPL · 203 DPI',
+          title: Text(l10n.settingsLabelSize),
+          subtitle: const Text('60 × 40 mm · TSPL · 203 DPI',
               style: TextStyle(color: SterelisColors.textMuted)),
         ),
+        // Legacy direct-print (Bluetooth A318BT / System print) — ซ่อนใน Pilot
+        // (flag default = false ใน release) แสดงเฉพาะ dev/opt-in (feature_flags.dart)
+        if (legacyPrint)
+          ListTile(
+            leading:
+                const Icon(Icons.print_outlined, color: SterelisColors.blue500),
+            title: Text(l10n.settingsLegacyPrinterTitle),
+            subtitle: Text(printer.displayName,
+                style: const TextStyle(color: SterelisColors.textMuted)),
+            trailing: const Icon(Icons.chevron_right,
+                color: SterelisColors.textFaint),
+            onTap: () => _choosePrinter(context, ref),
+          ),
         const Divider(),
         _SectionHeader(l10n.settingsSystem),
         ListTile(
@@ -176,12 +194,13 @@ class SettingsPage extends ConsumerWidget {
 
   Future<void> _editServerUrl(
       BuildContext context, WidgetRef ref, String current) async {
+    final l10n = AppLocalizations.of(context);
     final ctrl = TextEditingController(text: current);
     final result = await showDialog<String>(
       context: context,
       builder: (dctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('ที่อยู่ Server API'),
+        title: Text(l10n.settingsServerUrl),
         content: TextField(
           controller: ctrl,
           keyboardType: TextInputType.url,
@@ -193,10 +212,10 @@ class SettingsPage extends ConsumerWidget {
         actions: [
           TextButton(
               onPressed: () => Navigator.of(dctx).pop(),
-              child: const Text('ยกเลิก')),
+              child: Text(l10n.actionCancel)),
           FilledButton(
             onPressed: () => Navigator.of(dctx).pop(ctrl.text),
-            child: const Text('บันทึก'),
+            child: Text(l10n.actionSave),
           ),
         ],
       ),
@@ -281,6 +300,11 @@ class SettingsPage extends ConsumerWidget {
 
 /// ⚠️ LEGACY — Sheet เลือกเครื่องพิมพ์สำหรับ **direct-print fallback** เท่านั้น
 /// (ทางหลัก = Print Gateway + XP-420B ผ่าน Print Job Queue ไม่ผ่าน sheet นี้)
+///
+/// i18n-allowlist (Gate 1): ข้อความไทยในคลาสนี้จงใจไม่ผ่าน gen-l10n เพราะเป็น UI legacy
+/// ที่ **ซ่อนจากผู้ใช้ทั่วไปใน Pilot** (legacyDirectPrintEnabledProvider = false ใน release
+/// — ดู feature_flags.dart) เข้าถึงได้เฉพาะ dev/opt-in ยังไม่ลบจนกว่า XP-420B/Linux จะผ่าน
+/// Hardware Gate (ตาม PRE_PILOT directive 1.8) — ถ้าจะเปิดให้ผู้ใช้จริงต้อง i18n ก่อน
 /// Sheet เลือกเครื่องพิมพ์: Mock (dev) หรือสแกนหา FlashLabel A318BT ผ่าน Bluetooth
 class _PrinterSheet extends ConsumerStatefulWidget {
   const _PrinterSheet();

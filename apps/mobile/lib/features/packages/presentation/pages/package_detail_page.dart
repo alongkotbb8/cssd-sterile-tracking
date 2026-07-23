@@ -7,6 +7,7 @@ import '../../../../core/api/repositories.dart';
 import '../../../../core/models/models.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/domain_widgets.dart';
+import '../../../../l10n/app_localizations.dart';
 import '../../../print_jobs/presentation/widgets/submit_print_job_sheet.dart';
 
 class PackageDetailPage extends ConsumerWidget {
@@ -16,6 +17,7 @@ class PackageDetailPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final detail = ref.watch(packageDetailProvider(id));
+    final l10n = AppLocalizations.of(context);
 
     return Scaffold(
       appBar: AppBar(
@@ -24,7 +26,7 @@ class PackageDetailPage extends ConsumerWidget {
         actions: [
           detail.maybeWhen(
             data: (pkg) => IconButton(
-              tooltip: 'พิมพ์ label ซ้ำ',
+              tooltip: l10n.pdReprintTooltip,
               icon: const Icon(Icons.print_outlined),
               onPressed: () => submitPrintJobs(context, ref, [pkg]),
             ),
@@ -44,7 +46,7 @@ class PackageDetailPage extends ConsumerWidget {
               const SizedBox(height: 12),
               OutlinedButton(
                 onPressed: () => ref.invalidate(packageDetailProvider(id)),
-                child: const Text('ลองใหม่'),
+                child: Text(l10n.commonRetry),
               ),
             ]),
           ),
@@ -55,9 +57,9 @@ class PackageDetailPage extends ConsumerWidget {
             padding: const EdgeInsets.all(16),
             children: [
               if (pkg.isExpired || pkg.status == 'EXPIRED') ...[
-                const BlockedCard(
-                    title: 'ห้ามใช้ — ห่อหมดอายุแล้ว',
-                    detail: 'นำกลับไป reprocess ที่หน่วยจ่ายกลางเท่านั้น'),
+                BlockedCard(
+                    title: l10n.scanBlockExpired,
+                    detail: l10n.pdExpiredDetail),
                 const SizedBox(height: 12),
               ],
               _HeaderCard(pkg: pkg),
@@ -129,15 +131,15 @@ class _LifecycleCard extends StatelessWidget {
   final String status;
   final String? locationName;
 
-  static const _steps = [
-    ('PACKED', 'แพ็ก'),
-    ('STERILE', 'ปลอดเชื้อ'),
-    ('ISSUED', 'เบิกออก'),
-    ('RETURNED', 'ส่งคืน'),
-  ];
-
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final steps = [
+      ('PACKED', l10n.pdStepPacked),
+      ('STERILE', l10n.pdStepSterile),
+      ('ISSUED', l10n.pdStepIssued),
+      ('RETURNED', l10n.pdStepReturned),
+    ];
     // PACKED_OUT อยู่นอกวงจรหลัก (แพ็ก→ปลอดเชื้อ→เบิก→คืน) — แสดงการ์ดสถานะแยก
     if (status == 'PACKED_OUT') {
       return Container(
@@ -155,22 +157,22 @@ class _LifecycleCard extends StatelessWidget {
             child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('ส่งออกโดยยังไม่ฆ่าเชื้อ',
-                      style: TextStyle(
+                  Text(l10n.pdPackedOutTitle,
+                      style: const TextStyle(
                           fontWeight: FontWeight.w800,
                           fontSize: 15,
                           color: Color(0xFF6D28D9))),
                   const SizedBox(height: 4),
                   Text(
                     locationName != null
-                        ? 'อยู่ที่ $locationName · ยังไม่คืนคลัง'
-                        : 'ยังไม่คืนคลัง',
+                        ? l10n.pdLocationNotReturned(locationName!)
+                        : l10n.pdNotReturned,
                     style: const TextStyle(
                         fontSize: 13, color: Color(0xFF7C5CC4)),
                   ),
                   const SizedBox(height: 2),
-                  const Text('เมื่อสแกนรับคืน สถานะจะกลับเป็น "แพ็กแล้ว" พร้อมเข้ารอบนึ่งต่อ',
-                      style: TextStyle(
+                  Text(l10n.pdPackedOutHint,
+                      style: const TextStyle(
                           fontSize: 12, color: Color(0xFF9B87CE))),
                 ]),
           ),
@@ -178,7 +180,7 @@ class _LifecycleCard extends StatelessWidget {
       );
     }
 
-    final currentIdx = _steps.indexWhere((s) => s.$1 == status);
+    final currentIdx = steps.indexWhere((s) => s.$1 == status);
     final isTerminal = status == 'EXPIRED' || status == 'DISCARDED';
 
     return Container(
@@ -189,14 +191,14 @@ class _LifecycleCard extends StatelessWidget {
         border: Border.all(color: SterelisColors.border),
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        const Text('วงจรชีวิต',
-            style: TextStyle(
+        Text(l10n.pdLifecycleTitle,
+            style: const TextStyle(
                 fontWeight: FontWeight.w700,
                 fontSize: 14,
                 color: SterelisColors.textStrong)),
         const SizedBox(height: 16),
         Row(children: [
-          for (var i = 0; i < _steps.length; i++) ...[
+          for (var i = 0; i < steps.length; i++) ...[
             if (i > 0)
               Expanded(
                 child: Container(
@@ -211,7 +213,7 @@ class _LifecycleCard extends StatelessWidget {
                 ),
               ),
             _LifecycleNode(
-              label: _steps[i].$2,
+              label: steps[i].$2,
               state: isTerminal
                   ? _NodeState.idle
                   : currentIdx > i
@@ -226,8 +228,8 @@ class _LifecycleCard extends StatelessWidget {
           const SizedBox(height: 12),
           Text(
             status == 'EXPIRED'
-                ? 'สถานะปัจจุบัน: หมดอายุ — ห้ามใช้'
-                : 'สถานะปัจจุบัน: ทิ้ง/ชำรุด',
+                ? l10n.pdTerminalExpired
+                : l10n.pdTerminalDiscarded,
             style: const TextStyle(
                 color: SterelisColors.danger,
                 fontWeight: FontWeight.w600,
@@ -302,25 +304,26 @@ class _InfoCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final fmt = DateFormat('dd/MM/yyyy HH:mm');
     final dfmt = DateFormat('dd/MM/yyyy');
     final rows = <(String, String, bool)>[
       if (pkg.sterilizeDate != null)
-        ('วันที่นึ่ง', fmt.format(pkg.sterilizeDate!), false),
+        (l10n.pdFieldSterilizeDate, fmt.format(pkg.sterilizeDate!), false),
       if (pkg.expiryDate != null)
-        ('วันหมดอายุ', dfmt.format(pkg.expiryDate!), pkg.isExpired),
+        (l10n.pdFieldExpiryDate, dfmt.format(pkg.expiryDate!), pkg.isExpired),
       if (pkg.daysLeft != null && !pkg.isExpired)
-        ('เหลืออีก', '${pkg.daysLeft} วัน', false),
-      if (pkg.batchId != null) ('รอบนึ่ง', pkg.batchId!, false),
+        (l10n.pdFieldDaysLeft, l10n.pdDaysValue(pkg.daysLeft!), false),
+      if (pkg.batchId != null) (l10n.pdFieldBatch, pkg.batchId!, false),
       if (pkg.printedAt != null)
         (
-          'พิมพ์ label',
+          l10n.pjPrintLabel,
           '${fmt.format(pkg.printedAt!)}'
-              '${pkg.reprintCount > 0 ? ' · พิมพ์ซ้ำ ${pkg.reprintCount} ครั้ง' : ''}',
+              '${pkg.reprintCount > 0 ? l10n.pdReprintSuffix(pkg.reprintCount) : ''}',
           false
         ),
       if (pkg.notes != null && pkg.notes!.isNotEmpty)
-        ('หมายเหตุ', pkg.notes!, false),
+        (l10n.pdFieldNotes, pkg.notes!, false),
     ];
 
     if (rows.isEmpty) return const SizedBox.shrink();
@@ -333,8 +336,8 @@ class _InfoCard extends StatelessWidget {
         border: Border.all(color: SterelisColors.border),
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        const Text('ข้อมูลห่อ',
-            style: TextStyle(
+        Text(l10n.pdInfoTitle,
+            style: const TextStyle(
                 fontWeight: FontWeight.w700,
                 fontSize: 14,
                 color: SterelisColors.textStrong)),
@@ -373,6 +376,7 @@ class _TagsCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
@@ -382,8 +386,8 @@ class _TagsCard extends ConsumerWidget {
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
-          const Text('ป้ายกำกับ',
-              style: TextStyle(
+          Text(l10n.pdTagsTitle,
+              style: const TextStyle(
                   fontWeight: FontWeight.w700,
                   fontSize: 14,
                   color: SterelisColors.textStrong)),
@@ -391,7 +395,7 @@ class _TagsCard extends ConsumerWidget {
           TextButton.icon(
             onPressed: () => _editTags(context, ref),
             icon: const Icon(Icons.edit_outlined, size: 16),
-            label: const Text('แก้ไข'),
+            label: Text(l10n.commonEdit),
             style: TextButton.styleFrom(
                 visualDensity: VisualDensity.compact,
                 padding: const EdgeInsets.symmetric(horizontal: 8)),
@@ -399,8 +403,9 @@ class _TagsCard extends ConsumerWidget {
         ]),
         const SizedBox(height: 4),
         if (pkg.tags.isEmpty)
-          const Text('ยังไม่มีป้ายกำกับ',
-              style: TextStyle(fontSize: 13, color: SterelisColors.textFaint))
+          Text(l10n.pdNoTags,
+              style: const TextStyle(
+                  fontSize: 13, color: SterelisColors.textFaint))
         else
           Wrap(
             spacing: 6,
@@ -491,6 +496,7 @@ class _EditTagsSheetState extends ConsumerState<_EditTagsSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final tagsAsync = ref.watch(tagsProvider);
     final bottom = MediaQuery.of(context).viewInsets.bottom;
 
@@ -510,14 +516,15 @@ class _EditTagsSheetState extends ConsumerState<_EditTagsSheet> {
             ),
           ),
           const SizedBox(height: 16),
-          const Text('ป้ายกำกับของห่อ',
-              style: TextStyle(
+          Text(l10n.pdEditTagsTitle,
+              style: const TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.w800,
                   color: SterelisColors.textStrong)),
           const SizedBox(height: 4),
-          const Text('เลือกป้ายที่ต้องการให้ห่อนี้มี (แตะเพื่อเปิด/ปิด)',
-              style: TextStyle(fontSize: 13, color: SterelisColors.textMuted)),
+          Text(l10n.pdEditTagsSubtitle,
+              style: const TextStyle(
+                  fontSize: 13, color: SterelisColors.textMuted)),
           const SizedBox(height: 16),
           tagsAsync.when(
             loading: () => const Padding(
@@ -527,11 +534,11 @@ class _EditTagsSheetState extends ConsumerState<_EditTagsSheet> {
             error: (e, _) => Text(apiErrorMessage(e),
                 style: const TextStyle(color: SterelisColors.danger)),
             data: (tags) => tags.isEmpty
-                ? const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 12),
-                    child: Text(
-                        'ยังไม่มีป้ายในระบบ — เพิ่มได้ที่เมนูข้อมูลตั้งต้น (SUPERVISOR/ADMIN)',
-                        style: TextStyle(color: SterelisColors.textFaint)),
+                ? Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    child: Text(l10n.pdNoTagsInSystem,
+                        style:
+                            const TextStyle(color: SterelisColors.textFaint)),
                   )
                 : Wrap(
                     spacing: 8,
@@ -569,7 +576,7 @@ class _EditTagsSheetState extends ConsumerState<_EditTagsSheet> {
                     child: CircularProgressIndicator(
                         strokeWidth: 2, color: Colors.white))
                 : const Icon(Icons.check),
-            label: const Text('บันทึกป้ายกำกับ'),
+            label: Text(l10n.pdSaveTags),
             style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
           ),
         ],
@@ -582,25 +589,26 @@ class _HistoryCard extends StatelessWidget {
   const _HistoryCard({required this.movements});
   final List<Movement> movements;
 
-  static ({IconData icon, Color color, String label}) _style(String type) {
+  static ({IconData icon, Color color, String label}) _style(
+      AppLocalizations l10n, String type) {
     switch (type) {
       case 'IN':
         return (
           icon: Icons.login,
           color: SterelisColors.success,
-          label: 'สแกนเข้าคลังปลอดเชื้อ'
+          label: l10n.pdMoveIn
         );
       case 'OUT':
         return (
           icon: Icons.logout,
           color: SterelisColors.blue500,
-          label: 'เบิกออก'
+          label: l10n.moveOut
         );
       case 'RETURN':
         return (
           icon: Icons.keyboard_return,
           color: SterelisColors.warning,
-          label: 'ส่งคืน'
+          label: l10n.moveReturn
         );
       default:
         return (
@@ -613,6 +621,7 @@ class _HistoryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final fmt = DateFormat('dd/MM/yyyy HH:mm');
     final sorted = [...movements]..sort((a, b) =>
         (b.createdAt ?? DateTime(0)).compareTo(a.createdAt ?? DateTime(0)));
@@ -625,17 +634,18 @@ class _HistoryCard extends StatelessWidget {
         border: Border.all(color: SterelisColors.border),
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        const Text('ประวัติการเคลื่อนไหว',
-            style: TextStyle(
+        Text(l10n.pdHistoryTitle,
+            style: const TextStyle(
                 fontWeight: FontWeight.w700,
                 fontSize: 14,
                 color: SterelisColors.textStrong)),
         const SizedBox(height: 8),
         if (sorted.isEmpty)
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 12),
-            child: Text('ยังไม่มีการเคลื่อนไหว',
-                style: TextStyle(color: SterelisColors.textFaint, fontSize: 13)),
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            child: Text(l10n.pdNoHistory,
+                style: const TextStyle(
+                    color: SterelisColors.textFaint, fontSize: 13)),
           )
         else
           for (final m in sorted)
@@ -643,7 +653,7 @@ class _HistoryCard extends StatelessWidget {
               padding: const EdgeInsets.symmetric(vertical: 8),
               child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Builder(builder: (_) {
-                  final s = _style(m.type);
+                  final s = _style(l10n, m.type);
                   return Container(
                     width: 34,
                     height: 34,
@@ -659,7 +669,7 @@ class _HistoryCard extends StatelessWidget {
                   child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(_style(m.type).label,
+                        Text(_style(l10n, m.type).label,
                             style: const TextStyle(
                                 fontWeight: FontWeight.w600,
                                 fontSize: 13.5,
@@ -667,12 +677,12 @@ class _HistoryCard extends StatelessWidget {
                         Text(
                           [
                             if (m.departmentName != null)
-                              'แผนก: ${m.departmentName}',
+                              l10n.pdMoveDept(m.departmentName!),
                             if (m.receiverName != null &&
                                 m.receiverName!.isNotEmpty)
-                              'ผู้รับ: ${m.receiverName}',
+                              l10n.pdMoveReceiver(m.receiverName!),
                             if (m.performedByName != null)
-                              'โดย: ${m.performedByName}',
+                              l10n.pdMoveBy(m.performedByName!),
                           ].join(' · '),
                           style: const TextStyle(
                               fontSize: 12, color: SterelisColors.textMuted),

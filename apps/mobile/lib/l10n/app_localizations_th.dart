@@ -27,6 +27,19 @@ class AppLocalizationsTh extends AppLocalizations {
   String get settingsPrinterInUse => 'เครื่องพิมพ์ที่ใช้';
 
   @override
+  String get settingsLabelSize => 'ขนาดฉลาก';
+
+  @override
+  String get settingsGatewayPrimaryTitle => 'พิมพ์ผ่าน Print Gateway (XP-420B)';
+
+  @override
+  String get settingsGatewayPrimarySubtitle =>
+      'งานพิมพ์ทั้งหมดส่งผ่าน Gateway → ติดตามสถานะที่แท็บ \"งานพิมพ์\"';
+
+  @override
+  String get settingsLegacyPrinterTitle => 'เครื่องพิมพ์ direct (legacy)';
+
+  @override
   String get settingsServerUrl => 'ที่อยู่ Server API';
 
   @override
@@ -89,7 +102,294 @@ class AppLocalizationsTh extends AppLocalizations {
   String get statusExpired => 'หมดอายุ';
 
   @override
+  String get statusDiscarded => 'ทิ้ง/ชำรุด';
+
+  @override
   String get filterAll => 'ทั้งหมด';
+
+  @override
+  String get dmQrForScan => 'QR สำหรับสแกน';
+
+  @override
+  String get dmWrapSeal => 'ห่อซีล · 180 วัน';
+
+  @override
+  String get dmWrapCloth => 'ห่อผ้า · 7 วัน';
+
+  @override
+  String get dmDaysShort => 'วัน';
+
+  @override
+  String get brandTagline => 'ระบบตามรอยอุปกรณ์หัตถการปลอดเชื้อ (CSSD)';
+
+  @override
+  String get loginTitle => 'เข้าสู่ระบบ';
+
+  @override
+  String get loginSubtitle => 'ใช้รหัสพนักงานที่ได้รับจากผู้ดูแลระบบ';
+
+  @override
+  String get loginEmployeeCode => 'รหัสพนักงาน';
+
+  @override
+  String get loginEmployeeCodeRequired => 'กรอกรหัสพนักงาน';
+
+  @override
+  String get loginPassword => 'รหัสผ่าน';
+
+  @override
+  String get loginPasswordRequired => 'กรอกรหัสผ่าน';
+
+  @override
+  String get loginSubmit => 'เข้าสู่ระบบ';
+
+  @override
+  String get dashTitle => 'แดชบอร์ด';
+
+  @override
+  String dashGreeting(String name) {
+    return 'สวัสดี $name';
+  }
+
+  @override
+  String get dashReportTooltip => 'รายงานสรุป / พิมพ์';
+
+  @override
+  String get dashSterileStockTitle => 'คงเหลือปลอดเชื้อ (แยกตามชุด)';
+
+  @override
+  String get dashSterileStockCenter => 'ห่อพร้อมใช้';
+
+  @override
+  String get dashIssuedByDeptTitle => 'เบิกแยกตามแผนก (30 วัน)';
+
+  @override
+  String get dashIssuedCenter => 'ครั้งที่เบิก';
+
+  @override
+  String get dashExpiringSoon => 'ใกล้หมดอายุ';
+
+  @override
+  String get dashNoData => 'ยังไม่มีข้อมูล';
+
+  @override
+  String get cpCreatedOne => 'สร้างห่อสำเร็จ';
+
+  @override
+  String cpCreatedMany(int count) {
+    return 'สร้าง $count ห่อสำเร็จ';
+  }
+
+  @override
+  String cpPrintAll(int count) {
+    return 'พิมพ์ทั้งหมด ($count)';
+  }
+
+  @override
+  String cpPrintSentOne(String printer) {
+    return 'ส่งพิมพ์ไปยัง $printer แล้ว';
+  }
+
+  @override
+  String cpPrintSentMany(int ok, String printer) {
+    return 'ส่งพิมพ์ $ok label ไปยัง $printer แล้ว';
+  }
+
+  @override
+  String get cpPrintFailed => 'พิมพ์ไม่สำเร็จ ตรวจสอบเครื่องพิมพ์';
+
+  @override
+  String get cpTitle => 'สร้างห่อใหม่';
+
+  @override
+  String get cpSubtitle => 'ระบบจะออกเลขรันให้อัตโนมัติเมื่อบันทึก';
+
+  @override
+  String get cpSetLabel => 'ชุดอุปกรณ์';
+
+  @override
+  String get cpNewSet => 'ชุดใหม่';
+
+  @override
+  String get cpWrapType => 'ชนิดห่อ';
+
+  @override
+  String get cpQuantity => 'จำนวน';
+
+  @override
+  String get cpMaxQty => 'สร้างได้สูงสุด 50 ห่อต่อครั้ง';
+
+  @override
+  String get cpNotes => 'หมายเหตุ (ไม่บังคับ)';
+
+  @override
+  String cpSavingProgress(int done, int total) {
+    return 'กำลังสร้าง $done/$total...';
+  }
+
+  @override
+  String get cpSaveOne => 'บันทึก + ออกเลขรัน';
+
+  @override
+  String cpSaveMany(int count) {
+    return 'บันทึก $count ห่อ + ออกเลขรัน';
+  }
+
+  @override
+  String get ctTitle => 'สร้างชุดอุปกรณ์ใหม่';
+
+  @override
+  String get ctSubtitle => 'ระบุว่าในอุปกรณ์ 1 ชุดมีอะไรบ้าง';
+
+  @override
+  String get ctCode => 'รหัสชุด (ใช้ขึ้นต้นเลขรัน)';
+
+  @override
+  String get ctCodeHint => 'เช่น DELIV';
+
+  @override
+  String get ctName => 'ชื่อชุดอุปกรณ์';
+
+  @override
+  String get ctNameHint => 'เช่น ชุดทำคลอด';
+
+  @override
+  String get ctDefaultWrap => 'ชนิดห่อเริ่มต้น';
+
+  @override
+  String get ctItems => 'รายการอุปกรณ์ในชุด';
+
+  @override
+  String ctItemN(int n) {
+    return 'อุปกรณ์ชิ้นที่ $n';
+  }
+
+  @override
+  String get ctAddItem => 'เพิ่มรายการอุปกรณ์';
+
+  @override
+  String get ctValidationError =>
+      'กรอกรหัส ชื่อชุด และรายการอุปกรณ์อย่างน้อย 1 รายการ';
+
+  @override
+  String get ctSave => 'บันทึกชุดอุปกรณ์';
+
+  @override
+  String get commonEdit => 'แก้ไข';
+
+  @override
+  String get pdReprintTooltip => 'พิมพ์ label ซ้ำ';
+
+  @override
+  String get pdExpiredDetail => 'นำกลับไป reprocess ที่หน่วยจ่ายกลางเท่านั้น';
+
+  @override
+  String get pdStepPacked => 'แพ็ก';
+
+  @override
+  String get pdStepSterile => 'ปลอดเชื้อ';
+
+  @override
+  String get pdStepIssued => 'เบิกออก';
+
+  @override
+  String get pdStepReturned => 'ส่งคืน';
+
+  @override
+  String get pdPackedOutTitle => 'ส่งออกโดยยังไม่ฆ่าเชื้อ';
+
+  @override
+  String pdLocationNotReturned(String location) {
+    return 'อยู่ที่ $location · ยังไม่คืนคลัง';
+  }
+
+  @override
+  String get pdNotReturned => 'ยังไม่คืนคลัง';
+
+  @override
+  String get pdPackedOutHint =>
+      'เมื่อสแกนรับคืน สถานะจะกลับเป็น \"แพ็กแล้ว\" พร้อมเข้ารอบนึ่งต่อ';
+
+  @override
+  String get pdLifecycleTitle => 'วงจรชีวิต';
+
+  @override
+  String get pdTerminalExpired => 'สถานะปัจจุบัน: หมดอายุ — ห้ามใช้';
+
+  @override
+  String get pdTerminalDiscarded => 'สถานะปัจจุบัน: ทิ้ง/ชำรุด';
+
+  @override
+  String get pdFieldSterilizeDate => 'วันที่นึ่ง';
+
+  @override
+  String get pdFieldExpiryDate => 'วันหมดอายุ';
+
+  @override
+  String get pdFieldDaysLeft => 'เหลืออีก';
+
+  @override
+  String pdDaysValue(int days) {
+    return '$days วัน';
+  }
+
+  @override
+  String get pdFieldBatch => 'รอบนึ่ง';
+
+  @override
+  String pdReprintSuffix(int count) {
+    return ' · พิมพ์ซ้ำ $count ครั้ง';
+  }
+
+  @override
+  String get pdFieldNotes => 'หมายเหตุ';
+
+  @override
+  String get pdInfoTitle => 'ข้อมูลห่อ';
+
+  @override
+  String get pdTagsTitle => 'ป้ายกำกับ';
+
+  @override
+  String get pdNoTags => 'ยังไม่มีป้ายกำกับ';
+
+  @override
+  String get pdEditTagsTitle => 'ป้ายกำกับของห่อ';
+
+  @override
+  String get pdEditTagsSubtitle =>
+      'เลือกป้ายที่ต้องการให้ห่อนี้มี (แตะเพื่อเปิด/ปิด)';
+
+  @override
+  String get pdNoTagsInSystem =>
+      'ยังไม่มีป้ายในระบบ — เพิ่มได้ที่เมนูข้อมูลตั้งต้น (SUPERVISOR/ADMIN)';
+
+  @override
+  String get pdSaveTags => 'บันทึกป้ายกำกับ';
+
+  @override
+  String get pdMoveIn => 'สแกนเข้าคลังปลอดเชื้อ';
+
+  @override
+  String get pdHistoryTitle => 'ประวัติการเคลื่อนไหว';
+
+  @override
+  String get pdNoHistory => 'ยังไม่มีการเคลื่อนไหว';
+
+  @override
+  String pdMoveDept(String dept) {
+    return 'แผนก: $dept';
+  }
+
+  @override
+  String pdMoveReceiver(String name) {
+    return 'ผู้รับ: $name';
+  }
+
+  @override
+  String pdMoveBy(String name) {
+    return 'โดย: $name';
+  }
 
   @override
   String get pkgListTitle => 'รายการห่อ';

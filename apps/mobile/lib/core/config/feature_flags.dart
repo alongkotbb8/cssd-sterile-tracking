@@ -1,0 +1,24 @@
+import 'package:flutter/foundation.dart' show kReleaseMode;
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+/// Feature flags ของแอป — คุมการมองเห็นเส้นทาง legacy ใน Pilot/production
+///
+/// **legacy direct print** (Bluetooth FlashLabel A318BT / System·Browser print):
+/// เส้นทางพิมพ์หลักของ Pilot คือ **Print Gateway → Linux/CUPS → XP-420B** เท่านั้น
+/// (สร้าง Print Job แล้ว Gateway พิมพ์/ACK — บันทึกประวัติ + ยืนยันพิมพ์จริงได้)
+/// direct-print เดิมไม่บันทึกประวัติและยืนยันไม่ได้ จึง **ซ่อนจากผู้ใช้ทั่วไปใน Pilot**
+///
+/// ค่าเริ่มต้น: **ปิดใน release/Pilot** (patient safety — กันผู้ใช้เข้าใจผิดว่าพิมพ์ผ่าน
+/// Gateway), เปิดใน debug (สะดวกพัฒนา) ; override ตอน build ด้วย
+/// `--dart-define=CSSD_ENABLE_LEGACY_PRINT=true` (เก็บโค้ด legacy ไว้ ไม่ได้ลบ —
+/// ยังไม่ลบจนกว่า XP-420B/Linux จะผ่าน Hardware Gate)
+const bool _legacyPrintOptIn =
+    bool.fromEnvironment('CSSD_ENABLE_LEGACY_PRINT', defaultValue: false);
+
+/// true = แสดง UI legacy direct-print ให้ผู้ใช้ (debug หรือ opt-in ชัดเจน)
+const bool kLegacyDirectPrintEnabled = _legacyPrintOptIn || !kReleaseMode;
+
+/// provider ครอบ [kLegacyDirectPrintEnabled] เพื่อ override ได้ในเทส
+/// (feature-flag test ยืนยันว่า Pilot production build ไม่โชว์ตัวเลือกเครื่องพิมพ์ legacy)
+final legacyDirectPrintEnabledProvider =
+    Provider<bool>((ref) => kLegacyDirectPrintEnabled);

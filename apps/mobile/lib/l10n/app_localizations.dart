@@ -134,6 +134,30 @@ abstract class AppLocalizations {
   /// **'เครื่องพิมพ์ที่ใช้'**
   String get settingsPrinterInUse;
 
+  /// No description provided for @settingsLabelSize.
+  ///
+  /// In th, this message translates to:
+  /// **'ขนาดฉลาก'**
+  String get settingsLabelSize;
+
+  /// No description provided for @settingsGatewayPrimaryTitle.
+  ///
+  /// In th, this message translates to:
+  /// **'พิมพ์ผ่าน Print Gateway (XP-420B)'**
+  String get settingsGatewayPrimaryTitle;
+
+  /// No description provided for @settingsGatewayPrimarySubtitle.
+  ///
+  /// In th, this message translates to:
+  /// **'งานพิมพ์ทั้งหมดส่งผ่าน Gateway → ติดตามสถานะที่แท็บ \"งานพิมพ์\"'**
+  String get settingsGatewayPrimarySubtitle;
+
+  /// No description provided for @settingsLegacyPrinterTitle.
+  ///
+  /// In th, this message translates to:
+  /// **'เครื่องพิมพ์ direct (legacy)'**
+  String get settingsLegacyPrinterTitle;
+
   /// No description provided for @settingsServerUrl.
   ///
   /// In th, this message translates to:
@@ -254,11 +278,521 @@ abstract class AppLocalizations {
   /// **'หมดอายุ'**
   String get statusExpired;
 
+  /// No description provided for @statusDiscarded.
+  ///
+  /// In th, this message translates to:
+  /// **'ทิ้ง/ชำรุด'**
+  String get statusDiscarded;
+
   /// No description provided for @filterAll.
   ///
   /// In th, this message translates to:
   /// **'ทั้งหมด'**
   String get filterAll;
+
+  /// No description provided for @dmQrForScan.
+  ///
+  /// In th, this message translates to:
+  /// **'QR สำหรับสแกน'**
+  String get dmQrForScan;
+
+  /// No description provided for @dmWrapSeal.
+  ///
+  /// In th, this message translates to:
+  /// **'ห่อซีล · 180 วัน'**
+  String get dmWrapSeal;
+
+  /// No description provided for @dmWrapCloth.
+  ///
+  /// In th, this message translates to:
+  /// **'ห่อผ้า · 7 วัน'**
+  String get dmWrapCloth;
+
+  /// No description provided for @dmDaysShort.
+  ///
+  /// In th, this message translates to:
+  /// **'วัน'**
+  String get dmDaysShort;
+
+  /// No description provided for @brandTagline.
+  ///
+  /// In th, this message translates to:
+  /// **'ระบบตามรอยอุปกรณ์หัตถการปลอดเชื้อ (CSSD)'**
+  String get brandTagline;
+
+  /// No description provided for @loginTitle.
+  ///
+  /// In th, this message translates to:
+  /// **'เข้าสู่ระบบ'**
+  String get loginTitle;
+
+  /// No description provided for @loginSubtitle.
+  ///
+  /// In th, this message translates to:
+  /// **'ใช้รหัสพนักงานที่ได้รับจากผู้ดูแลระบบ'**
+  String get loginSubtitle;
+
+  /// No description provided for @loginEmployeeCode.
+  ///
+  /// In th, this message translates to:
+  /// **'รหัสพนักงาน'**
+  String get loginEmployeeCode;
+
+  /// No description provided for @loginEmployeeCodeRequired.
+  ///
+  /// In th, this message translates to:
+  /// **'กรอกรหัสพนักงาน'**
+  String get loginEmployeeCodeRequired;
+
+  /// No description provided for @loginPassword.
+  ///
+  /// In th, this message translates to:
+  /// **'รหัสผ่าน'**
+  String get loginPassword;
+
+  /// No description provided for @loginPasswordRequired.
+  ///
+  /// In th, this message translates to:
+  /// **'กรอกรหัสผ่าน'**
+  String get loginPasswordRequired;
+
+  /// No description provided for @loginSubmit.
+  ///
+  /// In th, this message translates to:
+  /// **'เข้าสู่ระบบ'**
+  String get loginSubmit;
+
+  /// No description provided for @dashTitle.
+  ///
+  /// In th, this message translates to:
+  /// **'แดชบอร์ด'**
+  String get dashTitle;
+
+  /// No description provided for @dashGreeting.
+  ///
+  /// In th, this message translates to:
+  /// **'สวัสดี {name}'**
+  String dashGreeting(String name);
+
+  /// No description provided for @dashReportTooltip.
+  ///
+  /// In th, this message translates to:
+  /// **'รายงานสรุป / พิมพ์'**
+  String get dashReportTooltip;
+
+  /// No description provided for @dashSterileStockTitle.
+  ///
+  /// In th, this message translates to:
+  /// **'คงเหลือปลอดเชื้อ (แยกตามชุด)'**
+  String get dashSterileStockTitle;
+
+  /// No description provided for @dashSterileStockCenter.
+  ///
+  /// In th, this message translates to:
+  /// **'ห่อพร้อมใช้'**
+  String get dashSterileStockCenter;
+
+  /// No description provided for @dashIssuedByDeptTitle.
+  ///
+  /// In th, this message translates to:
+  /// **'เบิกแยกตามแผนก (30 วัน)'**
+  String get dashIssuedByDeptTitle;
+
+  /// No description provided for @dashIssuedCenter.
+  ///
+  /// In th, this message translates to:
+  /// **'ครั้งที่เบิก'**
+  String get dashIssuedCenter;
+
+  /// No description provided for @dashExpiringSoon.
+  ///
+  /// In th, this message translates to:
+  /// **'ใกล้หมดอายุ'**
+  String get dashExpiringSoon;
+
+  /// No description provided for @dashNoData.
+  ///
+  /// In th, this message translates to:
+  /// **'ยังไม่มีข้อมูล'**
+  String get dashNoData;
+
+  /// No description provided for @cpCreatedOne.
+  ///
+  /// In th, this message translates to:
+  /// **'สร้างห่อสำเร็จ'**
+  String get cpCreatedOne;
+
+  /// No description provided for @cpCreatedMany.
+  ///
+  /// In th, this message translates to:
+  /// **'สร้าง {count} ห่อสำเร็จ'**
+  String cpCreatedMany(int count);
+
+  /// No description provided for @cpPrintAll.
+  ///
+  /// In th, this message translates to:
+  /// **'พิมพ์ทั้งหมด ({count})'**
+  String cpPrintAll(int count);
+
+  /// No description provided for @cpPrintSentOne.
+  ///
+  /// In th, this message translates to:
+  /// **'ส่งพิมพ์ไปยัง {printer} แล้ว'**
+  String cpPrintSentOne(String printer);
+
+  /// No description provided for @cpPrintSentMany.
+  ///
+  /// In th, this message translates to:
+  /// **'ส่งพิมพ์ {ok} label ไปยัง {printer} แล้ว'**
+  String cpPrintSentMany(int ok, String printer);
+
+  /// No description provided for @cpPrintFailed.
+  ///
+  /// In th, this message translates to:
+  /// **'พิมพ์ไม่สำเร็จ ตรวจสอบเครื่องพิมพ์'**
+  String get cpPrintFailed;
+
+  /// No description provided for @cpTitle.
+  ///
+  /// In th, this message translates to:
+  /// **'สร้างห่อใหม่'**
+  String get cpTitle;
+
+  /// No description provided for @cpSubtitle.
+  ///
+  /// In th, this message translates to:
+  /// **'ระบบจะออกเลขรันให้อัตโนมัติเมื่อบันทึก'**
+  String get cpSubtitle;
+
+  /// No description provided for @cpSetLabel.
+  ///
+  /// In th, this message translates to:
+  /// **'ชุดอุปกรณ์'**
+  String get cpSetLabel;
+
+  /// No description provided for @cpNewSet.
+  ///
+  /// In th, this message translates to:
+  /// **'ชุดใหม่'**
+  String get cpNewSet;
+
+  /// No description provided for @cpWrapType.
+  ///
+  /// In th, this message translates to:
+  /// **'ชนิดห่อ'**
+  String get cpWrapType;
+
+  /// No description provided for @cpQuantity.
+  ///
+  /// In th, this message translates to:
+  /// **'จำนวน'**
+  String get cpQuantity;
+
+  /// No description provided for @cpMaxQty.
+  ///
+  /// In th, this message translates to:
+  /// **'สร้างได้สูงสุด 50 ห่อต่อครั้ง'**
+  String get cpMaxQty;
+
+  /// No description provided for @cpNotes.
+  ///
+  /// In th, this message translates to:
+  /// **'หมายเหตุ (ไม่บังคับ)'**
+  String get cpNotes;
+
+  /// No description provided for @cpSavingProgress.
+  ///
+  /// In th, this message translates to:
+  /// **'กำลังสร้าง {done}/{total}...'**
+  String cpSavingProgress(int done, int total);
+
+  /// No description provided for @cpSaveOne.
+  ///
+  /// In th, this message translates to:
+  /// **'บันทึก + ออกเลขรัน'**
+  String get cpSaveOne;
+
+  /// No description provided for @cpSaveMany.
+  ///
+  /// In th, this message translates to:
+  /// **'บันทึก {count} ห่อ + ออกเลขรัน'**
+  String cpSaveMany(int count);
+
+  /// No description provided for @ctTitle.
+  ///
+  /// In th, this message translates to:
+  /// **'สร้างชุดอุปกรณ์ใหม่'**
+  String get ctTitle;
+
+  /// No description provided for @ctSubtitle.
+  ///
+  /// In th, this message translates to:
+  /// **'ระบุว่าในอุปกรณ์ 1 ชุดมีอะไรบ้าง'**
+  String get ctSubtitle;
+
+  /// No description provided for @ctCode.
+  ///
+  /// In th, this message translates to:
+  /// **'รหัสชุด (ใช้ขึ้นต้นเลขรัน)'**
+  String get ctCode;
+
+  /// No description provided for @ctCodeHint.
+  ///
+  /// In th, this message translates to:
+  /// **'เช่น DELIV'**
+  String get ctCodeHint;
+
+  /// No description provided for @ctName.
+  ///
+  /// In th, this message translates to:
+  /// **'ชื่อชุดอุปกรณ์'**
+  String get ctName;
+
+  /// No description provided for @ctNameHint.
+  ///
+  /// In th, this message translates to:
+  /// **'เช่น ชุดทำคลอด'**
+  String get ctNameHint;
+
+  /// No description provided for @ctDefaultWrap.
+  ///
+  /// In th, this message translates to:
+  /// **'ชนิดห่อเริ่มต้น'**
+  String get ctDefaultWrap;
+
+  /// No description provided for @ctItems.
+  ///
+  /// In th, this message translates to:
+  /// **'รายการอุปกรณ์ในชุด'**
+  String get ctItems;
+
+  /// No description provided for @ctItemN.
+  ///
+  /// In th, this message translates to:
+  /// **'อุปกรณ์ชิ้นที่ {n}'**
+  String ctItemN(int n);
+
+  /// No description provided for @ctAddItem.
+  ///
+  /// In th, this message translates to:
+  /// **'เพิ่มรายการอุปกรณ์'**
+  String get ctAddItem;
+
+  /// No description provided for @ctValidationError.
+  ///
+  /// In th, this message translates to:
+  /// **'กรอกรหัส ชื่อชุด และรายการอุปกรณ์อย่างน้อย 1 รายการ'**
+  String get ctValidationError;
+
+  /// No description provided for @ctSave.
+  ///
+  /// In th, this message translates to:
+  /// **'บันทึกชุดอุปกรณ์'**
+  String get ctSave;
+
+  /// No description provided for @commonEdit.
+  ///
+  /// In th, this message translates to:
+  /// **'แก้ไข'**
+  String get commonEdit;
+
+  /// No description provided for @pdReprintTooltip.
+  ///
+  /// In th, this message translates to:
+  /// **'พิมพ์ label ซ้ำ'**
+  String get pdReprintTooltip;
+
+  /// No description provided for @pdExpiredDetail.
+  ///
+  /// In th, this message translates to:
+  /// **'นำกลับไป reprocess ที่หน่วยจ่ายกลางเท่านั้น'**
+  String get pdExpiredDetail;
+
+  /// No description provided for @pdStepPacked.
+  ///
+  /// In th, this message translates to:
+  /// **'แพ็ก'**
+  String get pdStepPacked;
+
+  /// No description provided for @pdStepSterile.
+  ///
+  /// In th, this message translates to:
+  /// **'ปลอดเชื้อ'**
+  String get pdStepSterile;
+
+  /// No description provided for @pdStepIssued.
+  ///
+  /// In th, this message translates to:
+  /// **'เบิกออก'**
+  String get pdStepIssued;
+
+  /// No description provided for @pdStepReturned.
+  ///
+  /// In th, this message translates to:
+  /// **'ส่งคืน'**
+  String get pdStepReturned;
+
+  /// No description provided for @pdPackedOutTitle.
+  ///
+  /// In th, this message translates to:
+  /// **'ส่งออกโดยยังไม่ฆ่าเชื้อ'**
+  String get pdPackedOutTitle;
+
+  /// No description provided for @pdLocationNotReturned.
+  ///
+  /// In th, this message translates to:
+  /// **'อยู่ที่ {location} · ยังไม่คืนคลัง'**
+  String pdLocationNotReturned(String location);
+
+  /// No description provided for @pdNotReturned.
+  ///
+  /// In th, this message translates to:
+  /// **'ยังไม่คืนคลัง'**
+  String get pdNotReturned;
+
+  /// No description provided for @pdPackedOutHint.
+  ///
+  /// In th, this message translates to:
+  /// **'เมื่อสแกนรับคืน สถานะจะกลับเป็น \"แพ็กแล้ว\" พร้อมเข้ารอบนึ่งต่อ'**
+  String get pdPackedOutHint;
+
+  /// No description provided for @pdLifecycleTitle.
+  ///
+  /// In th, this message translates to:
+  /// **'วงจรชีวิต'**
+  String get pdLifecycleTitle;
+
+  /// No description provided for @pdTerminalExpired.
+  ///
+  /// In th, this message translates to:
+  /// **'สถานะปัจจุบัน: หมดอายุ — ห้ามใช้'**
+  String get pdTerminalExpired;
+
+  /// No description provided for @pdTerminalDiscarded.
+  ///
+  /// In th, this message translates to:
+  /// **'สถานะปัจจุบัน: ทิ้ง/ชำรุด'**
+  String get pdTerminalDiscarded;
+
+  /// No description provided for @pdFieldSterilizeDate.
+  ///
+  /// In th, this message translates to:
+  /// **'วันที่นึ่ง'**
+  String get pdFieldSterilizeDate;
+
+  /// No description provided for @pdFieldExpiryDate.
+  ///
+  /// In th, this message translates to:
+  /// **'วันหมดอายุ'**
+  String get pdFieldExpiryDate;
+
+  /// No description provided for @pdFieldDaysLeft.
+  ///
+  /// In th, this message translates to:
+  /// **'เหลืออีก'**
+  String get pdFieldDaysLeft;
+
+  /// No description provided for @pdDaysValue.
+  ///
+  /// In th, this message translates to:
+  /// **'{days} วัน'**
+  String pdDaysValue(int days);
+
+  /// No description provided for @pdFieldBatch.
+  ///
+  /// In th, this message translates to:
+  /// **'รอบนึ่ง'**
+  String get pdFieldBatch;
+
+  /// No description provided for @pdReprintSuffix.
+  ///
+  /// In th, this message translates to:
+  /// **' · พิมพ์ซ้ำ {count} ครั้ง'**
+  String pdReprintSuffix(int count);
+
+  /// No description provided for @pdFieldNotes.
+  ///
+  /// In th, this message translates to:
+  /// **'หมายเหตุ'**
+  String get pdFieldNotes;
+
+  /// No description provided for @pdInfoTitle.
+  ///
+  /// In th, this message translates to:
+  /// **'ข้อมูลห่อ'**
+  String get pdInfoTitle;
+
+  /// No description provided for @pdTagsTitle.
+  ///
+  /// In th, this message translates to:
+  /// **'ป้ายกำกับ'**
+  String get pdTagsTitle;
+
+  /// No description provided for @pdNoTags.
+  ///
+  /// In th, this message translates to:
+  /// **'ยังไม่มีป้ายกำกับ'**
+  String get pdNoTags;
+
+  /// No description provided for @pdEditTagsTitle.
+  ///
+  /// In th, this message translates to:
+  /// **'ป้ายกำกับของห่อ'**
+  String get pdEditTagsTitle;
+
+  /// No description provided for @pdEditTagsSubtitle.
+  ///
+  /// In th, this message translates to:
+  /// **'เลือกป้ายที่ต้องการให้ห่อนี้มี (แตะเพื่อเปิด/ปิด)'**
+  String get pdEditTagsSubtitle;
+
+  /// No description provided for @pdNoTagsInSystem.
+  ///
+  /// In th, this message translates to:
+  /// **'ยังไม่มีป้ายในระบบ — เพิ่มได้ที่เมนูข้อมูลตั้งต้น (SUPERVISOR/ADMIN)'**
+  String get pdNoTagsInSystem;
+
+  /// No description provided for @pdSaveTags.
+  ///
+  /// In th, this message translates to:
+  /// **'บันทึกป้ายกำกับ'**
+  String get pdSaveTags;
+
+  /// No description provided for @pdMoveIn.
+  ///
+  /// In th, this message translates to:
+  /// **'สแกนเข้าคลังปลอดเชื้อ'**
+  String get pdMoveIn;
+
+  /// No description provided for @pdHistoryTitle.
+  ///
+  /// In th, this message translates to:
+  /// **'ประวัติการเคลื่อนไหว'**
+  String get pdHistoryTitle;
+
+  /// No description provided for @pdNoHistory.
+  ///
+  /// In th, this message translates to:
+  /// **'ยังไม่มีการเคลื่อนไหว'**
+  String get pdNoHistory;
+
+  /// No description provided for @pdMoveDept.
+  ///
+  /// In th, this message translates to:
+  /// **'แผนก: {dept}'**
+  String pdMoveDept(String dept);
+
+  /// No description provided for @pdMoveReceiver.
+  ///
+  /// In th, this message translates to:
+  /// **'ผู้รับ: {name}'**
+  String pdMoveReceiver(String name);
+
+  /// No description provided for @pdMoveBy.
+  ///
+  /// In th, this message translates to:
+  /// **'โดย: {name}'**
+  String pdMoveBy(String name);
 
   /// No description provided for @pkgListTitle.
   ///

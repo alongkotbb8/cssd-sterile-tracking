@@ -329,7 +329,7 @@ class _ScanPageState extends ConsumerState<ScanPage> with WidgetsBindingObserver
     }
     final st = r.package.status;
     if (!_mode.allowedStatuses.contains(st)) {
-      final label = packageStatusStyle(st).label;
+      final label = packageStatusStyle(l10n, st).label;
       return l10n.scanBlockStatus(label, scanModeTitle(l10n, _mode));
     }
     return null;
