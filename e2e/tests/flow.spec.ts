@@ -29,11 +29,13 @@ test.describe('full flow (login → packages → create)', () => {
     await login(page, 'ADMIN001', 'Admin@1234');
     await openTab(page, 'รายการ');
 
-    // FAB "สร้างห่อใหม่" → sheet เปิด → บันทึก (template ตัวแรกถูกเลือกตาม seed)
+    // FAB "สร้างห่อใหม่" → sheet เปิด → เลือกชุดอุปกรณ์ก่อน (ปุ่มบันทึก disabled
+    // จนกว่าจะเลือก template — พิสูจน์จาก trace CI: aria-disabled="true")
     await byLabel(page, 'สร้างห่อใหม่').first().click();
-    await expect(byLabel(page, 'บันทึก').last()).toBeVisible({
+    await expect(byLabel(page, 'ชุดถอนฟัน').first()).toBeVisible({
       timeout: 10_000,
     });
+    await byLabel(page, 'ชุดถอนฟัน').first().click();
     await byLabel(page, 'บันทึก').last().click();
 
     // เห็น snackbar สำเร็จ หรือสถานะ "แพ็กแล้ว" ของห่อที่เพิ่งสร้างในรายการ

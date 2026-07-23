@@ -59,9 +59,14 @@ export async function typeInto(
   text: string,
 ): Promise<void> {
   await input.click();
+  // รอ Flutter attach editing element หลัง focus (พิมพ์เร็วไปตัวแรกหาย)
+  await page.waitForTimeout(300);
   await page.keyboard.press('ControlOrMeta+a');
   await page.keyboard.press('Backspace');
-  await page.keyboard.type(text, { delay: 15 });
+  // insertText = ส่งข้อความทั้งก้อนผ่าน input event (แบบ paste) — ไม่พึ่ง key
+  // emulation ราย keystroke ซึ่งทำอักขระพิเศษ (@) หลุดบน WebKit
+  // (พิสูจน์จาก trace CI: WebKit พิมพ์ password ขาดไป 1 ตัว → 401)
+  await page.keyboard.insertText(text);
 }
 
 /** login ด้วย semantics (label ไทยจากหน้า login) */
