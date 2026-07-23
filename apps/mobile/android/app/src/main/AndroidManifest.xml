@@ -1,5 +1,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- Bluetooth สำหรับเครื่องพิมพ์ FlashLabel A318BT -->
+    <!-- Bluetooth สำหรับ LEGACY direct-print fallback (เครื่องพิมพ์ BT บนแอปมือถือ) -->
+    <!-- ทางหลัก = Print Gateway + Xprinter XP-420B (usb_spool) ไม่ใช้ BT ใน flow ปกติ -->
+    <!-- คงไว้เผื่อ fallback ฉุกเฉิน — ถอด permission ชุดนี้ได้เมื่อยกเลิก BT fallback -->
+
     <!-- Android ≤11 (API ≤30): permission แบบเดิม + ต้องมี location ถึงจะสแกนเจออุปกรณ์ -->
     <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
     <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30" />

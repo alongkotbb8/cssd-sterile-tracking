@@ -66,11 +66,13 @@ flutter run
 | GET  | /api/v1/reports/dashboard | ข้อมูล donut charts |
 | GET  | /api/v1/reports/weekly | รายงานรายสัปดาห์ |
 
-## Printer: FlashLabel A318BT
+## Printer: Xprinter XP-420B (via Print Gateway)
 - Protocol: TSPL (203 DPI, 60×40 mm label)
-- Connection: Bluetooth Classic SPP + USB
-- Default in dev: `MockPrinterAdapter` (prints TSPL to debug console)
-- Production: `FlashLabelA318Adapter` — selected via Settings page in app
+- Connection: USB printer-class → Print Gateway ส่ง raw TSPL เข้า OS printer queue
+  (transport `usb_spool`); dev ใช้ `console` mock
+- **ทางพิมพ์อย่างเป็นทางการ = Print Job Queue → Print Gateway → ACK** (PWA/มือถือไม่พิมพ์ตรง
+  และไม่ตั้งสถานะ PRINTED เอง) — ดู `apps/print-gateway/README.md`, `HARDWARE_VERIFICATION.md`
+- Legacy: FlashLabel A318BT (Bluetooth direct-print) เหลือเป็น fallback ระดับโค้ดเท่านั้น
 
 ## Running tests
 ```bash

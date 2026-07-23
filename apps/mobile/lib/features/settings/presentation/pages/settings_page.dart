@@ -199,6 +199,8 @@ class SettingsPage extends ConsumerWidget {
   }
 }
 
+/// ⚠️ LEGACY — Sheet เลือกเครื่องพิมพ์สำหรับ **direct-print fallback** เท่านั้น
+/// (ทางหลัก = Print Gateway + XP-420B ผ่าน Print Job Queue ไม่ผ่าน sheet นี้)
 /// Sheet เลือกเครื่องพิมพ์: Mock (dev) หรือสแกนหา FlashLabel A318BT ผ่าน Bluetooth
 class _PrinterSheet extends ConsumerStatefulWidget {
   const _PrinterSheet();

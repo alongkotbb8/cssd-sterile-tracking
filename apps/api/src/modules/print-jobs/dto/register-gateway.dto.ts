@@ -3,7 +3,7 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { GatewayEnvironment, GatewayTransportMode } from '@prisma/client';
 
 export class RegisterGatewayDto {
-  @ApiProperty({ description: 'ชื่อ/ตำแหน่งของเครื่องพิมพ์-gateway เช่น "CSSD ชั้น 2 - A318BT"' })
+  @ApiProperty({ description: 'ชื่อ/ตำแหน่งของเครื่องพิมพ์-gateway เช่น "CSSD ชั้น 2 - XP-420B"' })
   @IsString()
   @MinLength(1)
   @MaxLength(100)

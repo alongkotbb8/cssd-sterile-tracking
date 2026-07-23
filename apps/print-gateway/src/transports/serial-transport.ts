@@ -2,10 +2,11 @@ import { SerialPort } from 'serialport';
 import { PrinterTransport, TransportSendError } from './transport';
 
 /**
- * ส่ง TSPL ตรงไปเครื่องพิมพ์ label ผ่านสาย Serial/USB (เครื่องพิมพ์ label
- * ความร้อนส่วนใหญ่ เช่น FlashLabel A318BT ต่อ USB จะปรากฏเป็น virtual COM
- * port ให้ OS) — ต้องตั้ง baud rate ให้ตรงกับเครื่อง (ปกติระบุใน DIP switch/
- * คู่มือเครื่อง ค่าเริ่มต้นทั่วไปคือ 9600)
+ * ส่ง TSPL ตรงผ่าน virtual COM/serial — ใช้เมื่อ driver ของเครื่องพิมพ์สร้าง COM
+ * port ให้ OS เท่านั้น ⚠️ **ทางหลักของ Xprinter XP-420B คือ `usb_spool`** (USB
+ * printer-class → OS printer queue ดู usb-spool-transport.ts) SerialTransport
+ * เป็นทางเลือกสำรองกรณีเครื่อง/driver ปรากฏเป็น virtual COM — ต้องตั้ง baud rate
+ * ให้ตรงกับเครื่อง (ดู DIP switch/คู่มือ ค่าเริ่มต้นทั่วไป 9600)
  *
  * FIX-04 — จัดประเภท error ตามช่วงที่เกิด:
  * - เปิด port ไม่ได้ (ก่อน write) → NOT_SENT (ยังไม่มี byte ออกไป retry ปลอดภัย)
