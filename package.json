@@ -1,14 +1,16 @@
 {
   "name": "cssd-sterile-tracking",
   "private": true,
-  "workspaces": ["apps/api", "packages/shared"],
+  "workspaces": ["apps/api", "apps/print-gateway", "packages/shared"],
   "scripts": {
     "api:dev": "yarn workspace @cssd/api dev",
     "api:build": "yarn workspace @cssd/api build",
     "api:start": "yarn workspace @cssd/api start:prod",
     "db:migrate": "yarn workspace @cssd/api prisma migrate dev",
     "db:generate": "yarn workspace @cssd/api prisma generate",
-    "db:studio": "yarn workspace @cssd/api prisma studio"
+    "db:studio": "yarn workspace @cssd/api prisma studio",
+    "gateway:dev": "yarn workspace @cssd/print-gateway dev",
+    "gateway:build": "yarn workspace @cssd/print-gateway build"
   },
   "engines": {
     "node": ">=20.0.0",

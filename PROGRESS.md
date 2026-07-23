@@ -18,6 +18,227 @@
 - [x] Mobile: สแกน QR, batch scan, แดชบอร์ดโดนัท, รายงานรายสัปดาห์ + PDF
 - [x] **แจ้งเตือน FCM (ใกล้หมดอายุ + ลืมสรุปรายวัน)** — โครง backend + mobile ครบ (ดูหมายเหตุด้านล่าง)
 
+## ตอบสนอง AI_DEVELOPMENT_GUARDRAILS.md — M1 (PWA Pilot) + M2 (Print Gateway) (2026-07-18)
+
+ผู้ใช้ส่งเอกสาร `AI_DEVELOPMENT_GUARDRAILS.md` (+ `AGENTS.md`) เป็นข้อบังคับใหม่ที่เข้มกว่าเดิม
+(traceability, idempotency แบบ atomic, Print Job Queue + Gateway แยกจาก PWA) สั่งให้ทำ
+ตามนี้ **ยกเว้น Milestone 3 (Offline)** และ **Milestone 4 (Reports/Ops) รอจนกว่า M1+M2 จะถูกตรวจสอบก่อน**
+**ยังไม่ deploy** ตามคำสั่ง
+
+### M1 — เก็บตกจาก Online PWA Pilot
+
+- **Idempotency แบบ atomic จริง** (ของเดิมเป็น find→execute→store ซึ่ง 2 request พร้อมกัน
+  ผ่านได้ทั้งคู่) — เปลี่ยน `IdempotentRequest` ให้ insert แถว `PENDING` ก่อนเสมอ (unique
+  constraint บน `key` = compare-and-swap จริงที่ระดับ DB), เพิ่ม `requestHash`/`method`/`status`
+  — key ซ้ำ+payload ต่างกัน หรือ user ต่างกัน หรือกำลังรันอยู่ → 409 ทั้งหมด
+  ทดสอบ concurrent request จริงด้วย fake client ที่ตั้งใจ interleave (`idempotency.service.spec.ts`)
+  ยืนยันว่า fn รันแค่ครั้งเดียวจริง — ใช้กับ scan in/out/return, สร้าง package, เปิดรอบนึ่ง,
+  บันทึกผล batch, สร้าง print job ครบทุกจุดที่ guardrails ระบุ
+- **Security headers ครบ**: CSP (`frame-ancestors 'none'`, `object-src 'none'`), HSTS 1 ปี,
+  Referrer-Policy `no-referrer`, Permissions-Policy `camera=(self)` (helmet ไม่มีให้ default
+  ต้องเพิ่มเอง) — `main.ts`
+- **Manual entry fallback**: ปุ่มพิมพ์เลขห่อเองในหน้าสแกน (validate รูปแบบ + backend lookup
+  ซ้ำ) ติด flag `manualEntry` ส่งไป backend → เขียนลง AuditLog metadata แยกจากการสแกนจริง
+  ตรวจสอบย้อนหลังได้ว่ารายการไหนพิมพ์เอง
+- **หน้าสรุปผลหลังยืนยัน** แทน SnackBar อย่างเดียว — แสดงราย ห่อ สำเร็จ/ไม่ผ่านพร้อมเหตุผล
+  + ปุ่ม "ลองใหม่เฉพาะที่ไม่ผ่าน", เสียง/แรงสั่นต่างกันระหว่างสำเร็จทั้งหมดกับมีรายการพลาด,
+  ยืนยันก่อนล้างรายการที่สแกนไว้
+- ทุก mutation หลัก (scan, สร้าง package, batch create/result) ส่ง `Idempotency-Key` (สุ่ม
+  128 บิตต่อการกด 1 ครั้ง, ไม่ใช่ package uuid เพิ่ม) — `core/api/api_client.dart newIdempotencyKey()`
+
+### M2 — Print Job Queue + Print Gateway (สถาปัตยกรรมใหม่)
+
+**หลักการ:** PWA/มือถือสร้าง `PrintJob` เท่านั้น ไม่พิมพ์ตรงและไม่ตั้งสถานะ `PRINTED` เอง —
+Gateway (บริการแยก, `apps/print-gateway`) ที่มี credential ของตัวเอง (`X-Gateway-Key`,
+**ไม่ใช่** user JWT) เป็นผู้ claim/พิมพ์/ยืนยันผลจริงเท่านั้น
+
+- **Schema ใหม่**: `PrintJob` (สถานะ `QUEUED→CLAIMED→PRINTING→PRINTED`, หรือ
+  `FAILED→RETRYING→DEAD_LETTER`, หรือ `CANCELLED`; เก็บ `payload`+`payloadHash`,
+  `attemptCount`, `isReprint`/`reprintReason`) และ `PrinterDevice` (`keyId` public +
+  `apiKeyHash` แบบ bcrypt เหมือน password — ไม่เก็บ API key จริงไว้ที่ไหนเลยหลังสร้าง)
+- **`GatewayAuthGuard`** แยกจาก JWT โดยสิ้นเชิง — header `X-Gateway-Key: {keyId}.{secret}`,
+  lookup ด้วย `keyId` ตรงๆ (ไม่ bcrypt.compare วนทุกเครื่อง) แล้วเทียบ `secret` ด้วย bcrypt
+- **Claim แบบ atomic จริง**: `SELECT ... FOR UPDATE SKIP LOCKED` ใน transaction — กัน 2
+  gateway claim งานเดียวกันด้วย row lock ระดับ Postgres (ไม่ใช่แค่เช็ค status ที่แอป)
+- **ACK คือทางเดียว** ที่ `Package.printedAt`/`reprintCount` จะถูกอัปเดต — ACK ซ้ำ (retry
+  ของ gateway เอง) idempotent ไม่เพิ่ม reprintCount ซ้ำ, ตรวจว่า job ผูกกับ gateway ที่ ACK
+  จริง (`assertOwnedByGateway`) กัน gateway อื่นมา ACK งานที่ไม่ใช่ของตัวเอง
+- **Retry/DEAD_LETTER**: fail ครบ `MAX_ATTEMPTS=3` ครั้ง → `DEAD_LETTER` ต้องมีคนมาดูมือ
+- **Lease timeout recovery**: cron ทุก 2 นาที คืนงาน `CLAIMED`/`PRINTING` ที่ค้างเกิน 10 นาที
+  (gateway อาจ crash) กลับเข้าคิว `QUEUED` ให้ gateway ตัวอื่น claim ได้
+- **Reprint ต้องมีเหตุผล** (`reprintReason` บังคับกรอกเมื่อ `isReprint=true` — DTO validation)
+- **ลบ endpoint เก่าที่ขัด guardrails**: `POST /packages/:id/printed` (เดิมให้ client เรียกเอง
+  หลัง `printLabel()` สำเร็จ — ตรงกับ anti-pattern ที่ guardrails ห้ามไว้ชัดเจน "ห้ามถือว่าเปิด
+  Print Dialog เท่ากับพิมพ์สำเร็จ") ตัดออกทั้ง backend/mobile แล้ว
+- **`apps/print-gateway`** (Node/TS ใหม่ทั้งแอป): heartbeat, poll+claim loop, TSPL builder
+  (QR native ของเครื่องพิมพ์ — ไม่ต้อง rasterize, ใช้ `payload.packageId` เท่านั้นตรงกฎโดเมน),
+  `PrinterTransport` interface + `ConsoleTransport` (mock เทียบเท่า `MockPrinterAdapter`
+  ฝั่ง Flutter) — README มีขั้นตอน setup ครบ
+
+## ตรวจ + แก้ตาม M1_M2_REQUIRED_FIXES.md (2026-07-22)
+
+Audit รอบสองตรวจ Print Job Queue/Gateway ที่สร้างในรอบ M2 โดยเฉพาะ ให้คะแนน 60-65%
+พร้อม Critical/High/Testing/Security findings — ตรวจกับโค้ดจริงแล้วยืนยันว่าทุกข้อเป็น
+บั๊กจริง (ไม่ใช่ false positive) แก้ครบทุกข้อ:
+
+- **แก้ duplicate-print ambiguity (Critical 1.1)**: เพิ่มสถานะ `SENT` คั่นระหว่าง
+  `PRINTING`→`PRINTED` — gateway เรียก `markSent()` ทันทีที่ `transport.send()` คืนผล
+  สำเร็จ **ก่อน** `ack()` เสมอ หลังจุดที่ยืนยันว่าส่งสำเร็จแล้ว **ห้าม `fail()`/retry
+  อัตโนมัติเด็ดขาด** ถ้า network หลุดตอนแจ้ง backend (`markSent`/`ack` เอง throw) จะ log
+  แล้วปล่อยให้ job ค้าง ไม่ retry ซ้ำ — lease recovery จะแปลง `PRINTING`/`SENT` ที่ค้างเกิน
+  timeout เป็นสถานะใหม่ `ACK_UNKNOWN` (ต่างจาก `CLAIMED` ที่ยังปลอดภัยคืนเข้าคิวได้ตรงๆ)
+  ต้องให้ SUPERVISOR/ADMIN ตัดสินใจผ่าน `POST /print-jobs/:id/resolve`
+  (`resolveAckUnknown()` — เลือก "ยืนยันพิมพ์จริง" หรือ "เปิดงานพิมพ์ใหม่" พร้อมหมายเหตุ)
+- **บล็อก mock/console transport ไม่ให้เป็น PRINTED จริง (Critical 1.2)**: เพิ่มสถานะ
+  `SIMULATED` แยกจาก `PRINTED` ชัดเจน — `ack()` รับ `simulated` flag (มาจาก
+  `transport.isSimulated`) ไม่แตะ `Package.printedAt`/`reprintCount` เมื่อ simulated;
+  `config.ts` ปฏิเสธการสตาร์ท gateway ทันทีถ้า `NODE_ENV=production` และ
+  `PRINTER_TRANSPORT=console`
+- **แก้ concurrent ACK race (Critical 1.3)**: `markPrinting`/`markSent`/`ack`/`fail`
+  เปลี่ยนจาก `update()` ตรงๆ เป็น `updateMany({where:{id,status:expected},...})` +
+  เช็ค `count===1` (compare-and-swap ระดับ DB) — เขียน integration-style unit test
+  จำลอง 2 ACK แข่งกันจริงด้วย fake Prisma client ยืนยันว่า `Package.reprintCount`
+  เพิ่มแค่ครั้งเดียว ไม่ใช่สองครั้ง
+- **Thai bitmap label rendering ที่ gateway (High)**: เพิ่ม `canvas` + `qrcode` npm
+  package, แนบฟอนต์ Sarabun ชุดเดียวกับมือถือ (`assets/fonts/`) — `label-renderer.ts`
+  render label ทั้งใบเป็นภาพเหมือน `label_renderer.dart` ฝั่งมือถือ ทดสอบจริงด้วย `jsqr`
+  decode QR กลับมาเทียบ packageId + เช็คว่ามีพิกเซลดำจริง (ไม่ใช่ tofu ว่างเปล่า) — **วิธีนี้
+  ปิดช่องโหว่ TSPL string injection ไปด้วย** (ไม่มี `TEXT`/`QRCODE` ที่รับ string จาก
+  payload ไปต่อ command ตรงๆ อีกแล้ว ทั้งใบเป็น `BITMAP` เดียว)
+- **Real printer transport (High)**: เพิ่ม `SerialTransport` (`serialport` npm package)
+  ส่ง TSPL ผ่าน USB/Serial จริง — เลือกผ่าน `PRINTER_TRANSPORT=serial` +
+  `PRINTER_SERIAL_PATH`/`PRINTER_SERIAL_BAUD_RATE`
+- **แก้ IDOR ที่ `GET /print-jobs/:id` (High 2.1)**: `findOne()` รับ `userId`/`role`
+  เพิ่ม ownership check เหมือน `listJobs()` เดิม (เจ้าของหรือ SUPERVISOR/ADMIN เท่านั้น)
+- **isReprint คำนวณที่ backend เสมอ (High 2.2)**: `createJob()` เลิกรับ `isReprint` จาก
+  client โดยสิ้นเชิง (ตัดออกจาก DTO) คำนวณจาก `package.printedAt !== null` เอง บังคับ
+  ต้องมี `reprintReason` เมื่อเป็น reprint จริง
+- **จำกัด cancel เหลือ QUEUED เท่านั้น (High 2.3)**: ตัด `CLAIMED` ออก (claim แล้วอาจพิมพ์
+  ไปแล้ว ยกเลิกไม่ปลอดภัย)
+- **Gateway ตรวจ payloadHash ก่อนพิมพ์ทุกครั้ง (High 2.4)**: คำนวณ SHA-256 ใหม่เทียบกับ
+  `payloadHash` จาก backend ก่อนเรียก `transport.send()` — ไม่ตรง = ปฏิเสธทันที
+  (`PAYLOAD_HASH_MISMATCH`) ไม่มี auto-retry แก้ `hashPayload` ทั้งสองฝั่งให้ sort key
+  ก่อน stringify เสมอ (Postgres jsonb ไม่รับประกัน preserve key order ตอนอ่านกลับ)
+- **แก้ semantics `printerId` ปนกันระหว่างงาน pool กับงานที่ระบุเครื่อง (High 2.6)**:
+  แยกเป็น `requestedPrinterId` (สิ่งที่ผู้ใช้ระบุตอนสร้าง, immutable) กับ `printerId`
+  (เครื่องที่ claim ไปแล้วจริง) — `claim()` จับคู่ด้วย `requestedPrinterId`,
+  `recoverStaleLeases()` แยก `CLAIMED`(ปลอดภัย→`QUEUED`) จาก `PRINTING`/`SENT`
+  (ไม่ปลอดภัย→`ACK_UNKNOWN`)
+- **Idempotency ไม่ค้าง PENDING ถาวรอีกต่อไป (High 2.7)**: เพิ่ม `expiresAt` — แถว
+  PENDING ที่ค้างเกิน TTL (5 นาที, เคย crash กลางคัน) reclaim ได้ด้วย key เดิมแทนที่จะบล็อก
+  ตลอดไป, เพิ่ม cron ทำความสะอาดทุกชั่วโมง (`cleanupExpired`) ลบทั้ง PENDING ค้างและ DONE
+  เก่าเกิน retention (24 ชม.)
+- **บังคับ Idempotency-Key ในทุก mutation หลัก (High 2.8)**: `run()` รับ
+  `{required: true}` — ไม่ส่ง key มา = 400 ทันที ใช้กับ package create, scan
+  in/out/return, batch create/result, print job create ครบทุกจุด
+- **Route ordering + gateway HTTPS enforcement (3.2/4.1)**: ย้าย static routes
+  (`gateways/list`, `gateways`, `gateways/:id/revoke`) ไว้ก่อน dynamic `:id/*` ใน
+  controller เพื่อความชัดเจน (segment count ต่างกันจึงไม่มี collision จริงอยู่แล้ว
+  แต่ทำตามที่ audit ขอเพื่อความปลอดภัย/อ่านง่าย); `config.ts` ปฏิเสธ `API_BASE_URL` ที่
+  เป็น `http://` ยกเว้น localhost/LAN (กัน `X-Gateway-Key` รั่วผ่านสาย)
+
+### ⚠️ Known limitations (ตรงตาม Definition of Done — ห้ามบอกว่าเสร็จทั้งที่ยังไม่จริง)
+
+1. **ยังไม่ได้ผูก Print Gateway กับปุ่มพิมพ์ในแอปมือถือ/PWA** — mobile ยังพิมพ์ตรงผ่าน
+   `SystemPrintAdapter`/Bluetooth เดิม (ไม่สร้าง `PrintJob`) เพราะต้องเพิ่ม UI เลือก
+   printer ที่ลงทะเบียนไว้ + polling สถานะงาน ซึ่งเป็นงานถัดไป
+2. **Claim atomicity (`FOR UPDATE SKIP LOCKED`) พิสูจน์ตรรกะด้วย unit test (fake Prisma
+   client ที่จำลอง compare-and-swap จริง) เท่านั้น** — มี local Postgres ที่ apply
+   migration ทุกตัวแล้วและใช้ตรวจว่า schema ใช้งานได้จริง แต่**ตั้งใจไม่เพิ่ม integration
+   test กับ Postgres จริงเข้า default test suite** เพราะจะเปลี่ยน contract ของ `npm test`
+   ให้ทุกคน/CI ต้องมี Postgres ที่ migrate ตรงกันเป๊ะ (เป็นการตัดสินใจเรื่อง tooling/CI ที่
+   ควรคุยกับทีมก่อน ไม่ใช่แค่โค้ดฟิกซ์) — ดูรายละเอียดใน `apps/print-gateway/README.md`
+3. **CSP/HSTS ยังไม่ได้ทดสอบกับ Swagger UI จริง** (อาจต้องปรับ directive ถ้า Swagger UI แสดงผลผิดจากการที่ CSP เข้มไป)
+4. **M3 (Offline-first) และ M4 ส่วนที่เหลือ (monitoring/alerts, backup/restore drill)** ยังไม่ทำตามคำสั่งผู้ใช้ในรอบนี้
+5. **ยังไม่ deploy** (ตามคำสั่งผู้ใช้) — โค้ดทั้งหมดอยู่ใน working tree เท่านั้น รอ verify ก่อน
+
+### Verification ที่ทำแล้ว
+- `apps/api`: `npx tsc --noEmit` ผ่าน, `npx jest` ผ่าน **87/87** (เพิ่มจาก 61 — เพิ่ม/เขียนใหม่
+  print-jobs state machine 33 เคส รวม concurrent-ACK race จริง, idempotency 12 เคส รวม
+  TTL-reclaim + required-key)
+- `apps/mobile`: `flutter analyze` ผ่าน ไม่มี issue (ไม่ได้แตะโค้ด mobile รอบนี้)
+- `apps/print-gateway`: `npx tsc --noEmit` ผ่าน, `npx jest` ผ่าน **20/20** (label renderer
+  6 เคส รวม decode QR จริงด้วย jsqr + เทียบ payloadHash, poll-loop 7 เคส รวม
+  duplicate-print-ambiguity, config guards 6 เคส รวม HTTPS/production enforcement)
+- Prisma migration `20260722072226_m1_m2_audit_fixes` apply กับ local Postgres 16 จริง
+  สำเร็จ (`postgresql://cssd:cssd_dev_pw@localhost:5432/cssd_db`) — ยืนยันว่า schema
+  ใช้งานได้จริงกับ Postgres ไม่ใช่แค่ผ่าน `prisma validate`
+
+## ตรวจ + แก้ตาม M1_M2_REAUDIT_FIX_DIRECTIVE.md (2026-07-22)
+
+Audit รอบสาม (directive กำกับก่อน Pilot) — ตรวจ 8 FIX + PWA gate + Hardware gate
+ทำทีละ FIX ตามลำดับ พร้อม test คู่กับการแก้ และหยุดถามเมื่อเจอ fork สถาปัตยกรรม
+(FIX-02 ผู้ใช้เลือกแนวทาง A: single transaction)
+
+- **FIX-01 — Migration `expiresAt` backfill-safe**: migration เดิมเพิ่ม `NOT NULL`
+  ตรงๆ (พังถ้าตารางมีข้อมูล) → แก้เป็น 3 ขั้น (add nullable → backfill DONE=+24h/
+  อื่น=+5min → set NOT NULL) พิสูจน์ 3 สถานการณ์กับ Postgres จริง: DB ว่าง (migrate
+  deploy ทั้งชุด), DB มีข้อมูล (isolated SQL 5→5 แถว), DB มีข้อมูลผ่าน Prisma จริง
+  (4→4 แถว, `migrate status` = up to date ไม่ drift) — ไม่มีแถวหาย ทุกแถวมี expiresAt
+- **FIX-02 — Idempotency crash recovery (แนวทาง A, single transaction)**: เดิม reclaim
+  แถว PENDING ที่หมด TTL แล้ว **rerun mutation** (กฎห้ามละเมิดสั่งห้าม) → เปลี่ยนเป็น
+  reservation + domain mutation + AuditLog + response อยู่ใน `$transaction` เดียวกัน
+  (`idem.run` เปิด tx แล้วส่ง `tx` ให้ service ทุกตัว) crash = rollback ทั้งก้อน จึง
+  ไม่มี PENDING commit เดี่ยว/mutation ครึ่งทาง/เลขรันกระโดด — ตัด logic rerun ทิ้ง
+  ถ้าเจอ PENDING → 409 ไม่ rerun เด็ดขาด ต้อง thread `tx` ผ่าน scan(in/out/return),
+  packages.create(+running-number), batches(create/recordResult+recall), print-jobs.createJob
+  — **แก้เพิ่มหลัง review:** cron `cleanupExpired` จำกัดลบเฉพาะ `DONE` เท่านั้น ห้ามแตะ
+  `PENDING` ที่หมดอายุ (กฎ "ห้ามลบ PENDING โดยไม่ตรวจ domain result")
+- **FIX-03 — ACK_UNKNOWN resolve ครั้งเดียว**: CAS เดิมเช็คแค่ `status=ACK_UNKNOWN`
+  (REQUEUE คงสถานะเดิม → เรียกซ้ำสร้างงานใหม่ได้หลายงาน) → เพิ่มสถานะ terminal
+  `RESOLVED_PRINTED`/`RESOLVED_REQUEUED`, CAS เพิ่มเงื่อนไข `resolvedAt IS NULL`,
+  งานใหม่ลิงก์กลับ `requeuedFromJobId` (`@unique` กันสร้างซ้ำแม้แข่งกัน), resolve +
+  สร้างงานใหม่ใน transaction เดียว — resolve ซ้ำ/พร้อมกันสำเร็จได้ครั้งเดียว
+- **FIX-04 — Transport typed result NOT_SENT/MAYBE_SENT/SENT**: `write()` error อาจมี
+  byte ออกไปแล้วบางส่วน → เพิ่ม `TransportSendError(outcome)`; SerialTransport จัดประเภท
+  (เปิด port ไม่ได้=NOT_SENT, write/drain error=MAYBE_SENT); poll-loop map: NOT_SENT→fail/
+  retry, MAYBE_SENT→`reportMaybeSent()`→ACK_UNKNOWN (ห้าม retry), error ไม่ระบุชนิด→ถือเป็น
+  MAYBE_SENT เสมอ (กฎ "ห้ามถือว่า write error = ไม่มี byte ออก"); เพิ่ม endpoint
+  `POST /print-gateway/jobs/:id/maybe-sent` + service `reportIndeterminate` (CAS CLAIMED/
+  PRINTING→ACK_UNKNOWN)
+- **FIX-05 — Backend ตัดสิน simulation mode**: เดิม ack รับ `simulated` จาก request (gateway
+  ปลอมได้) → ลบ flag ออกจาก request; เพิ่ม `environment`/`transportMode`/`canConfirmRealPrint`
+  ใน `PrinterDevice` (backend เป็นเจ้าของ); เปลี่ยน capability ได้เฉพาะ ADMIN + AuditLog
+  (`GATEWAY_CAPABILITY_CHANGE`); gateway ถูก revoke → auth ไม่ผ่าน → ACK ไม่ได้ (guard เดิม)
+  — **แก้เพิ่มหลัง review:** เดิมตรวจแค่ `canConfirmRealPrint` ตัวเดียว (ตั้ง CONSOLE+true แล้ว
+  ดัน PRINTED ได้) → เพิ่ม invariant validation (register/update: canConfirm=true ได้เฉพาะ
+  PRODUCTION + ไม่ใช่ CONSOLE) **และ re-check ครบ 3 ค่าตอน ACK** (`canReallyConfirm`) —
+  Console/Test/Dev → SIMULATED เสมอ แม้แถวในฐานข้อมูลจะขัดแย้ง
+- **FIX-06 — Production HTTPS เข้มขึ้น**: เดิมยอม http ใน private LAN เสมอ → เปลี่ยนเป็น
+  production=https เท่านั้น (แม้ localhost/private IP ก็ไม่ยอม), dev/test=http เฉพาะ
+  localhost/127.0.0.1 — config test ครบทุกเคส
+- **FIX-07 — PostgreSQL integration/concurrency tests**: เพิ่ม suite แยก (`npm run
+  test:integration`, jest config + global setup/teardown สร้าง/ลบ DB `cssd_inttest` จริง)
+  รันกับ Postgres จริง 11 เคส: idempotency 10-concurrent-same-key (→ 1 package, ทุก
+  request replay response เดียวกัน, เลขรัน seq=1 ไม่กระโดด — พิสูจน์ row-lock+replay จริง
+  ที่ fake ทำไม่ได้), crash rollback, committed-PENDING no-rerun, dual-claim (FOR UPDATE
+  SKIP LOCKED), concurrent-ACK (reprintCount +1 ครั้งเดียว), cancel-vs-claim, concurrent
+  resolve, REQUEUE-ซ้ำ, lease recovery — ผ่านทั้งหมด
+- **FIX-08 — Hardware verification**: **AI ทำไม่ได้** (ไม่มีเครื่อง A318BT จริง) — จัดทำ
+  ขั้นตอน+แบบฟอร์มเก็บหลักฐานไว้ที่ [HARDWARE_VERIFICATION.md](HARDWARE_VERIFICATION.md)
+  ให้ทีมที่มีเครื่องจริงรัน (รวมเคสถอดสายก่อน/ระหว่าง/หลัง write เพื่อพิสูจน์ NOT_SENT vs
+  MAYBE_SENT บนเครื่องจริง) — ต้องผ่านก่อนเปิด Pilot
+
+### พฤติกรรมที่เปลี่ยน (บันทึกไว้)
+- **Scan เป็น all-or-nothing ต่อ request แล้ว**: เดิมแต่ละห่อ commit แยกทรานแซกชัน
+  (บางห่อสำเร็จ บางห่อพลาดได้) — ตอนนี้ทั้ง request อยู่ทรานแซกชันเดียว "ไม่ผ่าน" ปกติ
+  (ไม่พบห่อ/สถานะผิด/หมดอายุ/CAS ชน) ยังรายงานรายห่อได้เหมือนเดิม (ไม่ throw) แต่ถ้าเกิด
+  DB error จริงกลางคัน ทั้ง request จะ rollback แล้ว retry ด้วย idempotency-key เดิมได้สะอาด
+
+### Verification ที่ทำแล้ว (รอบ re-audit + แก้หลัง review)
+- `apps/api`: `npx tsc --noEmit` ผ่าน, unit `npx jest` **94/94**, integration
+  `npm run test:integration` **12/12** (Postgres จริง 16.14 — ต้องมี DB พร้อมตาม
+  `DATABASE_URL` ถึงจะ reproduce ได้)
+- `apps/print-gateway`: `npx tsc --noEmit` ผ่าน, `npx jest` **25/25** (poll-loop รวม
+  NOT_SENT/MAYBE_SENT/unknown-error mapping, config guards รวม FIX-06 ครบทุกเคส)
+- Migrations ใหม่: `20260722140000_fix03_ackunknown_resolution`,
+  `20260722150000_fix05_gateway_capability` (ทั้งคู่ additive, มี default/ backfill-safe) —
+  apply กับ dev DB จริง, `prisma migrate status` = up to date ไม่ drift
+- **ยังไม่ deploy** (ตามคำสั่งเดิม) — FIX-08 (hardware) + PWA Print Job integration + UAT
+  ยังเหลือก่อนเปิด Pilot ตาม Pilot Gate
+
+---
+
 ## ฟีเจอร์: ส่งออก/รับคืนชุดที่ยังไม่ฆ่าเชื้อ + แสดงตำแหน่งชุด (2026-07-16, v1.2.0+9)
 
 รองรับ workflow ส่งชุด `PACKED` (แพ็กแล้วยังไม่ฆ่าเชื้อ) ออกไปสถานที่ภายนอก เช่น รพ.พญาไท แล้วตามสถานะคืน/ยังไม่คืนได้:
@@ -228,6 +449,14 @@ npx wrangler pages deploy build/web --project-name=sterelis-cssd --branch=main
 
 | วันที่ | สรุป | ไฟล์หลัก |
 |---|---|---|
+| 2026-07-23 | **Phase 5 — Security & Operational Readiness:** เพิ่ม gateway key rotation (`POST /gateways/:id/rotate-key`, ADMIN, key เดิมตายทันที, device id ไม่เปลี่ยน, AuditLog `GATEWAY_KEY_ROTATE`), RBAC regression test (`@Roles` metadata ทุก sensitive endpoint), ยืนยัน RBAC/IDOR ครบทุก print-job endpoint; สรุป ops (cert/backup drill/monitoring/SOP/rate-limit decision) เป็น [OPERATIONAL_READINESS.md](OPERATIONAL_READINESS.md) — unit **100/100**, integration **12/12**, tsc สะอาด | `print-jobs.service.ts` (rotateGatewayKey), `print-jobs.controller.ts`, `__tests__/print-jobs.rbac.spec.ts` (ใหม่), `OPERATIONAL_READINESS.md` (ใหม่) |
+| 2026-07-23 | **Phase 3 — QR scanner/PWA completeness (online-only):** กล้องเว็บผ่าน getUserMedia (kIsWeb branch, ต้อง https), ขอสิทธิ์ + คำแนะนำเปิดใหม่แบบ web-aware (ไอคอนแม่กุญแจ ไม่ใช่ตั้งค่าเครื่อง), กล้องหลังเป็น default + ปุ่มสลับกล้อง; manual entry/ผลรายชิ้น/บล็อกหมดอายุ/กันสแกนซ้ำ มีอยู่แล้วจาก M1; **ตัด offline-first ตามที่ยืนยัน (online-only)**; ทดสอบ Android Chrome/iOS-WebKit เป็น manual checklist ([PWA_BROWSER_TESTING.md](PWA_BROWSER_TESTING.md)); เปลี่ยนเป้าเครื่องพิมพ์เป็น **Xprinter** (อัปเดต hardware doc + flag ยืนยันรุ่น/dialect) — `flutter analyze` สะอาด | `scan_page.dart`, `label-renderer.ts`, `HARDWARE_VERIFICATION.md`, `PWA_BROWSER_TESTING.md` (ใหม่), `CLAUDE.md` |
+| 2026-07-23 | **Phase 2 — PWA Print Job Integration:** ผูกปุ่มพิมพ์เข้ากับ Print Job Queue (สร้าง job ผ่าน backend + `Idempotency-Key`, ปิดเส้นทางพิมพ์ตรง), หน้าติดตามสถานะ poll `QUEUED→CLAIMED→PRINTING→SENT→PRINTED` + `FAILED/DEAD_LETTER/SIMULATED/ACK_UNKNOWN`, เลือก gateway, ยกเลิกเฉพาะ QUEUED, reprint reason, หน้า supervisor resolve ACK_UNKNOWN (role-gated), tab "งานพิมพ์" — `flutter analyze` สะอาด + widget tests 4/4 ผ่าน (ยังไม่ E2E จริง รอ server+FIX-08) | `apps/mobile/lib/core/models/models.dart` (PrintJob/PrinterGateway), `apps/mobile/lib/core/api/repositories.dart` (PrintJobRepository+providers), `apps/mobile/lib/features/print_jobs/**` (ใหม่), `app_router.dart`, `create_package_sheet.dart`/`packages_page.dart`/`package_detail_page.dart` (rewire) |
+| 2026-07-22 | **P1 closeout:** idempotency ตรวจ endpoint+method, gateway README HTTPS (FIX-06), integration tests reproduced 12/12, [TEST_EVIDENCE.md](TEST_EVIDENCE.md) | `idempotency.service.ts`, `apps/print-gateway/README.md`, `TEST_EVIDENCE.md` |
+| 2026-07-22 | **ตรวจ+แก้ตาม M1_M2_REAUDIT_FIX_DIRECTIVE.md (FIX-01→08):** migration backfill-safe, idempotency crash-recovery แบบ single-transaction (thread tx ทุก mutation), ACK_UNKNOWN resolve ครั้งเดียว (RESOLVED_* + requeuedFromJobId), transport NOT_SENT/MAYBE_SENT/SENT typed result, backend ตัดสิน simulation (PrinterDevice.canConfirmRealPrint), production HTTPS เข้ม, **PostgreSQL integration tests จริง 11 เคส**, hardware verification เป็นเอกสารให้ทีมรัน — ยังไม่ deploy | `apps/api/prisma/schema.prisma` (+2 migrations), `apps/api/src/common/idempotency/*`, `apps/api/src/modules/{scan,packages,batches,print-jobs}/*`, `apps/api/test/integration/*` (ใหม่), `apps/print-gateway/src/{config,poll-loop,api-client,transports}/*`, `HARDWARE_VERIFICATION.md` (ใหม่) |
+| 2026-07-22 | **ตรวจ+แก้ตาม M1_M2_REQUIRED_FIXES.md ทุกข้อ:** เพิ่มสถานะ SENT/SIMULATED/ACK_UNKNOWN แก้ duplicate-print, CAS จริงใน ack/fail/markSent/markPrinting, Thai bitmap label ที่ gateway (canvas+qrcode+Sarabun, ทดสอบ decode QR จริง), Serial transport จริง, แก้ IDOR/isReprint/cancel/idempotency required-key/lease-recovery semantics, gateway HTTPS enforcement — ยังไม่ deploy | `apps/api/prisma/schema.prisma`, `apps/api/src/modules/print-jobs/*`, `apps/api/src/common/idempotency/idempotency.service.ts`, `apps/print-gateway/src/*` |
+| 2026-07-18 | **M2:** สร้าง Print Job Queue + Print Gateway ใหม่ทั้งระบบ (atomic claim, gateway auth แยกจาก JWT, ACK-only printedAt, lease timeout, retry/DEAD_LETTER) — ลบ endpoint พิมพ์ที่ client ยืนยันเองซึ่งขัด guardrails, ยังไม่ deploy | `apps/api/prisma/schema.prisma`, `apps/api/src/modules/print-jobs/*` (ใหม่), `apps/print-gateway/*` (แอปใหม่ทั้งตัว), `apps/mobile/lib/features/packages/presentation/widgets/create_package_sheet.dart` |
+| 2026-07-18 | **M1:** idempotency ให้ atomic จริง (CAS แทน find→execute→store), security headers ครบ (CSP/HSTS/Permissions-Policy), manual entry fallback, หน้าสรุปผลสแกน+retry-failed+ยืนยันก่อนล้างรายการ | `apps/api/src/common/idempotency/*`, `apps/api/src/main.ts`, `apps/api/src/modules/scan/*`, `apps/mobile/lib/features/scan/presentation/pages/scan_page.dart`, `apps/mobile/lib/core/api/*` |
 | 2026-07-16 | **Fix:** กล้อง genericError (race ตอนขอ permission) + เพิ่ม SystemPrintAdapter (พิมพ์ผ่าน OS/เบราว์เซอร์ → แอปเครื่องพิมพ์) เป็นค่าเริ่มต้น + ลบ Mock, bump v1.2.1+10 | `apps/mobile/lib/features/scan/presentation/pages/scan_page.dart`, `apps/mobile/lib/core/printer/system_print_adapter.dart` (ใหม่), `printer_provider.dart`, `label_renderer.dart`, `settings_page.dart` |
 | 2026-07-16 | **Feature:** ส่งออก/รับคืนชุด PACKED ที่ยังไม่ฆ่าเชื้อไปสถานที่ภายนอก + สถานะ PACKED_OUT + การ์ดแสดงตำแหน่ง + POST /departments + ปุ่มเพิ่มสถานที่, bump v1.2.0+9 | `packages/shared/src/index.ts`, `apps/api/prisma/schema.prisma`, `apps/api/src/modules/scan/scan.service.ts`, `apps/api/src/modules/departments/*`, `apps/mobile/lib/features/scan/presentation/pages/scan_page.dart`, `apps/mobile/lib/features/packages/presentation/pages/*` |
 | 2026-07-16 | **Fix:** เลือกเครื่องพิมพ์ Bluetooth ไว้แล้วพิมพ์ไปตกที่ Mock เสมอ — printerAdapterProvider ไม่เคย persist เลย เปลี่ยนเป็น NotifierProvider + SharedPreferences, bump v1.1.6+8 | `apps/mobile/lib/core/printer/printer_provider.dart`, `apps/mobile/lib/features/settings/presentation/pages/settings_page.dart` |
