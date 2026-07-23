@@ -1,7 +1,8 @@
 # CSSD Sterile Instrument Tracking System
 
-ระบบตามรอยอุปกรณ์หัตถการปลอดเชื้อ | Flutter + NestJS + PostgreSQL
+ระบบตามรอยอุปกรณ์หัตถการปลอดเชื้อ | Chrome PWA (Flutter Web, online-only) + NestJS + PostgreSQL + Print Gateway → Xprinter XP-420B
 
+> ⚠️ **Single source of truth = [CSSD_MASTER_EXECUTION_DIRECTIVE.md](./CSSD_MASTER_EXECUTION_DIRECTIVE.md)** — online-only, ไม่มี offline/Bluetooth/Zebra ใน scope
 > ดูสถานะความคืบหน้าล่าสุด/checklist เฟส 1-3 ที่ [PROGRESS.md](./PROGRESS.md) — อัปเดตทุกครั้งที่มีการแก้ไข
 
 ## Structure
@@ -10,7 +11,7 @@
 cssd/
 ├── apps/
 │   ├── api/          NestJS backend + Prisma
-│   └── mobile/       Flutter app (Android + iOS)
+│   └── mobile/       Flutter app — Chrome PWA (หลัก, online-only) + build Android/iOS ได้
 ├── packages/
 │   └── shared/       enums, helpers, state machine constants
 ├── docs/             SRS + diagrams

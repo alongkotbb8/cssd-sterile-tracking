@@ -3,6 +3,10 @@
 > ไฟล์นี้คือบริบทถาวรของโปรเจกต์ Codex จะอ่านไฟล์นี้อัตโนมัติทุก session
 > เก็บ **กฎโดเมน + สถาปัตยกรรม + ข้อตกลงการเขียนโค้ด** อ่านก่อนเขียนหรือแก้โค้ดเสมอ
 
+> ⚠️ **SINGLE SOURCE OF TRUTH = [`CSSD_MASTER_EXECUTION_DIRECTIVE.md`](CSSD_MASTER_EXECUTION_DIRECTIVE.md)** (2026-07-23) —
+> เมื่อขัดแย้งกัน เอกสารนั้นมีอำนาจเหนือไฟล์นี้. Baseline: online-only Chrome PWA (หลัก), backend เป็นแหล่งความจริงเดียว,
+> พิมพ์ผ่าน Print Gateway → Linux/CUPS → Xprinter XP-420B (`usb_spool`) เท่านั้น; **ยกเลิก offline/Bluetooth Pilot/A318BT/Zebra/mobile-first**.
+
 ---
 
 ## 1. โปรเจกต์นี้คืออะไร
