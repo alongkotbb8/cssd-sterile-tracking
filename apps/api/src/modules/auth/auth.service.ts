@@ -1,7 +1,8 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { UserStatus } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
+import { AuditService } from '../../common/audit/audit.service';
 import * as bcrypt from 'bcrypt';
 
 const LOGIN_FAILED_MESSAGE = 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง';
@@ -20,6 +21,7 @@ export class AuthService {
   constructor(
     private prisma: PrismaService,
     private jwt: JwtService,
+    private audit: AuditService,
   ) {}
 
   async login(employeeCode: string, password: string) {
@@ -58,10 +60,32 @@ export class AuthService {
       });
     }
 
-    const payload = { sub: user.id, role: user.role, name: user.name };
+    // ฝัง tokenVersion (ver) — ใช้เพิกถอน token เก่าทั้งหมดได้ (ดู revokeSessions)
+    const payload = { sub: user.id, role: user.role, name: user.name, ver: user.tokenVersion };
     return {
       accessToken: this.jwt.sign(payload),
       user: { id: user.id, name: user.name, role: user.role, employeeCode: user.employeeCode },
     };
+  }
+
+  /**
+   * เพิกถอน session ทั้งหมดของผู้ใช้ — เพิ่ม tokenVersion ทำให้ JWT ที่ออกไปแล้ว
+   * (ฝัง ver เดิม) ใช้ไม่ได้ทันทีทุกใบ (jwt.strategy ตรวจ ver ทุก request)
+   * ใช้ตอน: ผู้ใช้กด "ออกจากระบบทุกอุปกรณ์", บัญชีถูกยึด, หรือ ADMIN สั่งเพิกถอน
+   * [actorId] = ผู้สั่ง (self หรือ ADMIN) เก็บใน AuditLog
+   */
+  async revokeSessions(userId: string, actorId: string) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw new NotFoundException('ไม่พบผู้ใช้');
+    await this.prisma.$transaction(async (tx) => {
+      await tx.user.update({
+        where: { id: userId },
+        data: { tokenVersion: { increment: 1 } },
+      });
+      await this.audit.logTx(tx, actorId, 'SESSION_REVOKE', userId, {
+        self: actorId === userId,
+      });
+    });
+    return { revoked: true };
   }
 }

@@ -394,6 +394,9 @@ model User {
   // Account lockout (brute-force ต่อบัญชี) — fail 5 ครั้งติด → ล็อก 15 นาที
   failedLoginCount Int       @default(0)
   lockedUntil      DateTime?
+  // Session revocation — เพิ่มค่านี้เมื่อต้องการเพิกถอน token ที่ออกไปแล้วทั้งหมด
+  // (ลาออก/บัญชีถูกยึด/logout-all) JWT ฝัง ver ตอน sign, strategy ตรวจทุก request
+  tokenVersion Int        @default(0)
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
 
