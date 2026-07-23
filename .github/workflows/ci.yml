@@ -27,8 +27,40 @@ jobs:
         run: npm run -w apps/api test
       - name: unit tests (print-gateway)
         run: npm run -w apps/print-gateway test
-      # หมายเหตุ: integration tests (Postgres จริง) รันแยกด้วย `npm run -w apps/api test:integration`
-      # ต้องมี service Postgres — ยังไม่ผูกใน CI นี้ (รันในเครื่อง/ก่อน release)
+
+  # Integration tests กับ Postgres จริง (พิสูจน์ migration + flow batch/scan/idempotency)
+  integration:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: cssd
+          POSTGRES_PASSWORD: cssd_dev_pw
+          POSTGRES_DB: cssd_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      # config.ts อ่าน DATABASE_URL แล้วสลับเป็น DB ทดสอบ cssd_inttest (สร้าง/ลบเองใน global-setup)
+      DATABASE_URL: postgresql://cssd:cssd_dev_pw@localhost:5432/cssd_db
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: prisma generate
+        run: npx prisma generate --schema apps/api/prisma/schema.prisma
+      - name: install postgres client (createdb/dropdb ใน global-setup)
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+      - name: integration tests (real Postgres)
+        run: npm run -w apps/api test:integration
 
   mobile:
     runs-on: ubuntu-latest
@@ -43,3 +75,58 @@ jobs:
       - run: flutter pub get
       - run: flutter analyze
       - run: flutter test
+
+  # E2E (Playwright) — ยก stack จริง (Postgres + API + web build ชี้ API local) แล้วรัน smoke
+  # flow เต็ม (login→create→print) gate ด้วย E2E_FLOW จึงยังไม่รันใน CI (ต้อง validate selector ก่อน)
+  e2e:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: cssd
+          POSTGRES_PASSWORD: cssd_dev_pw
+          POSTGRES_DB: cssd_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://cssd:cssd_dev_pw@localhost:5432/cssd_db
+      JWT_SECRET: e2e-ci-secret-not-for-prod
+      NODE_ENV: development # seed ใช้รหัส default + CORS เปิด
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - run: npm ci
+      - name: prisma generate
+        run: npx prisma generate --schema apps/api/prisma/schema.prisma
+      - name: migrate + seed
+        run: |
+          npm run -w apps/api prisma:migrate:deploy
+          npm run -w apps/api prisma:seed
+      - name: build + start API (background)
+        run: |
+          npm run -w apps/api build
+          (cd apps/api && node dist/main &)
+          for _ in $(seq 1 30); do curl -s -o /dev/null http://localhost:3000/api/v1 && break; sleep 1; done
+      - name: build + serve PWA web (→ API local)
+        run: |
+          (cd apps/mobile && flutter build web --release --dart-define=CSSD_API_URL=http://localhost:3000)
+          (npx --yes http-server apps/mobile/build/web -p 8080 -s &)
+          for _ in $(seq 1 20); do curl -s -o /dev/null http://localhost:8080 && break; sleep 1; done
+      - name: playwright smoke
+        working-directory: e2e
+        run: |
+          npm install
+          npx playwright install --with-deps chromium
+          E2E_BASE_URL=http://localhost:8080 npx playwright test --project=chromium

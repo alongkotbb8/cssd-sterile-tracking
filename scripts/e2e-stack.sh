@@ -1,0 +1,70 @@
+#!/usr/bin/env bash
+# ยก stack สำหรับรัน E2E ในเครื่อง: Postgres (docker compose) + API (Node) + PWA web (static)
+#   bash scripts/e2e-stack.sh up     # ยก stack + build/serve web แล้วพร้อมรัน Playwright
+#   bash scripts/e2e-stack.sh down   # หยุดทุกอย่าง + ลบ db container
+#
+# หลัง up: cd e2e && E2E_BASE_URL=http://localhost:8080 npm test
+set -euo pipefail
+cd "$(dirname "$0")/.."
+ROOT="$(pwd)"
+
+API_URL="http://localhost:3000"
+WEB_PORT="${WEB_PORT:-8080}"
+PID_FILE="$ROOT/.e2e-stack.pids"
+export DATABASE_URL="${DATABASE_URL:-postgresql://cssd:cssd_dev_pw@localhost:5432/cssd_db?schema=public}"
+export JWT_SECRET="${JWT_SECRET:-e2e-local-secret-not-for-prod}"
+export NODE_ENV=development   # seed ใช้รหัส default (ADMIN001/Admin@1234 ฯลฯ) + CORS เปิด
+
+dc() { if docker compose version >/dev/null 2>&1; then docker compose "$@"; else docker-compose "$@"; fi; }
+
+up() {
+  echo "== 1/5 Postgres (docker compose) =="
+  dc up -d db
+  echo "-- รอ Postgres พร้อม --"
+  for _ in $(seq 1 30); do
+    if dc exec -T db pg_isready -U cssd >/dev/null 2>&1; then break; fi
+    sleep 1
+  done
+
+  echo "== 2/5 migrate + seed =="
+  npm run -w apps/api prisma:generate >/dev/null
+  npm run -w apps/api prisma:migrate:deploy
+  npm run -w apps/api prisma:seed
+
+  echo "== 3/5 build + start API (background) =="
+  npm run -w apps/api build >/dev/null
+  ( cd apps/api && node dist/main >/tmp/cssd-e2e-api.log 2>&1 & echo $! >"$PID_FILE" )
+  echo "-- รอ API พร้อม ($API_URL) --"
+  for _ in $(seq 1 30); do
+    if curl -sf "$API_URL/api/v1/health" >/dev/null 2>&1 || curl -s "$API_URL/api/v1" >/dev/null 2>&1; then break; fi
+    sleep 1
+  done
+
+  echo "== 4/5 build PWA web (ชี้ API → $API_URL) =="
+  ( cd apps/mobile && flutter build web --release --dart-define=CSSD_API_URL="$API_URL" )
+
+  echo "== 5/5 serve web ที่ :$WEB_PORT (background) =="
+  ( npx --yes http-server "$ROOT/apps/mobile/build/web" -p "$WEB_PORT" -s >/tmp/cssd-e2e-web.log 2>&1 & echo $! >>"$PID_FILE" )
+
+  echo
+  echo "✓ stack พร้อม:"
+  echo "    API : $API_URL/api/v1"
+  echo "    Web : http://localhost:$WEB_PORT"
+  echo "    รัน : cd e2e && E2E_BASE_URL=http://localhost:$WEB_PORT E2E_FLOW=1 npm test"
+  echo "    หยุด: bash scripts/e2e-stack.sh down"
+}
+
+down() {
+  if [ -f "$PID_FILE" ]; then
+    while read -r pid; do [ -n "$pid" ] && kill "$pid" 2>/dev/null || true; done <"$PID_FILE"
+    rm -f "$PID_FILE"
+  fi
+  dc down
+  echo "✓ หยุด stack แล้ว"
+}
+
+case "${1:-up}" in
+  up) up ;;
+  down) down ;;
+  *) echo "ใช้: $0 [up|down]"; exit 1 ;;
+esac

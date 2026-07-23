@@ -3,52 +3,47 @@
 Smoke + PWA checks สำหรับเวอร์ชันเว็บ/PWA ของแอป (Flutter web) — เป็น **scaffold**
 พร้อมต่อยอด flow เต็ม (login → สแกน → พิมพ์) ตอนมี stack ครบ
 
-> สถานะ: scaffold — ยังไม่ auto-start web server (Flutter web build หนัก + ต้องมี
-> backend แยก) ต้องรัน stack เองก่อนตามด้านล่าง ยังไม่ผูกใน CI จนกว่าจะมี
-> environment ที่ build web + backend ได้ครบ
-
-## เตรียม
+## ยก stack อัตโนมัติ (แนะนำ)
 
 ```bash
-cd e2e
-npm install
-npm run install:browsers   # ติดตั้ง Chromium ให้ Playwright
+# จาก repo root — ยก Postgres (docker compose) + migrate/seed + API + build/serve web
+bash scripts/e2e-stack.sh up
+# ... รันเทส (ดูด้านล่าง) ...
+bash scripts/e2e-stack.sh down   # หยุด + ลบ container
 ```
-
-## รัน stack ที่จะทดสอบ (เทอร์มินัลแยก)
-
-1. Backend (จำเป็นสำหรับ flow ที่ต้อง login — smoke ปัจจุบันยังไม่ต้อง):
-   ```bash
-   npm run -w apps/api start:prod   # หรือ dev
-   ```
-2. Build + serve PWA:
-   ```bash
-   cd apps/mobile
-   flutter build web --release
-   # เสิร์ฟไฟล์ static (เลือกอย่างใดอย่างหนึ่ง)
-   npx http-server build/web -p 8080        # หรือ
-   python3 -m http.server 8080 -d build/web
-   ```
-   > กล้อง/PWA ต้องรันผ่าน **https** หรือ `localhost` (secure context) — localhost ใช้ได้
+ต้องมี: docker, Node 20, Flutter (stable) ; script ใช้บัญชี seed `ADMIN001 / Admin@1234`
 
 ## รันเทส
 
 ```bash
 cd e2e
-E2E_BASE_URL=http://localhost:8080 npm test          # headless
+npm install
+npm run install:browsers                              # ติดตั้ง Chromium
+
+E2E_BASE_URL=http://localhost:8080 npm test           # smoke (default)
+E2E_BASE_URL=http://localhost:8080 E2E_FLOW=1 npm test # smoke + full flow
 E2E_BASE_URL=http://localhost:8080 npm run test:headed
 npm run report                                        # เปิดรายงานล่าสุด
 ```
 
-## ครอบอะไรบ้าง (ปัจจุบัน)
+> PWA ต้องรันผ่าน `localhost`/https (secure context) — localhost ใช้ได้
 
-- PWA โหลดขึ้น + Flutter engine bootstrap สำเร็จ (ไม่มี console error ร้ายแรง)
-- มี PWA manifest ที่ถูกต้อง (installable)
-- ลงทะเบียน service worker (offline shell / installable)
+## ครอบอะไรบ้าง
 
-## TODO (ต่อยอด)
+**smoke** (รันเสมอ + ใน CI):
+- PWA โหลด + Flutter bootstrap (ไม่มี console error ร้ายแรง)
+- PWA manifest ถูกต้อง (installable) + service worker ลงทะเบียน
 
-- [ ] login flow (ใส่ credential test → เข้าหน้าหลัก)
-- [ ] สแกน (mock QR / manual entry) → เห็นผลรายการ
-- [ ] สร้าง print job → เห็นสถานะใน queue
-- [ ] ผูกเข้า CI พร้อม service backend + Postgres + build web (matrix)
+**flow** (`E2E_FLOW=1` เท่านั้น — ยัง **ต้อง validate selector กับ build จริง**):
+- login (ADMIN001) เข้าสู่ระบบ → เห็น shell หลัก
+- สร้างห่อ → สร้างงานพิมพ์ → เห็นสถานะในคิว
+- (fixme) สแกน manual entry → reprocess ห่อที่ส่งคืน
+
+> Flutter web วาดด้วย canvas — E2E ต้องเปิด semantics ก่อน (ดู `tests/helpers.ts`)
+> flow ยัง gate ไว้เพราะยังไม่ได้ verify selector กับ build จริง (ไม่มี browser/stack
+> ในสภาพแวดล้อมพัฒนา) — CI จึงรันเฉพาะ smoke
+
+## CI
+
+`.github/workflows/ci.yml` job `e2e`: ยก Postgres service + API (node) + build/serve web
+(`--dart-define=CSSD_API_URL=http://localhost:3000`) แล้วรัน **smoke** (flow gate ไว้)

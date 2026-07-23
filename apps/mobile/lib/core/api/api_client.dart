@@ -18,7 +18,13 @@ String newIdempotencyKey() {
 
 const kPrefServerUrl = 'server_url';
 // ค่าเริ่มต้น production (Render) — เปลี่ยนได้ที่หน้าตั้งค่าถ้า URL จริงต่างจากนี้
-const kDefaultServerUrl = 'https://cssd-api.onrender.com';
+// override ได้ตอน build ด้วย --dart-define=CSSD_API_URL=... (ใช้กับ E2E ที่ชี้ไป
+// local stack เช่น http://localhost:3000) ; ค่า default นี้ไม่ผ่าน validation
+// (serverUrlValidationError ตรวจเฉพาะตอนผู้ใช้แก้ URL เอง) จึงตั้ง localhost ได้
+const kDefaultServerUrl = String.fromEnvironment(
+  'CSSD_API_URL',
+  defaultValue: 'https://cssd-api.onrender.com',
+);
 
 /// override ใน main() ด้วย instance จริงก่อน runApp
 final sharedPreferencesProvider = Provider<SharedPreferences>(
