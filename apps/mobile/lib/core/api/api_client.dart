@@ -136,6 +136,8 @@ final dioProvider = Provider<Dio>((ref) {
 /// คืน null เมื่อไม่มี/ไม่รู้จัก code
 String? serverErrorFromCode(AppLocalizations l10n, String? code) {
   switch (code) {
+    case 'AUTH_LOCKED':
+      return l10n.srvAuthLocked;
     case 'PKG_NOT_FOUND':
       return l10n.srvPkgNotFound;
     case 'PKG_WRONG_STATUS':

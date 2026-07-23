@@ -128,8 +128,18 @@ void main() {
       expect(enMsg, equals(en.errGeneric('400')));
     });
 
+    test('AUTH_LOCKED — จอ login แยก "ถูกล็อก" ออกจากรหัสผิด (ทั้งสองภาษา)', () {
+      // คำว่า "ถูกล็อก" ต้องอยู่ในข้อความ th (E2E lockout test ใช้คำนี้หา element)
+      expect(serverErrorFromCode(th, 'AUTH_LOCKED'), contains('ถูกล็อก'));
+      expect(serverErrorFromCode(en, 'AUTH_LOCKED')!.toLowerCase(),
+          contains('locked'));
+      expect(serverErrorFromCode(th, 'AUTH_LOCKED'),
+          isNot(equals(th.errLoginInvalid)));
+    });
+
     test('serverErrorFromCode ครอบทุก code แล้วให้ข้อความ en ที่ไม่มีอักษรไทย', () {
       const codes = [
+        'AUTH_LOCKED',
         'PKG_NOT_FOUND', 'PKG_WRONG_STATUS', 'PKG_ALREADY_IN_THIS_BATCH',
         'PKG_IN_OTHER_BATCH', 'PKG_CONCURRENT', 'PKG_EXPIRED',
         'PKG_UNSTERILE_EXTERNAL_ONLY', 'PKG_DISCARDED', 'REPRINT_REASON_REQUIRED',

@@ -113,6 +113,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get errUnknown => 'An unknown error occurred';
 
   @override
+  String get srvAuthLocked =>
+      'Account temporarily locked after repeated failed attempts — please try again later';
+
+  @override
   String get srvPkgNotFound => 'Package not found';
 
   @override

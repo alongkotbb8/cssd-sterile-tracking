@@ -296,6 +296,12 @@ abstract class AppLocalizations {
   /// **'เกิดข้อผิดพลาดไม่ทราบสาเหตุ'**
   String get errUnknown;
 
+  /// No description provided for @srvAuthLocked.
+  ///
+  /// In th, this message translates to:
+  /// **'บัญชีถูกล็อกชั่วคราวจากการใส่รหัสผิดหลายครั้ง — กรุณาลองใหม่ภายหลัง'**
+  String get srvAuthLocked;
+
   /// No description provided for @srvPkgNotFound.
   ///
   /// In th, this message translates to:

@@ -29,9 +29,10 @@ export class AuthService {
 
     if (user?.lockedUntil && user.lockedUntil > new Date()) {
       const minsLeft = Math.ceil((user.lockedUntil.getTime() - Date.now()) / 60_000);
-      throw new UnauthorizedException(
-        `บัญชีถูกล็อกชั่วคราวจากการใส่รหัสผิดหลายครั้ง — ลองใหม่ใน ${minsLeft} นาที`,
-      );
+      throw new UnauthorizedException({
+        message: `บัญชีถูกล็อกชั่วคราวจากการใส่รหัสผิดหลายครั้ง — ลองใหม่ใน ${minsLeft} นาที`,
+        code: 'AUTH_LOCKED', // client แยกจาก 401 รหัสผิดปกติ เพื่อแสดงข้อความล็อกตาม locale
+      });
     }
 
     // Always run bcrypt.compare, even for unknown users (same message + timing).

@@ -114,6 +114,10 @@ class AppLocalizationsTh extends AppLocalizations {
   String get errUnknown => 'เกิดข้อผิดพลาดไม่ทราบสาเหตุ';
 
   @override
+  String get srvAuthLocked =>
+      'บัญชีถูกล็อกชั่วคราวจากการใส่รหัสผิดหลายครั้ง — กรุณาลองใหม่ภายหลัง';
+
+  @override
   String get srvPkgNotFound => 'ไม่พบห่อ';
 
   @override

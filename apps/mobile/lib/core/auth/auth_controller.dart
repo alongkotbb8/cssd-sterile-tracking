@@ -86,7 +86,11 @@ class AuthController extends Notifier<AuthState> {
       return null;
     } on DioException catch (e) {
       if (e.response?.statusCode == 401) {
-        return l10n.errLoginInvalid;
+        // 401 มีสองความหมาย: รหัสผิด กับ "บัญชีถูกล็อก" (code: AUTH_LOCKED) —
+        // ต้องแยกให้ผู้ใช้เห็นสาเหตุจริง ไม่ใช่บอกว่ารหัสผิดทั้งที่ถูกล็อกอยู่
+        return serverErrorFromCode(
+                l10n, (e.response?.data as Map?)?['code'] as String?) ??
+            l10n.errLoginInvalid;
       }
       return apiErrorMessage(l10n, e);
     } catch (e) {

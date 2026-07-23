@@ -40,6 +40,7 @@
   "errGeneric": "An error occurred ({code})",
   "@errGeneric": { "placeholders": { "code": { "type": "String" } } },
   "errUnknown": "An unknown error occurred",
+  "srvAuthLocked": "Account temporarily locked after repeated failed attempts — please try again later",
   "srvPkgNotFound": "Package not found",
   "srvPkgWrongStatus": "The package status does not allow this action",
   "srvPkgAlreadyInThisBatch": "This package is already in this batch",
