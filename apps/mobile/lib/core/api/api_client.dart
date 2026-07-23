@@ -76,10 +76,12 @@ final dioProvider = Provider<Dio>((ref) {
       handler.next(options);
     },
     onError: (e, handler) async {
-      // token หมดอายุ/ไม่ถูกต้อง → บังคับออกจากระบบ (ยกเว้นตอน login เอง)
+      // token หมดอายุ/ถูกเพิกถอน → บังคับออกจากระบบ (ยกเว้นตอน login เอง)
+      // ใช้ clearLocalSession() ที่ **ไม่ยิง API** — ถ้าเรียก logout() ที่ยิง unregister
+      // FCM ด้วย token ที่ใช้ไม่ได้แล้ว จะได้ 401 อีก → interceptor เรียกซ้ำ = ลูป
       if (e.response?.statusCode == 401 &&
           !e.requestOptions.path.contains('/auth/login')) {
-        ref.read(authControllerProvider.notifier).logout();
+        ref.read(authControllerProvider.notifier).clearLocalSession();
         handler.next(e);
         return;
       }
