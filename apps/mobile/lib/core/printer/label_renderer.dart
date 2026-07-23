@@ -8,6 +8,12 @@ import 'package:qr_flutter/qr_flutter.dart';
 
 import 'printer_adapter.dart';
 
+/// ข้อความชนิดห่อ **บน label ที่พิมพ์จริง** — ภาษาไทยตาม SOP ของ CSSD
+/// (i18n-allowlist: เนื้อหา label แยกจาก UI localization ตาม directive §1A.5
+/// — ห้ามใช้ค่านี้แสดงบน UI; UI ใช้ l10n.dmWrapSeal/dmWrapCloth)
+String wrapTypeLabelText(String wrapType) =>
+    wrapType == 'SEAL' ? 'ห่อซีล' : 'ห่อผ้า';
+
 /// สร้างคำสั่ง TSPL สำหรับพิมพ์ label โดย **render ทั้งใบเป็นภาพ bitmap ก่อน**
 /// แล้วส่งผ่านคำสั่ง `BITMAP`
 ///

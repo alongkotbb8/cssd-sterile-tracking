@@ -7,6 +7,7 @@ import '../../../../core/api/api_client.dart';
 import '../../../../core/api/repositories.dart';
 import '../../../../core/auth/auth_controller.dart';
 import '../../../../core/models/models.dart';
+import '../../../../core/printer/label_renderer.dart';
 import '../../../../core/printer/printer_adapter.dart';
 import '../../../../core/printer/printer_provider.dart';
 import '../../../../core/theme/app_theme.dart';
@@ -129,7 +130,7 @@ Future<void> printPackageLabels(
       await printer.printLabel(LabelData(
         packageId: pkg.id,
         setName: pkg.templateName,
-        wrapType: pkg.wrapType == 'SEAL' ? 'ห่อซีล' : 'ห่อผ้า',
+        wrapType: wrapTypeLabelText(pkg.wrapType),
         sterilizeDate: pkg.sterilizeDate,
         expiryDate: pkg.expiryDate,
       ));

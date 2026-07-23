@@ -49,7 +49,7 @@ class FcmService {
     try {
       await Firebase.initializeApp();
     } catch (e) {
-      debugPrint('[FcmService] Firebase ยังไม่ได้ตั้งค่า — ปิดการแจ้งเตือน push ($e)');
+      debugPrint('[FcmService] Firebase not configured — push disabled ($e)');
       return;
     }
 
@@ -121,7 +121,7 @@ Future<void> registerFcmToken(WidgetRef ref) async {
       'deviceId': '$platformLabel-${identityHashCode(token)}',
     });
   } catch (e) {
-    debugPrint('[FcmService] ลงทะเบียน token ไม่สำเร็จ: $e');
+    debugPrint('[FcmService] register token failed: $e');
   }
 }
 
@@ -132,6 +132,6 @@ Future<void> unregisterFcmToken(Ref ref) async {
   try {
     await ref.read(dioProvider).delete('/notifications/fcm-token', data: {'token': token});
   } catch (e) {
-    debugPrint('[FcmService] ยกเลิก token ไม่สำเร็จ: $e');
+    debugPrint('[FcmService] unregister token failed: $e');
   }
 }
