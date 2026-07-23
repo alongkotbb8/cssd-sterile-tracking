@@ -68,10 +68,12 @@ export class PrintJobsService {
     canConfirmRealPrint: boolean,
   ) {
     if (canConfirmRealPrint && !this.canReallyConfirm({ environment, transportMode, canConfirmRealPrint })) {
-      throw new BadRequestException(
-        'canConfirmRealPrint=true ได้เฉพาะ gateway ที่ environment=PRODUCTION และ transportMode ไม่ใช่ CONSOLE ' +
+      throw new BadRequestException({
+        message:
+          'canConfirmRealPrint=true ได้เฉพาะ gateway ที่ environment=PRODUCTION และ transportMode ไม่ใช่ CONSOLE ' +
           `(ได้ environment=${environment}, transportMode=${transportMode}) — Console/Test/Dev ต้องเป็น SIMULATED เท่านั้น`,
-      );
+        code: 'GATEWAY_CONFIG',
+      });
     }
   }
 
@@ -127,7 +129,7 @@ export class PrintJobsService {
     },
   ) {
     const printer = await this.prisma.printerDevice.findUnique({ where: { id } });
-    if (!printer) throw new NotFoundException('ไม่พบ gateway');
+    if (!printer) throw new NotFoundException({ message: 'ไม่พบ gateway', code: 'GATEWAY_NOT_FOUND' });
 
     // ตรวจ invariant กับค่า "หลัง merge" (ค่าเดิม + สิ่งที่ patch มา) — กันตั้ง
     // canConfirmRealPrint=true คู่กับ CONSOLE/Dev ผ่านการ update ทีละฟิลด์
@@ -178,9 +180,9 @@ export class PrintJobsService {
    */
   async rotateGatewayKey(id: string, userId: string) {
     const printer = await this.prisma.printerDevice.findUnique({ where: { id } });
-    if (!printer) throw new NotFoundException('ไม่พบ gateway');
+    if (!printer) throw new NotFoundException({ message: 'ไม่พบ gateway', code: 'GATEWAY_NOT_FOUND' });
     if (printer.revokedAt) {
-      throw new BadRequestException('gateway นี้ถูกเพิกถอนแล้ว หมุน key ไม่ได้ (ลงทะเบียนใหม่แทน)');
+      throw new BadRequestException({ message: 'gateway นี้ถูกเพิกถอนแล้ว หมุน key ไม่ได้ (ลงทะเบียนใหม่แทน)', code: 'GATEWAY_REVOKED' });
     }
 
     const keyId = randomBytes(9).toString('hex');
@@ -196,7 +198,7 @@ export class PrintJobsService {
 
   async revokeGateway(id: string, userId: string) {
     const printer = await this.prisma.printerDevice.findUnique({ where: { id } });
-    if (!printer) throw new NotFoundException('ไม่พบ gateway');
+    if (!printer) throw new NotFoundException({ message: 'ไม่พบ gateway', code: 'GATEWAY_NOT_FOUND' });
 
     await this.prisma.$transaction(async (tx) => {
       await tx.printerDevice.update({
@@ -256,7 +258,7 @@ export class PrintJobsService {
       where: { id: packageId },
       include: { setTemplate: true },
     });
-    if (!pkg) throw new NotFoundException(`ไม่พบห่อ ${packageId}`);
+    if (!pkg) throw new NotFoundException({ message: `ไม่พบห่อ ${packageId}`, code: 'PKG_NOT_FOUND' });
 
     const payload: PrintJobPayload = {
       packageId: pkg.id,
@@ -286,14 +288,14 @@ export class PrintJobsService {
 
     if (opts.requestedPrinterId) {
       const printer = await tx.printerDevice.findUnique({ where: { id: opts.requestedPrinterId } });
-      if (!printer || !printer.isActive) throw new BadRequestException('ไม่พบเครื่องพิมพ์ที่ระบุ');
+      if (!printer || !printer.isActive) throw new BadRequestException({ message: 'ไม่พบเครื่องพิมพ์ที่ระบุ', code: 'PRINTER_NOT_FOUND' });
     }
 
     // isReprint คำนวณที่ backend เสมอ (ห้ามให้ client ส่งมาเอง) กันหลบการกรอก
     // เหตุผล reprint (AI_DEVELOPMENT_GUARDRAILS.md ข้อ 2.2)
     const isReprint = pkg.printedAt !== null;
     if (isReprint && !opts.reprintReason?.trim()) {
-      throw new BadRequestException('ห่อนี้เคยพิมพ์แล้ว ต้องระบุเหตุผลการพิมพ์ซ้ำ (reprintReason)');
+      throw new BadRequestException({ message: 'ห่อนี้เคยพิมพ์แล้ว ต้องระบุเหตุผลการพิมพ์ซ้ำ (reprintReason)', code: 'REPRINT_REASON_REQUIRED' });
     }
 
     const created = await tx.printJob.create({
@@ -318,11 +320,11 @@ export class PrintJobsService {
   /** เจ้าของงานหรือ SUPERVISOR/ADMIN เท่านั้นที่ดูรายละเอียดงานพิมพ์ได้ (กัน IDOR) */
   async findOne(id: string, userId: string, role: UserRole) {
     const job = await this.prisma.printJob.findUnique({ where: { id } });
-    if (!job) throw new NotFoundException('ไม่พบ print job');
+    if (!job) throw new NotFoundException({ message: 'ไม่พบ print job', code: 'PRINT_JOB_NOT_FOUND' });
 
     const canSeeAll = role === UserRole.SUPERVISOR || role === UserRole.ADMIN;
     if (!canSeeAll && job.requestedById !== userId) {
-      throw new ForbiddenException('ไม่มีสิทธิ์ดูงานพิมพ์นี้');
+      throw new ForbiddenException({ message: 'ไม่มีสิทธิ์ดูงานพิมพ์นี้', code: 'PRINT_JOB_FORBIDDEN' });
     }
     return job;
   }
@@ -343,16 +345,17 @@ export class PrintJobsService {
   /** ยกเลิกได้เฉพาะงานที่ยังไม่ถูก gateway claim (QUEUED) — claim แล้วอาจพิมพ์ไปแล้ว ยกเลิกไม่ปลอดภัย */
   async cancel(id: string, userId: string, role: UserRole) {
     const job = await this.prisma.printJob.findUnique({ where: { id } });
-    if (!job) throw new NotFoundException('ไม่พบ print job');
+    if (!job) throw new NotFoundException({ message: 'ไม่พบ print job', code: 'PRINT_JOB_NOT_FOUND' });
 
     const isOwner = job.requestedById === userId;
     const isPrivileged = role === UserRole.SUPERVISOR || role === UserRole.ADMIN;
-    if (!isOwner && !isPrivileged) throw new ForbiddenException('ยกเลิกงานนี้ไม่ได้');
+    if (!isOwner && !isPrivileged) throw new ForbiddenException({ message: 'ยกเลิกงานนี้ไม่ได้', code: 'PRINT_JOB_FORBIDDEN' });
 
     if (job.status !== PrintJobStatus.QUEUED) {
-      throw new BadRequestException(
-        `ยกเลิกได้เฉพาะงานที่ยังไม่ถูก claim (ปัจจุบัน: ${job.status})`,
-      );
+      throw new BadRequestException({
+        message: `ยกเลิกได้เฉพาะงานที่ยังไม่ถูก claim (ปัจจุบัน: ${job.status})`,
+        code: 'PRINT_JOB_STATE',
+      });
     }
 
     await this.prisma.$transaction(async (tx) => {
@@ -360,7 +363,7 @@ export class PrintJobsService {
         where: { id, status: PrintJobStatus.QUEUED }, // CAS กันชนกับ gateway claim พอดี
         data: { status: PrintJobStatus.CANCELLED },
       });
-      if (count === 0) throw new BadRequestException('สถานะงานเปลี่ยนไปแล้ว ลองโหลดใหม่');
+      if (count === 0) throw new BadRequestException({ message: 'สถานะงานเปลี่ยนไปแล้ว ลองโหลดใหม่', code: 'PRINT_JOB_STATE' });
       await this.audit.logTx(tx, userId, 'PRINT_CANCEL', id, { previousStatus: job.status });
     });
     return { cancelled: true };
@@ -373,12 +376,12 @@ export class PrintJobsService {
     decision: 'CONFIRM_PRINTED' | 'REQUEUE',
     note: string,
   ) {
-    if (!note?.trim()) throw new BadRequestException('ต้องระบุหมายเหตุการตัดสินใจ');
+    if (!note?.trim()) throw new BadRequestException({ message: 'ต้องระบุหมายเหตุการตัดสินใจ', code: 'PRINT_JOB_NOTE_REQUIRED' });
 
     const job = await this.prisma.printJob.findUnique({ where: { id: jobId } });
-    if (!job) throw new NotFoundException('ไม่พบ print job');
+    if (!job) throw new NotFoundException({ message: 'ไม่พบ print job', code: 'PRINT_JOB_NOT_FOUND' });
     if (job.status !== PrintJobStatus.ACK_UNKNOWN) {
-      throw new BadRequestException(`แก้ไขได้เฉพาะงานที่เป็น ACK_UNKNOWN (ปัจจุบัน: ${job.status})`);
+      throw new BadRequestException({ message: `แก้ไขได้เฉพาะงานที่เป็น ACK_UNKNOWN (ปัจจุบัน: ${job.status})`, code: 'PRINT_JOB_STATE' });
     }
 
     if (decision === 'CONFIRM_PRINTED') {
@@ -396,7 +399,7 @@ export class PrintJobsService {
             resolutionNote: note,
           },
         });
-        if (count === 0) throw new ConflictException('งานนี้ถูกตัดสินใจไปแล้ว หรือสถานะเปลี่ยนไป');
+        if (count === 0) throw new ConflictException({ message: 'งานนี้ถูกตัดสินใจไปแล้ว หรือสถานะเปลี่ยนไป', code: 'PRINT_JOB_STATE' });
 
         const pkg = await tx.package.findUniqueOrThrow({ where: { id: job.packageId } });
         await tx.package.update({
@@ -427,7 +430,7 @@ export class PrintJobsService {
           resolutionNote: note,
         },
       });
-      if (count === 0) throw new ConflictException('งานนี้ถูกตัดสินใจไปแล้ว หรือสถานะเปลี่ยนไป');
+      if (count === 0) throw new ConflictException({ message: 'งานนี้ถูกตัดสินใจไปแล้ว หรือสถานะเปลี่ยนไป', code: 'PRINT_JOB_STATE' });
 
       const { pkg, payload, payloadHash } = await this.buildPayload(tx, job.packageId);
       const requeued = await tx.printJob.create({
@@ -488,9 +491,9 @@ export class PrintJobsService {
 
   private async assertOwnedByGateway(jobId: string, printerId: string) {
     const job = await this.prisma.printJob.findUnique({ where: { id: jobId } });
-    if (!job) throw new NotFoundException('ไม่พบ print job');
+    if (!job) throw new NotFoundException({ message: 'ไม่พบ print job', code: 'PRINT_JOB_NOT_FOUND' });
     if (job.printerId !== printerId) {
-      throw new ForbiddenException('งานนี้ไม่ได้ผูกกับ gateway นี้');
+      throw new ForbiddenException({ message: 'งานนี้ไม่ได้ผูกกับ gateway นี้', code: 'PRINT_JOB_FORBIDDEN' });
     }
     return job;
   }
@@ -503,7 +506,7 @@ export class PrintJobsService {
       data: { status: PrintJobStatus.PRINTING, printingAt: new Date() },
     });
     if (count === 0) {
-      throw new BadRequestException(`เปลี่ยนเป็น PRINTING ไม่ได้จากสถานะ ${job.status}`);
+      throw new BadRequestException({ message: `เปลี่ยนเป็น PRINTING ไม่ได้จากสถานะ ${job.status}`, code: 'PRINT_JOB_STATE' });
     }
     return this.prisma.printJob.findUniqueOrThrow({ where: { id: jobId } });
   }
@@ -522,7 +525,7 @@ export class PrintJobsService {
       data: { status: PrintJobStatus.SENT, sentAt: new Date() },
     });
     if (count === 0) {
-      throw new BadRequestException(`เปลี่ยนเป็น SENT ไม่ได้จากสถานะ ${job.status}`);
+      throw new BadRequestException({ message: `เปลี่ยนเป็น SENT ไม่ได้จากสถานะ ${job.status}`, code: 'PRINT_JOB_STATE' });
     }
     return this.prisma.printJob.findUniqueOrThrow({ where: { id: jobId } });
   }
@@ -555,9 +558,10 @@ export class PrintJobsService {
       return res;
     });
     if (count === 0) {
-      throw new BadRequestException(
-        `รายงาน MAYBE_SENT ไม่ได้จากสถานะ ${job.status} (ต้องเป็น CLAIMED/PRINTING)`,
-      );
+      throw new BadRequestException({
+        message: `รายงาน MAYBE_SENT ไม่ได้จากสถานะ ${job.status} (ต้องเป็น CLAIMED/PRINTING)`,
+        code: 'PRINT_JOB_STATE',
+      });
     }
     return this.prisma.printJob.findUniqueOrThrow({ where: { id: jobId } });
   }
@@ -590,7 +594,7 @@ export class PrintJobsService {
         data: { status: targetStatus, printedAt: new Date() },
       });
       if (count === 0) {
-        throw new BadRequestException(`ACK ไม่ได้จากสถานะ ${job.status} (ต้องเป็น SENT ก่อน)`);
+        throw new BadRequestException({ message: `ACK ไม่ได้จากสถานะ ${job.status} (ต้องเป็น SENT ก่อน)`, code: 'PRINT_JOB_STATE' });
       }
 
       if (!simulated) {
@@ -622,9 +626,10 @@ export class PrintJobsService {
   async fail(jobId: string, printerId: string, errorCode: string, message?: string) {
     const job = await this.assertOwnedByGateway(jobId, printerId);
     if (job.status !== PrintJobStatus.CLAIMED && job.status !== PrintJobStatus.PRINTING) {
-      throw new BadRequestException(
-        `รายงาน fail ไม่ได้จากสถานะ ${job.status} — หลังส่งข้อมูลสำเร็จ (SENT ขึ้นไป) ห้าม retry อัตโนมัติ`,
-      );
+      throw new BadRequestException({
+        message: `รายงาน fail ไม่ได้จากสถานะ ${job.status} — หลังส่งข้อมูลสำเร็จ (SENT ขึ้นไป) ห้าม retry อัตโนมัติ`,
+        code: 'PRINT_JOB_STATE',
+      });
     }
 
     const nextStatus =
@@ -635,7 +640,7 @@ export class PrintJobsService {
         where: { id: jobId, printerId, status: job.status },
         data: { status: nextStatus, errorCode, failedAt: new Date() },
       });
-      if (count === 0) throw new BadRequestException('สถานะงานเปลี่ยนไปแล้ว ลองโหลดใหม่');
+      if (count === 0) throw new BadRequestException({ message: 'สถานะงานเปลี่ยนไปแล้ว ลองโหลดใหม่', code: 'PRINT_JOB_STATE' });
 
       await this.audit.logTx(tx, job.requestedById, 'PRINT_FAILURE', jobId, {
         errorCode,

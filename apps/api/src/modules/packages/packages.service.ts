@@ -24,7 +24,7 @@ export class PackagesService {
     const template = await tx.setTemplate.findUnique({
       where: { id: dto.setTemplateId },
     });
-    if (!template) throw new NotFoundException('ไม่พบ SetTemplate ที่ระบุ');
+    if (!template) throw new NotFoundException({ message: 'ไม่พบ SetTemplate ที่ระบุ', code: 'TEMPLATE_NOT_FOUND' });
 
     const wrapType: WrapType = dto.wrapType ?? template.defaultWrapType;
     const id = await this.runningNum.nextId(template.code, template.id, new Date(), tx);
@@ -59,7 +59,7 @@ export class PackagesService {
         },
       },
     });
-    if (!pkg) throw new NotFoundException(`ไม่พบห่อ ${id}`);
+    if (!pkg) throw new NotFoundException({ message: `ไม่พบห่อ ${id}`, code: 'PKG_NOT_FOUND' });
 
     const expired =
       !!pkg.expiryDate && isExpired(pkg.expiryDate) && pkg.status === PackageStatus.STERILE;
@@ -102,9 +102,9 @@ export class PackagesService {
   /** Any status → DISCARDED (except already discarded) — mutation + AuditLog ใน tx เดียว */
   async discard(id: string, userId: string, notes?: string) {
     const pkg = await this.prisma.package.findUnique({ where: { id } });
-    if (!pkg) throw new NotFoundException(`ไม่พบห่อ ${id}`);
+    if (!pkg) throw new NotFoundException({ message: `ไม่พบห่อ ${id}`, code: 'PKG_NOT_FOUND' });
     if (pkg.status === PackageStatus.DISCARDED) {
-      throw new BadRequestException(`ห่อ ${id} ถูกทิ้งไปแล้ว`);
+      throw new BadRequestException({ message: `ห่อ ${id} ถูกทิ้งไปแล้ว`, code: 'PKG_DISCARDED' });
     }
 
     await this.prisma.$transaction(async (tx) => {
@@ -119,7 +119,7 @@ export class PackagesService {
   /** ตั้ง tag ของห่อ (แทนที่ทั้งชุด) — ใช้ติด/ถอด tag จากหน้ารายละเอียด */
   async setTags(id: string, tagIds: string[], userId: string) {
     const pkg = await this.prisma.package.findUnique({ where: { id } });
-    if (!pkg) throw new NotFoundException(`ไม่พบห่อ ${id}`);
+    if (!pkg) throw new NotFoundException({ message: `ไม่พบห่อ ${id}`, code: 'PKG_NOT_FOUND' });
 
     await this.prisma.$transaction(async (tx) => {
       await tx.packageTag.deleteMany({ where: { packageId: id } });

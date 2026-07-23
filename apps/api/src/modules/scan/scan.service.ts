@@ -14,6 +14,8 @@ export interface ScanResult {
   packageId: string;
   success: boolean;
   error?: string;
+  /** stable code สำหรับ client map เป็นข้อความตาม locale (i18n) — ข้อความ error ไทยคงไว้เพื่อ backward compat */
+  errorCode?: string;
   package?: Record<string, unknown>;
 }
 
@@ -53,25 +55,25 @@ export class ScanService {
     tx: Prisma.TransactionClient,
   ): Promise<ScanResult[]> {
     const batch = await tx.sterilizationBatch.findUnique({ where: { id: batchId } });
-    if (!batch) throw new NotFoundException('ไม่พบรอบนึ่ง');
+    if (!batch) throw new NotFoundException({ message: 'ไม่พบรอบนึ่ง', code: 'BATCH_NOT_FOUND' });
     if (batch.status !== 'PENDING') {
       throw new BadRequestException(
-        'รอบนึ่งนี้บันทึกผลไปแล้ว — เพิ่มห่อย้อนหลังไม่ได้ กรุณาเปิดรอบใหม่',
+        { message: 'รอบนึ่งนี้บันทึกผลไปแล้ว — เพิ่มห่อย้อนหลังไม่ได้ กรุณาเปิดรอบใหม่', code: 'BATCH_ALREADY_RESULTED' },
       );
     }
 
     const results: ScanResult[] = [];
     for (const id of packageIds) {
       const pkg = await tx.package.findUnique({ where: { id } });
-      if (!pkg) { results.push({ packageId: id, success: false, error: 'ไม่พบห่อ' }); continue; }
+      if (!pkg) { results.push({ packageId: id, success: false, error: 'ไม่พบห่อ', errorCode: 'PKG_NOT_FOUND' }); continue; }
       if (pkg.status !== PackageStatus.PACKED) {
-        results.push({ packageId: id, success: false, error: `สถานะปัจจุบัน: ${pkg.status}` }); continue;
+        results.push({ packageId: id, success: false, error: `สถานะปัจจุบัน: ${pkg.status}`, errorCode: 'PKG_WRONG_STATUS' }); continue;
       }
       if (pkg.batchId === batchId) {
-        results.push({ packageId: id, success: false, error: 'ห่อนี้อยู่ในรอบนี้แล้ว' }); continue;
+        results.push({ packageId: id, success: false, error: 'ห่อนี้อยู่ในรอบนี้แล้ว', errorCode: 'PKG_ALREADY_IN_THIS_BATCH' }); continue;
       }
       if (pkg.batchId) {
-        results.push({ packageId: id, success: false, error: 'ห่อนี้อยู่ในรอบนึ่งอื่นอยู่แล้ว' }); continue;
+        results.push({ packageId: id, success: false, error: 'ห่อนี้อยู่ในรอบนึ่งอื่นอยู่แล้ว', errorCode: 'PKG_IN_OTHER_BATCH' }); continue;
       }
 
       // CAS: batchId ต้องยังว่างและสถานะยัง PACKED กันสแกนซ้ำพร้อมกันจาก 2 เครื่อง
@@ -80,7 +82,7 @@ export class ScanService {
         data: { batchId },
       });
       if (count === 0) {
-        results.push({ packageId: id, success: false, error: 'ห่อนี้ถูกสแกนไปพร้อมกันจากที่อื่นแล้ว' });
+        results.push({ packageId: id, success: false, error: 'ห่อนี้ถูกสแกนไปพร้อมกันจากที่อื่นแล้ว', errorCode: 'PKG_CONCURRENT' });
         continue;
       }
       // บันทึกประวัติการผูกห่อ–รอบ (เก็บถาวร แม้ภายหลังห่อถูกปลด/เข้ารอบใหม่)
@@ -109,14 +111,14 @@ export class ScanService {
     tx: Prisma.TransactionClient,
   ): Promise<ScanResult[]> {
     const dept = await tx.department.findUnique({ where: { id: departmentId } });
-    if (!dept) throw new NotFoundException('ไม่พบแผนกปลายทาง');
+    if (!dept) throw new NotFoundException({ message: 'ไม่พบแผนกปลายทาง', code: 'DEPT_NOT_FOUND' });
 
     const now = new Date();
     const results: ScanResult[] = [];
 
     for (const id of packageIds) {
       const pkg = await tx.package.findUnique({ where: { id } });
-      if (!pkg) { results.push({ packageId: id, success: false, error: 'ไม่พบห่อ' }); continue; }
+      if (!pkg) { results.push({ packageId: id, success: false, error: 'ไม่พบห่อ', errorCode: 'PKG_NOT_FOUND' }); continue; }
 
       // FR-4: block expired — บันทึกเหตุการณ์ถูกบล็อกไว้ทำรายงานเหตุการณ์ผิดปกติ
       // (ใช้ได้ตลอดวันหมดอายุ บล็อกตั้งแต่วันถัดไป — ดู common/expiry.ts)
@@ -126,10 +128,10 @@ export class ScanService {
           departmentId,
           expiryDate: pkg.expiryDate,
         });
-        results.push({ packageId: id, success: false, error: '⛔ ห้ามใช้ — ห่อหมดอายุแล้ว' }); continue;
+        results.push({ packageId: id, success: false, error: '⛔ ห้ามใช้ — ห่อหมดอายุแล้ว', errorCode: 'PKG_EXPIRED' }); continue;
       }
       if (pkg.status !== PackageStatus.STERILE && pkg.status !== PackageStatus.PACKED) {
-        results.push({ packageId: id, success: false, error: `สถานะปัจจุบัน: ${pkg.status}` }); continue;
+        results.push({ packageId: id, success: false, error: `สถานะปัจจุบัน: ${pkg.status}`, errorCode: 'PKG_WRONG_STATUS' }); continue;
       }
 
       const fromStatus = pkg.status;
@@ -143,6 +145,7 @@ export class ScanService {
           packageId: id,
           success: false,
           error: 'ห่อนี้ยังไม่ผ่านการฆ่าเชื้อ — ส่งออกได้เฉพาะปลายทางภายนอก (external) เท่านั้น',
+          errorCode: 'PKG_UNSTERILE_EXTERNAL_ONLY',
         });
         continue;
       }
@@ -153,7 +156,7 @@ export class ScanService {
         data: { status: toStatus },
       });
       if (count === 0) {
-        results.push({ packageId: id, success: false, error: 'ห่อนี้ถูกสแกนไปพร้อมกันจากที่อื่นแล้ว' });
+        results.push({ packageId: id, success: false, error: 'ห่อนี้ถูกสแกนไปพร้อมกันจากที่อื่นแล้ว', errorCode: 'PKG_CONCURRENT' });
         continue;
       }
       await tx.movement.create({
@@ -189,14 +192,14 @@ export class ScanService {
     tx: Prisma.TransactionClient,
   ): Promise<ScanResult[]> {
     const dept = await tx.department.findUnique({ where: { id: departmentId } });
-    if (!dept) throw new NotFoundException('ไม่พบแผนก');
+    if (!dept) throw new NotFoundException({ message: 'ไม่พบแผนก', code: 'DEPT_NOT_FOUND' });
 
     const results: ScanResult[] = [];
     for (const id of packageIds) {
       const pkg = await tx.package.findUnique({ where: { id } });
-      if (!pkg) { results.push({ packageId: id, success: false, error: 'ไม่พบห่อ' }); continue; }
+      if (!pkg) { results.push({ packageId: id, success: false, error: 'ไม่พบห่อ', errorCode: 'PKG_NOT_FOUND' }); continue; }
       if (pkg.status !== PackageStatus.ISSUED && pkg.status !== PackageStatus.PACKED_OUT) {
-        results.push({ packageId: id, success: false, error: `สถานะปัจจุบัน: ${pkg.status}` }); continue;
+        results.push({ packageId: id, success: false, error: `สถานะปัจจุบัน: ${pkg.status}`, errorCode: 'PKG_WRONG_STATUS' }); continue;
       }
 
       const fromStatus = pkg.status;
@@ -209,7 +212,7 @@ export class ScanService {
         data: { status: toStatus },
       });
       if (count === 0) {
-        results.push({ packageId: id, success: false, error: 'ห่อนี้ถูกสแกนไปพร้อมกันจากที่อื่นแล้ว' });
+        results.push({ packageId: id, success: false, error: 'ห่อนี้ถูกสแกนไปพร้อมกันจากที่อื่นแล้ว', errorCode: 'PKG_CONCURRENT' });
         continue;
       }
       await tx.movement.create({
@@ -239,9 +242,9 @@ export class ScanService {
     const results: ScanResult[] = [];
     for (const id of packageIds) {
       const pkg = await tx.package.findUnique({ where: { id } });
-      if (!pkg) { results.push({ packageId: id, success: false, error: 'ไม่พบห่อ' }); continue; }
+      if (!pkg) { results.push({ packageId: id, success: false, error: 'ไม่พบห่อ', errorCode: 'PKG_NOT_FOUND' }); continue; }
       if (pkg.status !== PackageStatus.RETURNED) {
-        results.push({ packageId: id, success: false, error: `สถานะปัจจุบัน: ${pkg.status} (reprocess ได้เฉพาะห่อที่ส่งคืนแล้ว)` });
+        results.push({ packageId: id, success: false, error: `สถานะปัจจุบัน: ${pkg.status} (reprocess ได้เฉพาะห่อที่ส่งคืนแล้ว)`, errorCode: 'PKG_WRONG_STATUS' });
         continue;
       }
       // CAS: ต้องยัง RETURNED — กันชนกับการดำเนินการพร้อมกัน
@@ -250,7 +253,7 @@ export class ScanService {
         data: { status: PackageStatus.PACKED, batchId: null },
       });
       if (count === 0) {
-        results.push({ packageId: id, success: false, error: 'ห่อนี้ถูกดำเนินการไปพร้อมกันจากที่อื่นแล้ว' });
+        results.push({ packageId: id, success: false, error: 'ห่อนี้ถูกดำเนินการไปพร้อมกันจากที่อื่นแล้ว', errorCode: 'PKG_CONCURRENT' });
         continue;
       }
       await this.audit.logTx(tx, userId, 'REPROCESS', id, {
@@ -269,7 +272,7 @@ export class ScanService {
       where: { id: packageId },
       include: { setTemplate: true, batch: true },
     });
-    if (!pkg) throw new NotFoundException(`ไม่พบห่อ ${packageId}`);
+    if (!pkg) throw new NotFoundException({ message: `ไม่พบห่อ ${packageId}`, code: 'PKG_NOT_FOUND' });
 
     const now = new Date();
     return {

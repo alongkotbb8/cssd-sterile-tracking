@@ -18,7 +18,7 @@ export class BatchesService {
 
   async create(dto: CreateBatchDto, userId: string, tx: Prisma.TransactionClient) {
     const sterilizer = await tx.sterilizer.findUnique({ where: { id: dto.sterilizerId } });
-    if (!sterilizer) throw new NotFoundException('ไม่พบเครื่องนึ่งที่ระบุ');
+    if (!sterilizer) throw new NotFoundException({ message: 'ไม่พบเครื่องนึ่งที่ระบุ', code: 'STERILIZER_NOT_FOUND' });
 
     let batch;
     try {
@@ -33,7 +33,7 @@ export class BatchesService {
       });
     } catch (e) {
       if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
-        throw new ConflictException('มีรอบนึ่งนี้อยู่แล้ว (เครื่อง/วัน/รอบซ้ำ)');
+        throw new ConflictException({ message: 'มีรอบนึ่งนี้อยู่แล้ว (เครื่อง/วัน/รอบซ้ำ)', code: 'BATCH_DUPLICATE' });
       }
       throw e;
     }
@@ -72,9 +72,9 @@ export class BatchesService {
     tx: Prisma.TransactionClient,
   ) {
     const batch = await tx.sterilizationBatch.findUnique({ where: { id } });
-    if (!batch) throw new NotFoundException('ไม่พบรอบนึ่ง');
+    if (!batch) throw new NotFoundException({ message: 'ไม่พบรอบนึ่ง', code: 'BATCH_NOT_FOUND' });
     if (batch.status !== BatchStatus.PENDING) {
-      throw new BadRequestException('รอบนึ่งนี้บันทึกผลไปแล้ว (บันทึกผล CI ได้ครั้งเดียว)');
+      throw new BadRequestException({ message: 'รอบนึ่งนี้บันทึกผลไปแล้ว (บันทึกผล CI ได้ครั้งเดียว)', code: 'BATCH_ALREADY_RESULTED' });
     }
 
     // release = ห่อพร้อมใช้ (STERILE) — เมื่อ CI ผ่าน และ BI ไม่ได้ระบุว่า "ไม่ผ่าน"
@@ -152,11 +152,12 @@ export class BatchesService {
     tx: Prisma.TransactionClient,
   ) {
     const batch = await tx.sterilizationBatch.findUnique({ where: { id } });
-    if (!batch) throw new NotFoundException('ไม่พบรอบนึ่ง');
+    if (!batch) throw new NotFoundException({ message: 'ไม่พบรอบนึ่ง', code: 'BATCH_NOT_FOUND' });
     if (batch.status !== BatchStatus.PENDING_BI) {
-      throw new BadRequestException(
-        `บันทึกผล BI ได้เฉพาะรอบที่ยังรอผล BI (PENDING_BI) — ปัจจุบัน: ${batch.status}`,
-      );
+      throw new BadRequestException({
+        message: `บันทึกผล BI ได้เฉพาะรอบที่ยังรอผล BI (PENDING_BI) — ปัจจุบัน: ${batch.status}`,
+        code: 'BATCH_STATE',
+      });
     }
 
     const status = biResult ? BatchStatus.PASSED : BatchStatus.FAILED;
@@ -210,7 +211,7 @@ export class BatchesService {
    */
   private async recallTx(tx: Prisma.TransactionClient, batchId: string, userId: string) {
     const batch = await tx.sterilizationBatch.findUnique({ where: { id: batchId } });
-    if (!batch) throw new NotFoundException('ไม่พบรอบนึ่ง');
+    if (!batch) throw new NotFoundException({ message: 'ไม่พบรอบนึ่ง', code: 'BATCH_NOT_FOUND' });
 
     const recallable: PackageStatus[] = [PackageStatus.STERILE, PackageStatus.ISSUED];
 
@@ -284,7 +285,7 @@ export class BatchesService {
       where: { id },
       include: { sterilizer: true, _count: { select: { packages: true } } },
     });
-    if (!batch) throw new NotFoundException('ไม่พบรอบนึ่ง');
+    if (!batch) throw new NotFoundException({ message: 'ไม่พบรอบนึ่ง', code: 'BATCH_NOT_FOUND' });
     return batch;
   }
 }
