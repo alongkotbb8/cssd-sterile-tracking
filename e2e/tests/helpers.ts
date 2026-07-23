@@ -38,4 +38,11 @@ export async function login(
   await inputs.nth(1).fill(password);
 
   await page.getByText('เข้าสู่ระบบ', { exact: false }).last().click();
+  // รอหลุดจากหน้า login (ปุ่ม submit หาย)
+  await expect(page.getByText('เข้าสู่ระบบ')).toHaveCount(0, { timeout: 20_000 });
+}
+
+/** เปิดแท็บใน bottom navigation ด้วย label ไทย (semantics) */
+export async function openTab(page: Page, label: string): Promise<void> {
+  await page.getByText(label, { exact: false }).first().click();
 }

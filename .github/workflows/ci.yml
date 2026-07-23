@@ -76,8 +76,9 @@ jobs:
       - run: flutter analyze
       - run: flutter test
 
-  # E2E (Playwright) — ยก stack จริง (Postgres + API + web build ชี้ API local) แล้วรัน smoke
-  # flow เต็ม (login→create→print) gate ด้วย E2E_FLOW จึงยังไม่รันใน CI (ต้อง validate selector ก่อน)
+  # E2E (Playwright) — ยก stack จริง (Postgres + API + web build ชี้ API local) แล้วรัน
+  # smoke + flow + scanner ครบทุก spec ข้าม Desktop Chrome / Mobile Chrome / WebKit (Safari)
+  # ตาม master directive §2D/§3B (ไม่มี test.skip/fixme, ไม่ gate ด้วย flag ที่ CI ไม่ตั้ง)
   e2e:
     runs-on: ubuntu-latest
     services:
@@ -124,9 +125,17 @@ jobs:
           (cd apps/mobile && flutter build web --release --dart-define=CSSD_API_URL=http://localhost:3000)
           (npx --yes http-server apps/mobile/build/web -p 8080 -s &)
           for _ in $(seq 1 20); do curl -s -o /dev/null http://localhost:8080 && break; sleep 1; done
-      - name: playwright smoke
+      - name: playwright e2e (Desktop Chrome + Mobile Chrome + WebKit)
         working-directory: e2e
         run: |
-          npm install
-          npx playwright install --with-deps chromium
-          E2E_BASE_URL=http://localhost:8080 npx playwright test --project=chromium
+          npm ci
+          npx playwright install --with-deps chromium webkit
+          E2E_BASE_URL=http://localhost:8080 npx playwright test \
+            --project=chromium --project=mobile-chrome --project=webkit
+      - name: upload playwright report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: e2e/playwright-report
+          retention-days: 7
