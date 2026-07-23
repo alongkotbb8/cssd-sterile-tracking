@@ -16,6 +16,10 @@
     "node": ">=20.0.0",
     "yarn": ">=1.22.0"
   },
+  "devDependencies": {
+    "@cyclonedx/cyclonedx-npm": "6.0.0",
+    "http-server": "14.1.1"
+  },
   "overrides": {
     "tar": "^7.5.19",
     "multer": "^2.2.0",

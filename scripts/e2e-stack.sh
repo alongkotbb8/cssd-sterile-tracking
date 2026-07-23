@@ -46,7 +46,8 @@ up() {
   ( cd apps/mobile && flutter build web --release --dart-define=CSSD_API_URL="$API_URL" )
 
   echo "== 5/5 serve web ที่ :$WEB_PORT (background) =="
-  ( npx --yes http-server "$ROOT/apps/mobile/build/web" -p "$WEB_PORT" -s >/tmp/cssd-e2e-web.log 2>&1 & echo $! >>"$PID_FILE" )
+  # http-server pinned ใน root lockfile (npm ci ติดตั้งให้แล้ว — ไม่ดาวน์โหลดตอนรัน)
+  ( "$ROOT/node_modules/.bin/http-server" "$ROOT/apps/mobile/build/web" -p "$WEB_PORT" -s >/tmp/cssd-e2e-web.log 2>&1 & echo $! >>"$PID_FILE" )
 
   echo
   echo "✓ stack พร้อม:"

@@ -122,23 +122,39 @@ jobs:
         run: |
           npm run -w apps/api build
           (cd apps/api && node dist/main &)
-          for _ in $(seq 1 30); do curl -s -o /dev/null http://localhost:3000/api/v1 && break; sleep 1; done
+          # wait-for-health แบบ fail-fast: ครบ timeout แล้วยังไม่พร้อม → exit 1
+          # (กัน job เดินต่อทั้งที่ API ไม่ขึ้น แล้ว e2e ล้มแบบสับสน)
+          ok=0
+          for _ in $(seq 1 60); do
+            if curl -fsS -o /dev/null http://localhost:3000/api/v1; then ok=1; break; fi
+            sleep 1
+          done
+          [ "$ok" = 1 ] || { echo "::error::API did not become ready within 60s"; exit 1; }
       - name: build + serve PWA web (→ API local)
         run: |
           (cd apps/mobile && flutter build web --release --dart-define=CSSD_API_URL=http://localhost:3000)
-          (npx --yes http-server apps/mobile/build/web -p 8080 -s &)
-          for _ in $(seq 1 20); do curl -s -o /dev/null http://localhost:8080 && break; sleep 1; done
+          # http-server pinned ใน root lockfile (ไม่มี npx --yes ดาวน์โหลดตอน CI)
+          (./node_modules/.bin/http-server apps/mobile/build/web -p 8080 -s &)
+          ok=0
+          for _ in $(seq 1 30); do
+            if curl -fsS -o /dev/null http://localhost:8080; then ok=1; break; fi
+            sleep 1
+          done
+          [ "$ok" = 1 ] || { echo "::error::static web server did not become ready within 30s"; exit 1; }
       # §2D — E2E ทุก flow ต้องผ่าน 3 รอบติดกัน (จับ flakiness); bash -e ทำให้
-      # รอบใดตกจะหยุดทันที (ไม่ผ่านทั้ง job)
-      - name: playwright e2e ×3 (Desktop Chrome + Mobile Chrome + WebKit)
+      # รอบใดตกจะหยุดทันที (ไม่ผ่านทั้ง job). projects ครบตาม playwright.config
+      # (Desktop Chrome + Mobile Chrome + Desktop WebKit + Mobile Safari/WebKit §2D/§4B.1)
+      - name: playwright e2e ×3 (Chrome + Mobile Chrome + WebKit + Mobile Safari)
         working-directory: e2e
         run: |
           npm ci
+          # ติดตั้ง browser engine (ไม่ใช่ npm dep) จาก playwright ที่ pin ใน e2e lockfile
           npx playwright install --with-deps chromium webkit
           for round in 1 2 3; do
             echo "════════════ E2E round $round/3 ════════════"
             E2E_BASE_URL=http://localhost:8080 npx playwright test \
-              --project=chromium --project=mobile-chrome --project=webkit
+              --project=chromium --project=mobile-chrome \
+              --project=webkit --project=mobile-safari
           done
       - name: upload playwright report
         if: ${{ !cancelled() }}
