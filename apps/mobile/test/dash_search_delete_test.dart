@@ -174,10 +174,13 @@ void main() {
     container.read(dioProvider).httpClientAdapter = adapter;
 
     final l10n = await AppLocalizations.delegate.load(const Locale('th'));
-    final err = await container
+    // login ยิง dio จริง (async บน event loop จริง) — ต้องรันใน runAsync
+    // ไม่งั้น await จะค้างใน fake-async zone ของ testWidgets
+    await tester.runAsync(() => container
         .read(authControllerProvider.notifier)
-        .login('EMP001', 'pw', l10n);
-    expect(err, isNull);
+        .login('EMP001', 'pw', l10n));
+    expect(container.read(authControllerProvider).status,
+        AuthStatus.authenticated);
 
     await tester.pumpWidget(UncontrolledProviderScope(
       container: container,
@@ -200,12 +203,12 @@ void main() {
     // เข้าโหมดเลือก (ปุ่ม checklist)
     await tester.tap(find.byIcon(Icons.checklist_rounded));
     await tester.pump(const Duration(milliseconds: 120));
-    // เลือกตัวกรอง PACKED
-    await tester.tap(find.text(l10n.statusPacked));
+    // เลือกตัวกรอง PACKED — ระบุ FilterChip ให้ชัด (ป้าย "แพ็กแล้ว" ซ้ำกับ badge)
+    await tester.tap(find.widgetWithText(FilterChip, l10n.statusPacked));
     for (var i = 0; i < 6; i++) {
       await tester.pump(const Duration(milliseconds: 120));
     }
-    // เลือกห่อใบแรก (แตะการ์ด → toggle)
+    // เลือกห่อใบแรก (แตะการ์ด → toggle) — เลขห่อปรากฏครั้งเดียวในการ์ด
     await tester.tap(find.text(_kPkgId));
     await tester.pump(const Duration(milliseconds: 120));
   }
@@ -278,8 +281,9 @@ void main() {
     await boot(tester, role: 'CSSD', page: const DashboardPage());
 
     expect(find.text(l10n.dashRecentMovementsTitle), findsOneWidget);
-    // แถวการเคลื่อนไหว (setName + ป้าย OUT + dept)
-    expect(find.text('ห้องคลอด'), findsWidgets);
+    // แถวการเคลื่อนไหว: เลขห่อ + บรรทัด "เบิกออก · ห้องคลอด"
+    expect(find.text('BIRTH-20260101-0003'), findsWidgets);
+    expect(find.textContaining('ห้องคลอด'), findsWidgets);
   });
 
   testWidgets('แดชบอร์ด: พิมพ์ค้นหา → ผลลัพธ์เรนเดอร์ (debounced)', (tester) async {
@@ -310,7 +314,7 @@ void main() {
 
   test('RecentMovement.fromJson + DashboardData recentMovements parse', () {
     final d = DashboardData.fromJson({
-      'summary': const {},
+      'summary': <String, dynamic>{},
       'recentMovements': [
         {
           'packageId': 'P1',

@@ -150,7 +150,7 @@ class _SelectionBar extends ConsumerWidget {
               icon: const Icon(Icons.delete_outline),
               label: Text(l10n.pkgDeleteSelected),
               style: OutlinedButton.styleFrom(
-                minimumSize: const Size.fromHeight(50),
+                minimumSize: const Size(0, 50),
                 foregroundColor: SterelisColors.danger,
                 side: const BorderSide(color: SterelisColors.danger),
               ),
