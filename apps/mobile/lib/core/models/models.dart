@@ -265,6 +265,29 @@ class ScanResultItem {
       );
 }
 
+/// ผลการลบถาวรราย item (POST /packages/bulk-delete) — mirror ScanResultItem
+/// success=false → ดู errorCode (เช่น PKG_HAS_HISTORY) map เป็นข้อความตาม locale
+class BulkDeleteResult {
+  final String packageId;
+  final bool success;
+  final String? error;
+  final String? errorCode;
+
+  const BulkDeleteResult({
+    required this.packageId,
+    required this.success,
+    this.error,
+    this.errorCode,
+  });
+
+  factory BulkDeleteResult.fromJson(Map<String, dynamic> j) => BulkDeleteResult(
+        packageId: j['packageId'] as String,
+        success: (j['success'] ?? false) as bool,
+        error: j['error'] as String?,
+        errorCode: j['errorCode'] as String?,
+      );
+}
+
 class SterilizationBatch {
   final String id;
   final int? roundNo;
@@ -376,12 +399,45 @@ class DashboardSlice {
   const DashboardSlice({required this.name, required this.count});
 }
 
+/// การเคลื่อนไหวล่าสุด (dashboard "ชุดอะไรไปอยู่ที่ไหน") — 1 แถวต่อ 1 Movement
+/// backend map ให้พร้อมใช้ (ดู reports.service dashboard() recentMovements)
+class RecentMovement {
+  final String packageId;
+  final String setName;
+  final String type; // IN | OUT | RETURN
+  final String? departmentName;
+  final String? receiverName;
+  final DateTime? at;
+  final String packageStatus;
+
+  const RecentMovement({
+    required this.packageId,
+    required this.setName,
+    required this.type,
+    required this.packageStatus,
+    this.departmentName,
+    this.receiverName,
+    this.at,
+  });
+
+  factory RecentMovement.fromJson(Map<String, dynamic> j) => RecentMovement(
+        packageId: (j['packageId'] ?? '') as String,
+        setName: (j['setName'] ?? '') as String,
+        type: (j['type'] ?? '') as String,
+        departmentName: j['departmentName'] as String?,
+        receiverName: j['receiverName'] as String?,
+        at: _date(j['at']),
+        packageStatus: (j['packageStatus'] ?? '') as String,
+      );
+}
+
 class DashboardData {
   final List<DashboardSlice> sterileStock;
   final List<DashboardSlice> issuedByDept;
   final int expiringSoon;
   final int expired;
   final int awaitingReprocess;
+  final List<RecentMovement> recentMovements;
 
   const DashboardData({
     required this.sterileStock,
@@ -389,6 +445,7 @@ class DashboardData {
     required this.expiringSoon,
     required this.expired,
     required this.awaitingReprocess,
+    this.recentMovements = const [],
   });
 
   factory DashboardData.fromJson(Map<String, dynamic> j) {
@@ -409,6 +466,9 @@ class DashboardData {
       expiringSoon: (summary['expiringSoon'] ?? 0) as int,
       expired: (summary['expired'] ?? 0) as int,
       awaitingReprocess: (summary['awaitingReprocess'] ?? 0) as int,
+      recentMovements: ((j['recentMovements'] as List?) ?? const [])
+          .map((e) => RecentMovement.fromJson(e as Map<String, dynamic>))
+          .toList(),
     );
   }
 

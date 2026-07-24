@@ -144,6 +144,8 @@ String? serverErrorFromCode(AppLocalizations l10n, String? code) {
       return l10n.srvPkgNotFound;
     case 'PKG_WRONG_STATUS':
       return l10n.srvPkgWrongStatus;
+    case 'PKG_HAS_HISTORY':
+      return l10n.srvPkgHasHistory;
     case 'PKG_ALREADY_IN_THIS_BATCH':
       return l10n.srvPkgAlreadyInThisBatch;
     case 'PKG_IN_OTHER_BATCH':

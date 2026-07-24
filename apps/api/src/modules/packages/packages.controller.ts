@@ -12,16 +12,19 @@ import {
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { ApiBearerAuth, ApiTags, ApiOperation, ApiQuery, ApiHeader } from '@nestjs/swagger';
-import { PackageStatus } from '@prisma/client';
+import { PackageStatus, UserRole } from '@prisma/client';
 import { PackagesService } from './packages.service';
 import { CreatePackageDto } from './dto/create-package.dto';
 import { SetTagsDto } from './dto/set-tags.dto';
+import { BulkDeleteDto } from './dto/bulk-delete.dto';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { Roles } from '../../common/decorators/roles.decorator';
+import { RolesGuard } from '../../common/guards/roles.guard';
 import { IdempotencyService } from '../../common/idempotency/idempotency.service';
 
 @ApiTags('packages')
 @ApiBearerAuth()
-@UseGuards(AuthGuard('jwt'))
+@UseGuards(AuthGuard('jwt'), RolesGuard)
 @Controller('packages')
 export class PackagesController {
   constructor(
@@ -42,17 +45,34 @@ export class PackagesController {
   }
 
   @Get()
-  @ApiOperation({ summary: 'รายการห่อทั้งหมด (กรองตาม status / template / tag)' })
+  @ApiOperation({ summary: 'รายการห่อทั้งหมด (กรองตาม status / template / tag / ค้นหา)' })
   @ApiQuery({ name: 'status', enum: PackageStatus, required: false })
   @ApiQuery({ name: 'templateId', required: false })
   @ApiQuery({ name: 'tagId', required: false })
+  @ApiQuery({ name: 'search', required: false, description: 'ค้นหา: เลขห่อ / ชื่อชุด / อุปกรณ์ในชุด / คลัง (max 60)' })
   findAll(
     @Query('status', new ParseEnumPipe(PackageStatus, { optional: true }))
     status?: PackageStatus,
     @Query('templateId') templateId?: string,
     @Query('tagId') tagId?: string,
+    @Query('search') search?: string,
   ) {
-    return this.svc.findAll(status, templateId, tagId);
+    // trim + จำกัด 60 ตัว (กัน query ยาวผิดปกติ) — ว่าง/ไม่ส่ง = พฤติกรรมเดิม
+    const q = typeof search === 'string' ? search.trim().slice(0, 60) : undefined;
+    return this.svc.findAll(status, templateId, tagId, q || undefined);
+  }
+
+  @Post('bulk-delete')
+  @Roles(UserRole.SUPERVISOR, UserRole.ADMIN)
+  @ApiOperation({ summary: 'ลบห่อถาวรหลายรายการ — เฉพาะ PACKED ที่ยังไม่มีประวัติ (SUPERVISOR/ADMIN)' })
+  @ApiHeader({ name: 'Idempotency-Key', required: true, description: 'บังคับ — กันลบซ้ำจาก retry' })
+  bulkDelete(
+    @Body() dto: BulkDeleteDto,
+    @CurrentUser() user: { id: string },
+    @Headers('idempotency-key') idemKey?: string,
+  ) {
+    return this.idem.run(idemKey, user.id, 'packages/bulk-delete', 'POST', dto, (tx) =>
+      this.svc.bulkDelete(dto.packageIds, user.id, tx), { required: true });
   }
 
   @Get(':id')
