@@ -30,10 +30,9 @@ Future<void> showCreatePackageSheet(BuildContext context, WidgetRef ref) async {
   if (created == null || created.isEmpty || !context.mounted) return;
 
   final l10n = AppLocalizations.of(context);
-  // ปุ่ม "พิมพ์ผ่านเครื่องนี้" (BROWSER_DIALOG) แสดงเฉพาะ flag เปิด + สร้าง 1 ห่อ
-  // (browser print สั่งได้ทีละคำขอต่อห่อ — หลายห่อใช้ Print Gateway ตามเดิม)
-  final browserPrint =
-      ref.read(browserPrintEnabledProvider) && created.length == 1;
+  // ปุ่ม "พิมพ์ผ่านเครื่องนี้" (BROWSER_DIALOG) แสดงเฉพาะเมื่อ flag เปิด
+  // (รองรับหลายห่อ — สร้างคำขอแยกต่อห่อแล้วพิมพ์รวมใน print dialog เดียว)
+  final browserPrint = ref.read(browserPrintEnabledProvider);
   final action = await showDialog<_PostCreateAction>(
     context: context,
     builder: (dctx) => AlertDialog(
@@ -117,7 +116,7 @@ Future<void> showCreatePackageSheet(BuildContext context, WidgetRef ref) async {
       // โหมด BROWSER_DIALOG (หลัง flag) — สร้าง BrowserPrintRequest แยกจาก
       // PrintJob เด็ดขาด ผู้ใช้ยืนยันผลเอง ไม่แตะ printedAt
       await showBrowserPrintSheet(context, ref,
-          pkg: created.first, createdFrom: 'CREATE_PACKAGE');
+          pkgs: created, createdFrom: 'CREATE_PACKAGE');
     case null:
       break;
   }

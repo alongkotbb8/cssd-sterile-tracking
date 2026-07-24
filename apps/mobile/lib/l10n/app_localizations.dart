@@ -2447,8 +2447,14 @@ abstract class AppLocalizations {
   /// No description provided for @bpCopiesLine.
   ///
   /// In th, this message translates to:
-  /// **'จำนวนสำเนา: {count}'**
+  /// **'จำนวนสำเนา: {count} (ต่อห่อ)'**
   String bpCopiesLine(int count);
+
+  /// No description provided for @bpPackagesCount.
+  ///
+  /// In th, this message translates to:
+  /// **'{count} ห่อ'**
+  String bpPackagesCount(int count);
 
   /// No description provided for @bpReprintWarning.
   ///

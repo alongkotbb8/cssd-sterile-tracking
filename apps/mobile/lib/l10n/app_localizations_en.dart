@@ -1353,7 +1353,12 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String bpCopiesLine(int count) {
-    return 'Copies: $count';
+    return 'Copies: $count (per package)';
+  }
+
+  @override
+  String bpPackagesCount(int count) {
+    return '$count packages';
   }
 
   @override

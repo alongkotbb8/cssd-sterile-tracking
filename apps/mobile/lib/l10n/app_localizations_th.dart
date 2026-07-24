@@ -1338,7 +1338,12 @@ class AppLocalizationsTh extends AppLocalizations {
 
   @override
   String bpCopiesLine(int count) {
-    return 'จำนวนสำเนา: $count';
+    return 'จำนวนสำเนา: $count (ต่อห่อ)';
+  }
+
+  @override
+  String bpPackagesCount(int count) {
+    return '$count ห่อ';
   }
 
   @override

@@ -36,7 +36,7 @@ class PackageDetailPage extends ConsumerWidget {
                 tooltip: l10n.bpPrintViaThisDevice,
                 icon: const Icon(Icons.open_in_browser),
                 onPressed: () => showBrowserPrintSheet(context, ref,
-                    pkg: pkg, createdFrom: 'PACKAGE_DETAIL'),
+                    pkgs: [pkg], createdFrom: 'PACKAGE_DETAIL'),
               ),
               orElse: () => const SizedBox.shrink(),
             ),

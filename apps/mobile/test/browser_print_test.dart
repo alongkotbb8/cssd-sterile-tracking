@@ -247,12 +247,12 @@ void main() {
   }
 
   /// host เปิด sheet (ฟังก์ชัน show ต้องมี context+ref) — sheetHost pattern
-  Widget sheetHost(PackageModel pkg) => Consumer(builder: (context, ref, _) {
+  Widget sheetHost(List<PackageModel> pkgs) => Consumer(builder: (context, ref, _) {
         return Scaffold(
           body: Center(
             child: ElevatedButton(
               onPressed: () => showBrowserPrintSheet(context, ref,
-                  pkg: pkg, createdFrom: 'PACKAGE_DETAIL'),
+                  pkgs: pkgs, createdFrom: 'PACKAGE_DETAIL'),
               child: const Text('open'),
             ),
           ),
@@ -263,11 +263,12 @@ void main() {
     WidgetTester tester, {
     required _BpAdapter adapter,
     PackageModel? pkg,
+    List<PackageModel>? pkgs,
     List<LabelData>? renderedLabels,
   }) async {
     await pumpApp(tester,
         adapter: adapter,
-        home: sheetHost(pkg ?? _pkgModel()),
+        home: sheetHost(pkgs ?? [pkg ?? _pkgModel()]),
         renderedLabels: renderedLabels);
     await tester.tap(find.text('open'));
     await pumpN(tester);
@@ -422,6 +423,22 @@ void main() {
       expect(find.text(th.bpResultPrinted), findsOneWidget);
       expect(find.text(th.bpResultNotPrinted), findsOneWidget);
       expect(find.text(th.bpResultLater), findsOneWidget);
+    });
+
+    testWidgets('หลายห่อ: สร้างคำขอแยก 1 ต่อ 1 ห่อ → พิมพ์รวม print dialog เดียว → ยืนยันทุกห่อ',
+        (tester) async {
+      final adapter = _BpAdapter();
+      await openSheet(tester, adapter: adapter, pkgs: [_pkgModel(), _pkgModel()]);
+      // auto-create 1 คำขอต่อห่อ (2 ห่อ = 2 คำขอ)
+      expect(adapter.events.where((e) => e == 'POST create').length, 2);
+      await tapInSheet(tester, th.bpPrintViaThisDevice);
+      // บันทึก dialog-opened ทุกห่อ (2) ก่อน แล้วเปิด print dialog "ครั้งเดียว" (PDF รวม)
+      expect(adapter.events.where((e) => e == 'POST dialog-opened').length, 2);
+      expect(adapter.events.where((e) => e == 'print-seam').length, 1);
+      // ยืนยันผล → confirm ทุกห่อ (2)
+      await tapInSheet(tester, th.bpResultPrinted);
+      expect(adapter.events.where((e) => e == 'POST confirm').length, 2);
+      expect(find.text(th.bpResultQuestion), findsNothing);
     });
   });
 

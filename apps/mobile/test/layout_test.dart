@@ -282,7 +282,7 @@ void main() {
           body: Center(
             child: ElevatedButton(
               onPressed: () => showBrowserPrintSheet(context, ref,
-                  pkg: pkg, createdFrom: 'PACKAGE_DETAIL'),
+                  pkgs: [pkg], createdFrom: 'PACKAGE_DETAIL'),
               child: const Text('open'),
             ),
           ),

@@ -223,16 +223,15 @@ class _SubmitPrintJobSheetState extends ConsumerState<_SubmitPrintJobSheet> {
             style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
           ),
           // Browser print (BROWSER_DIALOG) — ทางเลือกพิมพ์ผ่าน macOS print dialog บนเครื่อง
-          // นี้โดยตรง (ไม่ต้องมี Print Gateway). รองรับทีละ 1 ห่อ + เฉพาะเมื่อเปิด feature flag
-          if (ref.watch(browserPrintEnabledProvider) &&
-              widget.pkgs.length == 1 &&
-              !_submitting) ...[
+          // นี้โดยตรง (ไม่ต้องมี Print Gateway). รองรับหลายห่อ (พิมพ์รวม print dialog เดียว)
+          // เฉพาะเมื่อเปิด feature flag
+          if (ref.watch(browserPrintEnabledProvider) && !_submitting) ...[
             const SizedBox(height: 10),
             OutlinedButton.icon(
               onPressed: () {
                 Navigator.of(context).pop();
                 showBrowserPrintSheet(context, ref,
-                    pkg: widget.pkgs.first, createdFrom: 'PACKAGE_DETAIL');
+                    pkgs: widget.pkgs, createdFrom: 'PACKAGE_DETAIL');
               },
               icon: const Icon(Icons.open_in_browser),
               label: Text(l10n.bpPrintViaThisDevice),
