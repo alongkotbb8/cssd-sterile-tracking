@@ -11,6 +11,7 @@ import { ReportsModule } from './modules/reports/reports.module';
 import { MasterDataModule } from './modules/master-data/master-data.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { PrintJobsModule } from './modules/print-jobs/print-jobs.module';
+import { BrowserPrintModule } from './modules/browser-print/browser-print.module';
 import { HealthController } from './health.controller';
 
 @Module({
@@ -27,6 +28,7 @@ import { HealthController } from './health.controller';
     MasterDataModule,
     NotificationsModule,
     PrintJobsModule,
+    BrowserPrintModule,
   ],
   controllers: [HealthController],
 })

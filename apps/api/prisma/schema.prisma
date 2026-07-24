@@ -169,6 +169,7 @@ model Package {
   tags          PackageTag[]
   printJobs     PrintJob[]
   batchAttempts PackageBatchAttempt[]
+  browserPrintRequests BrowserPrintRequest[]
 
   @@index([status])
   @@index([expiryDate])
@@ -301,6 +302,58 @@ model PrintJob {
   @@map("print_jobs")
 }
 
+// ─── Browser Print (MACOS_BROWSER_PRINT_DIRECTIVE.md) ───────────────────────
+// โหมดพิมพ์ผ่าน browser/macOS system print dialog บน Mac ที่เสียบ XP-420B —
+// แยก semantics จาก PrintJob (Gateway) เด็ดขาด: browser พิสูจน์ hardware ไม่ได้
+// จึงมีได้แค่ CREATED → DIALOG_OPENED → USER_CONFIRMED|CANCELLED (ผู้ใช้ยืนยันเอง)
+// ห้ามใช้ PRINTED/SENT/ACK_UNKNOWN กับตารางนี้ และห้ามแตะ Package.printedAt/reprintCount
+
+enum BrowserPrintStatus {
+  CREATED        // backend สร้างคำขอแล้ว (ยังไม่เปิดหน้าต่างพิมพ์)
+  DIALOG_OPENED  // PWA บันทึกว่าเรียกเปิด print dialog แล้ว — ยังไม่รู้ผลจริง
+  USER_CONFIRMED // ผู้ใช้ยืนยันเองว่ากระดาษออก (ไม่ใช่ hardware-confirmed)
+  CANCELLED      // ผู้ใช้แจ้งว่าไม่ได้พิมพ์/ยกเลิก
+}
+
+enum BrowserPrintMode {
+  BROWSER_DIALOG
+}
+
+enum BrowserPrintOrigin {
+  CREATE_PACKAGE // จาก dialog สร้างห่อสำเร็จ
+  PACKAGE_DETAIL // จากหน้ารายละเอียดห่อ
+  PRINT_JOBS     // จากหน้ารวมงานพิมพ์
+}
+
+model BrowserPrintRequest {
+  id                String              @id @default(cuid())
+  packageId         String
+  package           Package             @relation(fields: [packageId], references: [id])
+  requestedByUserId String
+  requestedBy       User                @relation("BrowserPrintRequester", fields: [requestedByUserId], references: [id])
+  requestedAt       DateTime            @default(now())
+  // ห้ามแก้ packageId/requestedByUserId/requestedAt/mode หลังสร้าง (service ไม่มี path ที่แก้)
+  mode              BrowserPrintMode    @default(BROWSER_DIALOG)
+  templateVersion   String              @db.VarChar(30)
+  copies            Int // 1–10 (DTO + service validate)
+  isReprint         Boolean             @default(false) // backend-computed เท่านั้น
+  reprintReason     String?             @db.VarChar(200)
+  status            BrowserPrintStatus  @default(CREATED)
+  dialogOpenedAt    DateTime?
+  userConfirmedAt   DateTime?
+  cancelledAt       DateTime?
+  createdFrom       BrowserPrintOrigin
+  userAgent         String?             @db.VarChar(300)
+  idempotencyKey    String              @db.VarChar(100)
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+
+  @@index([packageId, createdAt])
+  @@index([requestedByUserId])
+  @@index([status])
+  @@map("browser_print_requests")
+}
+
 // ─── Tagging (จัดกลุ่ม/ค้นหาห่อ) ────────────────────────────────────────────
 
 model Tag {
@@ -406,6 +459,7 @@ model User {
   fcmTokens         FcmToken[]
   printJobsRequested PrintJob[] @relation("PrintJobRequester")
   printJobsResolved  PrintJob[] @relation("PrintJobResolver")
+  browserPrintRequests BrowserPrintRequest[] @relation("BrowserPrintRequester")
 
   @@map("users")
 }
