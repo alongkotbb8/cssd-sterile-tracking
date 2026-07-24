@@ -911,3 +911,24 @@ Scope:
 | Gate 7/UAT | NOT STARTED | | | | |
 
 จนกว่าตารางนี้จะมีหลักฐานและผู้ตรวจลงผล ห้ามเปลี่ยนสถานะเอง
+
+---
+
+# 13. Addendum: Browser Print Mode (2026-07-24)
+
+เอกสาร [`MACOS_BROWSER_PRINT_DIRECTIVE.md`](MACOS_BROWSER_PRINT_DIRECTIVE.md)
+(REQUIRED / BLOCKING / LOCKED) เป็น **ส่วนขยายอย่างเป็นทางการของ directive ฉบับนี้**
+ว่าด้วยโหมดพิมพ์ `BROWSER_DIALOG`:
+
+- เพิ่มโหมดพิมพ์ `BROWSER_DIALOG` (macOS system print dialog บน Mac ที่เสียบ XP-420B
+  และเปิด PWA เครื่องเดียวกัน) โดย **คง `PRINT_GATEWAY` เดิมไว้ครบถ้วน** — ห้ามลบ
+  ลดความปลอดภัย หรือเปลี่ยนความหมายของ Print Gateway
+- Browser พิสูจน์ผล hardware ไม่ได้ → สถานะจำกัดที่
+  `CREATED → DIALOG_OPENED → USER_CONFIRMED | CANCELLED` (ผู้ใช้ยืนยันเอง)
+  และ**ห้ามแตะ** `printedAt`/`reprintCount`/สถานะ Gateway ใด ๆ
+- เปิดใช้หลัง feature flag `CSSD_BROWSER_PRINT_ENABLED` (default ปิดทั้ง backend + PWA)
+- ข้อกำหนดโดยละเอียด (data model, API, audit, reprint, UX, label, security, tests,
+  hardware acceptance บน Mac + XP-420B, รูปแบบรายงาน) ให้ยึดตามเอกสาร addendum ฉบับเต็ม
+- เมื่อขัดแย้งกับข้อความเดิมในเอกสารนี้ที่ระบุว่า Print Gateway เป็น "ทางเดียว/เท่านั้น"
+  ให้ตีความว่า: Print Gateway เป็นเส้นทางเดียวที่ **hardware-confirm ผลพิมพ์ได้**
+  ส่วน `BROWSER_DIALOG` เป็นโหมดเสริมที่บันทึกผลแบบ user-confirmed เท่านั้น

@@ -3,7 +3,7 @@
 > เอกสารนี้เป็นข้อบังคับสำหรับ AI และนักพัฒนาทุกคนที่ทำงานกับระบบนี้  
 > ต้องอ่าน `AGENTS.md` และไฟล์นี้ให้ครบก่อนวางแผน เขียน แก้ หรือ review โค้ด  
 > หากข้อกำหนดขัดกัน ให้ใช้กฎที่ปลอดภัยต่อผู้ป่วยและเข้มงวดกว่า และหยุดถามผู้ใช้ก่อนเปลี่ยนพฤติกรรมระบบ  
-> ⚠️ **SINGLE SOURCE OF TRUTH = [`CSSD_MASTER_EXECUTION_DIRECTIVE.md`](CSSD_MASTER_EXECUTION_DIRECTIVE.md)** (2026-07-23) — เมื่อขัดแย้งกันให้ยึดเอกสารนั้น (online-only Chrome PWA, XP-420B ผ่าน Gateway; ยกเลิก offline/Bluetooth Pilot/Zebra)
+> ⚠️ **SINGLE SOURCE OF TRUTH = [`CSSD_MASTER_EXECUTION_DIRECTIVE.md`](CSSD_MASTER_EXECUTION_DIRECTIVE.md)** (2026-07-23) + addendum การพิมพ์ [`MACOS_BROWSER_PRINT_DIRECTIVE.md`](MACOS_BROWSER_PRINT_DIRECTIVE.md) (2026-07-24) — เมื่อขัดแย้งกันให้ยึดเอกสารเหล่านั้น (online-only Chrome PWA, XP-420B ผ่าน Gateway + โหมดเสริม `BROWSER_DIALOG` บน Mac หลัง flag; ยกเลิก offline/Bluetooth Pilot/Zebra)
 
 ## 1. เป้าหมายระบบ
 
@@ -50,6 +50,20 @@ Chrome PWA
 8. ห้ามใช้ข้อมูลผู้ป่วยหรือข้อมูล Production ใน development/test
 9. ห้ามใส่ secret, token, password หรือ private key ลง repository
 10. ห้ามเปลี่ยน stack, state machine หรือกฎโดเมนโดยไม่ได้รับอนุมัติ
+
+### 2.1 Browser Print (`BROWSER_DIALOG`) — กฎเฉพาะโหมด (MACOS_BROWSER_PRINT_DIRECTIVE.md)
+
+- โหมดนี้ = macOS system print dialog บน Mac ที่เสียบ XP-420B และเปิด PWA เครื่องเดียวกัน
+  เท่านั้น — **ไม่ใช่ direct USB printing**; ห้าม WebUSB; ห้ามเปิด Bluetooth/A318BT กลับมา
+- สถานะมีได้เฉพาะ `CREATED → DIALOG_OPENED → USER_CONFIRMED | CANCELLED`;
+  ห้ามใช้ `PRINTED/SENT/MAYBE_SENT/ACK_UNKNOWN`; `USER_CONFIRMED` ต้องสื่อว่า
+  "ผู้ใช้ยืนยันเอง" ห้ามสื่อว่า "เครื่องพิมพ์ยืนยันแล้ว"
+- ห้ามตั้ง `printedAt`/`reprintCount` จาก browser flow; ห้ามเรียก Gateway ACK endpoint
+  จาก browser; ห้ามถือว่า `window.print()`/print plugin return = พิมพ์สำเร็จ
+- Feature flag `CSSD_BROWSER_PRINT_ENABLED` default ปิด ทั้ง backend (ตรวจทุก endpoint)
+  และ PWA (ซ่อนปุ่ม) — production ห้ามเปิดโดยไม่ตั้งใจ
+- Reprint: backend เป็นผู้ตัดสิน (ประวัติ browser `DIALOG_OPENED|USER_CONFIRMED` หรือ
+  gateway ACK) + บังคับเหตุผล + Audit; ห้าม reuse request เดิม/เปิด dialog อัตโนมัติหลัง refresh
 
 ## 3. กฎโดเมนบังคับ
 
