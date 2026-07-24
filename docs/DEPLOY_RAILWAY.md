@@ -1,5 +1,16 @@
 # Deploy API + PostgreSQL บน Railway (แทน Render — ไม่มี cold-start / ไม่หลับ)
 
+> ✅ **ทำจริงแล้ว (2026-07-24)** — production รันบน Railway:
+> - โปรเจกต์ Railway: `cssd-sterile` (workspace `alongkotbb8's Projects`)
+> - service `cssd-api` + `Postgres` (region sfo/US-East) — API: `https://cssd-api-production-3f39.up.railway.app`
+> - ข้อมูลย้ายจาก Neon เดิม → Railway Postgres เรียบร้อย (pg_dump/pg_restore v18)
+> - PWA (`https://sterelis-cssd.pages.dev`) rebuild ชี้ Railway แล้ว
+> - Render (`cssd-api.onrender.com`) = fallback เท่านั้น (rollback ได้โดย rebuild PWA ชี้ URL เดิม)
+> - เครื่องมือ client v18: `brew install libpq` → `/opt/homebrew/opt/libpq/bin/{pg_dump,pg_restore,psql}`
+>   (จำเป็นเพราะทั้ง Neon และ Railway เป็น PG18 — pg_dump ต้อง ≥ เวอร์ชัน server)
+> ขั้นตอนด้านล่างคือ runbook ทั่วไป/สำหรับทำซ้ำ.
+
+
 > เหตุผลที่ย้าย: Render free web service **หลับหลังไม่มีคนใช้ ~15 นาที** (คำขอแรกช้า 30–60 วิ
 > หรือ error 522) และ Render free Postgres **หมดอายุใน 90 วัน**. Railway ไม่หลับและมี Postgres ในตัว.
 > PWA (Cloudflare Pages) **ไม่ต้องย้าย** — แค่ rebuild ให้ชี้ URL ใหม่.
