@@ -7,6 +7,7 @@ import { RunningNumberService } from '../../src/modules/packages/running-number.
 import { PrintJobsService } from '../../src/modules/print-jobs/print-jobs.service';
 import { BatchesService } from '../../src/modules/batches/batches.service';
 import { ScanService } from '../../src/modules/scan/scan.service';
+import { BrowserPrintService } from '../../src/modules/browser-print/browser-print.service';
 
 export function makeClient(): PrismaClient {
   return new PrismaClient({ datasources: { db: { url: TEST_DATABASE_URL } } });
@@ -20,7 +21,8 @@ export function services(prisma: PrismaClient) {
   const printJobs = new PrintJobsService(prisma as any, audit);
   const batches = new BatchesService(prisma as any, audit);
   const scan = new ScanService(prisma as any, audit);
-  return { audit, running, packages, idem, printJobs, batches, scan };
+  const browserPrint = new BrowserPrintService(prisma as any, audit);
+  return { audit, running, packages, idem, printJobs, batches, scan, browserPrint };
 }
 
 export interface SeedIds {
@@ -34,7 +36,7 @@ export interface SeedIds {
  *  spec file ได้อย่างปลอดภัย (ไฟล์รันเรียงกันบน DB เดียว ต้องไม่ชน unique) */
 export async function seedBase(prisma: PrismaClient): Promise<SeedIds> {
   await prisma.$executeRawUnsafe(
-    'TRUNCATE "package_batch_attempts","sterilization_batches","sterilizers","print_jobs","idempotent_requests","movements","audit_logs","packages","running_number_sequences","printer_devices","set_templates","users" RESTART IDENTITY CASCADE',
+    'TRUNCATE "browser_print_requests","package_batch_attempts","sterilization_batches","sterilizers","print_jobs","idempotent_requests","movements","audit_logs","packages","running_number_sequences","printer_devices","set_templates","users" RESTART IDENTITY CASCADE',
   );
   const user = await prisma.user.create({
     data: { employeeCode: 'INT001', name: 'Integration Tester', passwordHash: 'x', role: 'ADMIN' },
@@ -63,7 +65,7 @@ export async function seedBase(prisma: PrismaClient): Promise<SeedIds> {
 /** ล้างข้อมูล transactional ระหว่างเทส (คง user/template/gateway/sterilizer ไว้) */
 export async function truncateTx(prisma: PrismaClient): Promise<void> {
   await prisma.$executeRawUnsafe(
-    'TRUNCATE "package_batch_attempts","sterilization_batches","print_jobs","idempotent_requests","movements","audit_logs","packages","running_number_sequences" RESTART IDENTITY CASCADE',
+    'TRUNCATE "browser_print_requests","package_batch_attempts","sterilization_batches","print_jobs","idempotent_requests","movements","audit_logs","packages","running_number_sequences" RESTART IDENTITY CASCADE',
   );
 }
 

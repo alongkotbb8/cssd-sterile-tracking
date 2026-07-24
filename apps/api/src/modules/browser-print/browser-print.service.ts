@@ -188,12 +188,25 @@ export class BrowserPrintService {
       });
     }
 
-    // isReprint คำนวณที่ backend เสมอ (directive §9): เคยมี browser request ที่
-    // DIALOG_OPENED/USER_CONFIRMED หรือ gateway เคย ACK พิมพ์จริง (printedAt)
+    // P1: serialize การตัดสิน reprint ต่อ 1 ห่อ — ล็อกระดับ transaction ด้วย
+    // pg_advisory_xact_lock (ปลดเองตอน tx commit/rollback). กัน TOCTOU: หากสองคำขอ
+    // (idempotency key คนละค่า) มาพร้อมกัน คำขอที่สองต้องรอคำขอแรก commit ก่อนจึงอ่าน
+    // ประวัติ → เห็นคำขอแรกเป็น prior → ถูกบังคับเป็น reprint (ไม่ใช่ isReprint=false ทั้งคู่)
+    await this.lockPackage(tx, pkg.id);
+
+    // isReprint คำนวณที่ backend เสมอ (directive §9 + P1): เคยมี browser request ที่
+    // "ยังไม่ถูกยกเลิก" (CREATED/DIALOG_OPENED/USER_CONFIRMED — คำขอที่กำลังจะพิมพ์อยู่)
+    // หรือ gateway เคย ACK พิมพ์จริง (printedAt). CANCELLED ไม่นับ (ถูกยกเลิกไปแล้ว)
     const priors = (await tx.browserPrintRequest.findMany({
       where: {
         packageId: pkg.id,
-        status: { in: [BrowserPrintStatus.DIALOG_OPENED, BrowserPrintStatus.USER_CONFIRMED] },
+        status: {
+          in: [
+            BrowserPrintStatus.CREATED,
+            BrowserPrintStatus.DIALOG_OPENED,
+            BrowserPrintStatus.USER_CONFIRMED,
+          ],
+        },
       },
       orderBy: { updatedAt: 'desc' },
       include: { requestedBy: { select: { name: true } } },
@@ -244,18 +257,44 @@ export class BrowserPrintService {
 
     return {
       ...this.toRow(created),
-      // label authoritative จาก DB — ห่อยังไม่ sterile → วันที่เป็น null ทั้งคู่
-      label: {
-        packageId: pkg.id,
-        templateName: pkg.setTemplate.name,
-        wrapType: pkg.wrapType,
-        status: pkg.status,
-        sterilizeDate: pkg.sterilizeDate,
-        expiryDate: pkg.expiryDate,
-        isSterilized: pkg.sterilizeDate !== null,
-      },
+      label: this.buildLabel(pkg),
       priorPrints,
     };
+  }
+
+  /**
+   * label authoritative จาก DB (directive §9/§11) — วันที่ต้องมาจาก backend เท่านั้น
+   * P0 (patient-safety): แสดงวันที่ได้เฉพาะเมื่อ "สถานะปัจจุบันเป็น STERILE จริง" และมี
+   * วันที่ครบทั้งคู่ — ห่อที่ reprocess กลับเป็น PACKED (RETURNED→PACKED) อาจยังมี
+   * sterilizeDate เก่าค้างในแถว การตัดสินจากการมี sterilizeDate เพียงอย่างเดียวจะทำให้
+   * พิมพ์วันที่รอบเก่า (ผิดกฎ) จึง gate ด้วย status === STERILE + วันที่ครบ มิฉะนั้นเป็น null
+   */
+  private buildLabel(pkg: {
+    id: string;
+    setTemplate: { name: string };
+    wrapType: string;
+    status: PackageStatus;
+    sterilizeDate: Date | null;
+    expiryDate: Date | null;
+  }) {
+    const isSterilized =
+      pkg.status === PackageStatus.STERILE &&
+      pkg.sterilizeDate !== null &&
+      pkg.expiryDate !== null;
+    return {
+      packageId: pkg.id,
+      templateName: pkg.setTemplate.name,
+      wrapType: pkg.wrapType,
+      status: pkg.status,
+      sterilizeDate: isSterilized ? pkg.sterilizeDate : null,
+      expiryDate: isSterilized ? pkg.expiryDate : null,
+      isSterilized,
+    };
+  }
+
+  /** P1: pg_advisory_xact_lock ต่อ packageId — serialize การสร้างคำขอของห่อเดียวกัน */
+  private async lockPackage(tx: Prisma.TransactionClient, packageId: string) {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`browser-print:${packageId}`}))`;
   }
 
   /**

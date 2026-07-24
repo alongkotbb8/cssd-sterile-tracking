@@ -152,6 +152,9 @@ function makeDb(requestRows: any[] = [], packageRows: any[] = []) {
     package: pkg,
     printJob,
     idempotentRequest,
+    // P1: advisory lock — no-op ใน fake (ของจริงคือ pg_advisory_xact_lock บน Postgres;
+    // การ serialize จริงพิสูจน์ใน integration test ด้วย PG จริง)
+    $executeRaw: async () => 0,
     auditLog: {
       create: async (args: any) => {
         audit.push(args.data);
@@ -275,6 +278,59 @@ describe('BrowserPrintService.create', () => {
     expect(res.label.sterilizeDate).toBeNull();
     expect(res.label.expiryDate).toBeNull();
     expect(res.label.isSterilized).toBe(false);
+  });
+
+  it('P0 label: ห่อ PACKED ที่ยังมีวันที่รอบเก่าค้าง (หลัง reprocess) → วันที่ null + isSterilized=false', async () => {
+    // สถานะปัจจุบัน PACKED (รอนึ่งรอบใหม่) แต่ sterilizeDate/expiryDate เก่ายังค้างในแถว —
+    // ต้อง gate ด้วยสถานะ ไม่ใช่แค่การมี sterilizeDate มิฉะนั้นจะพิมพ์วันที่รอบเก่า (ผิด patient-safety)
+    const db = makeDb([], [
+      pkgRow({
+        status: 'PACKED',
+        sterilizeDate: new Date('2026-01-01T00:00:00Z'),
+        expiryDate: new Date('2026-06-30T00:00:00Z'),
+      }),
+    ]);
+    const svc = makeSvc(db);
+    const res = await db.$transaction((tx: any) =>
+      svc.create(createDto() as any, 'user-1', 'UA', 'key-1', tx),
+    );
+    expect(res.label.status).toBe('PACKED');
+    expect(res.label.isSterilized).toBe(false);
+    expect(res.label.sterilizeDate).toBeNull();
+    expect(res.label.expiryDate).toBeNull();
+  });
+
+  it('P0 label: RETURNED ที่มีวันที่ค้าง → วันที่ null + isSterilized=false เช่นกัน', async () => {
+    const db = makeDb([], [
+      pkgRow({ status: 'RETURNED', sterilizeDate: new Date('2026-01-01T00:00:00Z'),
+        expiryDate: new Date('2026-06-30T00:00:00Z') }),
+    ]);
+    const svc = makeSvc(db);
+    const res = await db.$transaction((tx: any) =>
+      svc.create(createDto() as any, 'user-1', 'UA', 'key-2', tx),
+    );
+    expect(res.label.isSterilized).toBe(false);
+    expect(res.label.sterilizeDate).toBeNull();
+  });
+
+  it('P1 reprint: มี prior CREATED (คำขอที่กำลังจะพิมพ์) ไม่มีเหตุผล → 400 (นับ non-cancelled เป็น reprint)', async () => {
+    const prior = reqRow({ id: 'bpr-created', status: BrowserPrintStatus.CREATED });
+    const db = makeDb([prior], [pkgRow()]);
+    const svc = makeSvc(db);
+    await expect(
+      db.$transaction((tx: any) => svc.create(createDto() as any, 'user-1', 'UA', 'k', tx)),
+    ).rejects.toMatchObject({ response: { code: 'BROWSER_PRINT_REPRINT_REASON_REQUIRED' } });
+  });
+
+  it('P1 reprint: prior ที่ถูก CANCELLED ไม่นับเป็น reprint → สร้างใหม่ได้โดยไม่ต้องมีเหตุผล', async () => {
+    const prior = reqRow({ id: 'bpr-cancelled', status: BrowserPrintStatus.CANCELLED,
+      cancelledAt: new Date('2026-07-24T02:00:00Z') });
+    const db = makeDb([prior], [pkgRow()]);
+    const svc = makeSvc(db);
+    const res = await db.$transaction((tx: any) =>
+      svc.create(createDto() as any, 'user-1', 'UA', 'k', tx),
+    );
+    expect(res.isReprint).toBe(false);
   });
 
   it('ตัด userAgent ให้ไม่เกิน 300 ตัวอักษร', async () => {

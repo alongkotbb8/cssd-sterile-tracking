@@ -248,9 +248,17 @@ export class ScanService {
         continue;
       }
       // CAS: ต้องยัง RETURNED — กันชนกับการดำเนินการพร้อมกัน
+      // P0 (patient-safety): ล้างวันที่นึ่ง/หมดอายุของรอบเก่าตอนกลับเป็น PACKED — ห่อรอ
+      // นึ่งรอบใหม่ต้องไม่มีวันที่เก่าค้าง (กัน label/รายงานแสดงวันที่รอบก่อน) วันที่ใหม่จะถูก
+      // คำนวณตอนรอบนึ่งใหม่ผ่านผล; ประวัติการผูกรอบยังอยู่ครบใน PackageBatchAttempt (ไม่ถูกแตะ)
       const { count } = await tx.package.updateMany({
         where: { id, status: PackageStatus.RETURNED },
-        data: { status: PackageStatus.PACKED, batchId: null },
+        data: {
+          status: PackageStatus.PACKED,
+          batchId: null,
+          sterilizeDate: null,
+          expiryDate: null,
+        },
       });
       if (count === 0) {
         results.push({ packageId: id, success: false, error: 'ห่อนี้ถูกดำเนินการไปพร้อมกันจากที่อื่นแล้ว', errorCode: 'PKG_CONCURRENT' });
