@@ -6,9 +6,12 @@ import {
   Injectable,
 } from '@nestjs/common';
 import { Request } from 'express';
+import { resolveThrottleConfig } from '../config/throttle-config';
 
-const WINDOW_MS = 60_000; // 1 minute
-const MAX_ATTEMPTS = 10; // per IP per window
+// อ่าน+validate env ตอนโหลดโมดูล (fail fast: production ตั้งค่าผิด/เกินเพดาน →
+// โยน error ทันที ไม่เปิดเซิร์ฟเวอร์ที่ป้องกัน brute-force อ่อนเกินไปโดยเงียบ ๆ)
+const { windowMs: WINDOW_MS, maxAttempts: MAX_ATTEMPTS } =
+  resolveThrottleConfig(process.env);
 
 interface Bucket {
   count: number;
@@ -44,7 +47,10 @@ export class LoginThrottleGuard implements CanActivate {
     bucket.count += 1;
     if (bucket.count > MAX_ATTEMPTS) {
       throw new HttpException(
-        'พยายามเข้าสู่ระบบบ่อยเกินไป กรุณาลองใหม่อีกครั้งภายหลัง',
+        {
+          message: 'พยายามเข้าสู่ระบบบ่อยเกินไป กรุณาลองใหม่อีกครั้งภายหลัง',
+          code: 'AUTH_RATE_LIMITED',
+        },
         HttpStatus.TOO_MANY_REQUESTS,
       );
     }

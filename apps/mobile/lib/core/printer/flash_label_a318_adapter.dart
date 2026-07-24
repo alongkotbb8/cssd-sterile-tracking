@@ -5,6 +5,13 @@ import 'package:print_bluetooth_thermal/print_bluetooth_thermal.dart';
 import 'label_renderer.dart';
 import 'printer_adapter.dart';
 
+/// ⚠️ LEGACY / DEPRECATED — Bluetooth direct-print fallback เท่านั้น (ไม่ใช่ทางหลัก)
+///
+/// ทางพิมพ์อย่างเป็นทางการของระบบตอนนี้ = **Print Job Queue → Print Gateway → Xprinter
+/// XP-420B (usb_spool)** ซึ่ง PWA/มือถือ **ไม่พิมพ์ตรงและไม่ตั้งสถานะ PRINTED เอง**
+/// (ดู features/print_jobs/) adapter นี้ไม่ได้ผูกกับปุ่มพิมพ์ใน UI แล้ว คงไว้เป็น
+/// fallback ฉุกเฉินระดับโค้ด — ถอดได้เมื่อยืนยันยกเลิก BT fallback
+///
 /// FlashLabel A318BT adapter — TSPL over Bluetooth
 ///
 /// FlashLabel A318BT specs:

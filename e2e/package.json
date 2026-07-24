@@ -1,0 +1,17 @@
+{
+  "name": "@cssd/e2e",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Browser E2E (Playwright) สำหรับ CSSD PWA — smoke + PWA checks",
+  "scripts": {
+    "test": "playwright test smoke.spec.ts",
+    "test:e2e": "playwright test",
+    "test:headed": "playwright test --headed",
+    "report": "playwright show-report",
+    "test:webkit": "playwright test --project=webkit",
+    "install:browsers": "playwright install --with-deps chromium webkit"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.48.0"
+  }
+}

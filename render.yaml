@@ -18,3 +18,8 @@ services:
         sync: false
       - key: CORS_ORIGINS
         sync: false
+      # Browser Print (BROWSER_DIALOG) — เปิดชั่วคราวเพื่อให้หน้างานทดสอบบน Mac + XP-420B
+      # และเก็บข้อมูลจริง (MACOS_BROWSER_PRINT_DIRECTIVE.md). ยังไม่ผ่าน hardware verification
+      # (§15) — ปิดได้โดยตั้งค่าเป็น false หรือลบคีย์นี้แล้ว deploy ใหม่
+      - key: CSSD_BROWSER_PRINT_ENABLED
+        value: "true"

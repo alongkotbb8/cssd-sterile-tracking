@@ -18,7 +18,7 @@ export class NotificationsController {
   }
 
   @Delete('fcm-token')
-  unregister(@Body() dto: RegisterTokenDto) {
-    return this.svc.unregisterToken(dto.token);
+  unregister(@Body() dto: RegisterTokenDto, @CurrentUser() user: { id: string }) {
+    return this.svc.unregisterToken(user.id, dto.token);
   }
 }

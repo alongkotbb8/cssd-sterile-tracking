@@ -1,0 +1,106 @@
+name: security-scan
+
+# สแกนความปลอดภัย: dependency vulnerabilities + secret leak
+# รันทุก push/PR เข้า main และรายสัปดาห์ (จับ CVE ใหม่ของ dependency เดิม)
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: '0 2 * * 1' # ทุกวันจันทร์ 02:00 UTC
+
+permissions:
+  contents: read
+
+jobs:
+  # ── Secret scan (blocking) — กัน .env/คีย์/ความลับหลุดเข้า git ──
+  secret-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # gitleaks ต้องเห็นทั้ง history
+      - name: gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ── Node dependency audit (api / print-gateway / shared) ──
+  npm-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      # Blocking gate = ช่องโหว่ระดับ high+ ทั้ง tree (รวม dev). แก้ให้ครบด้วย overrides +
+      # dep bump (bcrypt@6 ตัด node-pre-gyp/tar; @nestjs/cli@11 → webpack patched;
+      # lodash/multer/js-yaml/qs/libxmljs2 pin เวอร์ชันที่ patch แล้ว) → high+ = 0
+      # (เหลือ moderate ของ uuid ใน firebase-admin/google-cloud tree ที่ยังไม่มี fix
+      # แบบ non-breaking — ต่ำกว่าเกณฑ์ block, รายงานด้านล่าง)
+      - name: npm audit (high+, blocking)
+        run: npm audit --audit-level=high
+      - name: npm audit (full report incl. moderate, non-blocking)
+        if: always()
+        run: npm audit || true
+
+  # ── Flutter dependency check (apps/mobile) ──
+  flutter-audit:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - run: flutter pub get
+      # Real advisory/CVE scan สำหรับ Dart/Flutter deps — Dart ไม่มี `pub audit` ในตัว
+      # จึงใช้ osv-scanner (Google OSV database) สแกน pubspec.lock จริง = blocking gate.
+      # ปักหมุด binary v2.4.0 ทั้งเวอร์ชันและ SHA256 (จาก osv-scanner_SHA256SUMS ที่ google
+      # เผยแพร่คู่ release — กัน supply-chain tampering ของ release asset เอง)
+      - name: install osv-scanner (pinned v2.4.0 + SHA256 verify)
+        working-directory: ${{ github.workspace }}
+        env:
+          OSV_SHA256: 15314940c10d26af9c6649f150b8a47c1262e8fc7e17b1d1029b0e479e8ed8a0
+        run: |
+          curl -sSfL https://github.com/google/osv-scanner/releases/download/v2.4.0/osv-scanner_linux_amd64 -o "$RUNNER_TEMP/osv-scanner"
+          echo "${OSV_SHA256}  ${RUNNER_TEMP}/osv-scanner" | sha256sum -c -
+          chmod +x "$RUNNER_TEMP/osv-scanner"
+      - name: Flutter/Dart CVE scan (osv-scanner, blocking)
+        run: '"$RUNNER_TEMP/osv-scanner" scan --lockfile=pubspec.lock'
+      # เสริม: รายงาน dependency ที่ล้าสมัย (ไม่ fail)
+      - name: flutter pub outdated (report)
+        run: flutter pub outdated || true
+
+  # ── SBOM (CycloneDX) สำหรับ API + Print Gateway (master directive §3B) ──
+  # ใช้ @cyclonedx/cyclonedx-npm + --ignore-npm-errors เพราะ npm overrides (แก้ CVE
+  # ของ transitive deps) ทำให้ npm ls รายงาน "invalid" โดยธรรมชาติของกลไก override —
+  # ไม่ใช่การ silence ผล scan; SBOM ยังครบทุก component
+  sbom:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: generate CycloneDX SBOM (api + print-gateway)
+        # cyclonedx-npm pinned ใน root lockfile (ไม่มี npx --yes ดาวน์โหลดตอน CI)
+        run: |
+          mkdir -p sbom
+          CDX=./node_modules/.bin/cyclonedx-npm
+          "$CDX" --omit dev --ignore-npm-errors \
+            --package-lock-only --workspace apps/api --output-file sbom/api.cdx.json
+          "$CDX" --omit dev --ignore-npm-errors \
+            --package-lock-only --workspace apps/print-gateway --output-file sbom/print-gateway.cdx.json
+          ls -la sbom/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sbom
+          path: sbom/
+          retention-days: 30

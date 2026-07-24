@@ -1,7 +1,8 @@
 # CSSD Sterile Instrument Tracking System
 
-ระบบตามรอยอุปกรณ์หัตถการปลอดเชื้อ | Flutter + NestJS + PostgreSQL
+ระบบตามรอยอุปกรณ์หัตถการปลอดเชื้อ | PWA (Flutter Web, online-only — Chrome + Safari iOS) + NestJS + PostgreSQL + Print Gateway → Xprinter XP-420B
 
+> ⚠️ **Single source of truth = [CSSD_MASTER_EXECUTION_DIRECTIVE.md](./CSSD_MASTER_EXECUTION_DIRECTIVE.md)** — online-only, ไม่มี offline/Bluetooth/Zebra ใน scope
 > ดูสถานะความคืบหน้าล่าสุด/checklist เฟส 1-3 ที่ [PROGRESS.md](./PROGRESS.md) — อัปเดตทุกครั้งที่มีการแก้ไข
 
 ## Structure
@@ -10,7 +11,7 @@
 cssd/
 ├── apps/
 │   ├── api/          NestJS backend + Prisma
-│   └── mobile/       Flutter app (Android + iOS)
+│   └── mobile/       Flutter app — Chrome PWA (หลัก, online-only) + build Android/iOS ได้
 ├── packages/
 │   └── shared/       enums, helpers, state machine constants
 ├── docs/             SRS + diagrams
@@ -66,11 +67,19 @@ flutter run
 | GET  | /api/v1/reports/dashboard | ข้อมูล donut charts |
 | GET  | /api/v1/reports/weekly | รายงานรายสัปดาห์ |
 
-## Printer: FlashLabel A318BT
+## Printer: Xprinter XP-420B — 2 โหมดที่อนุมัติ
 - Protocol: TSPL (203 DPI, 60×40 mm label)
-- Connection: Bluetooth Classic SPP + USB
-- Default in dev: `MockPrinterAdapter` (prints TSPL to debug console)
-- Production: `FlashLabelA318Adapter` — selected via Settings page in app
+- **โหมดหลัก `PRINT_GATEWAY`** — Print Job Queue → Print Gateway → เครื่องพิมพ์ + hardware ACK:
+  USB printer-class → Gateway ส่ง raw TSPL เข้า OS printer queue (transport `usb_spool`);
+  dev ใช้ `console` mock — PWA/มือถือไม่พิมพ์ตรงและไม่ตั้งสถานะ PRINTED เอง
+  (ดู `apps/print-gateway/README.md`, `HARDWARE_VERIFICATION.md`)
+- **โหมดเสริม `BROWSER_DIALOG`** ([MACOS_BROWSER_PRINT_DIRECTIVE.md](./MACOS_BROWSER_PRINT_DIRECTIVE.md)) —
+  PWA บน **Mac ที่เสียบ XP-420B เครื่องเดียวกัน** เปิด macOS system print dialog (PDF ขนาด label จริง);
+  browser พิสูจน์ผล hardware ไม่ได้ → ผู้ใช้ยืนยันเอง (`USER_CONFIRMED`) เก็บประวัติแยกใน
+  `BrowserPrintRequest` และ**ไม่แตะ** `printedAt`; เปิดใช้ด้วย `CSSD_BROWSER_PRINT_ENABLED=true`
+  (backend env + PWA dart-define, **default ปิด**) — ไม่ใช่ direct USB/WebUSB; อุปกรณ์อื่น
+  (iPhone/iPad/Android) ใช้ Print Gateway เท่านั้น (ดู `docs/MAC_XP420B_BROWSER_PRINT.md`)
+- Legacy: FlashLabel A318BT (Bluetooth direct-print) เหลือเป็น fallback ระดับโค้ดเท่านั้น
 
 ## Running tests
 ```bash

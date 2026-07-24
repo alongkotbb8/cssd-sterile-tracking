@@ -26,13 +26,11 @@ dependencies:
   mobile_scanner: ^5.1.1
   qr_flutter: ^4.1.0
 
-  # Offline storage (SQLite)
-  drift: ^2.18.0
-  drift_flutter: ^0.2.0
+  # (ตัด offline storage: ระบบเป็น online-only — ไม่มี drift/SQLite/sync queue)
 
-  # Bluetooth printer
-  # - print_bluetooth_thermal: Bluetooth Classic SPP (ทางหลัก — A318BT เป็น BT Classic)
-  # - flutter_blue_plus: BLE (ทางสำรอง เผื่อเครื่องพิมพ์รุ่น dual-mode)
+  # Bluetooth printer — LEGACY direct-print fallback เท่านั้น (ไม่ใช่ทางหลัก)
+  # ทางหลัก = Print Gateway + Xprinter XP-420B (usb_spool); ชุดนี้คงไว้เผื่อ fallback ฉุกเฉิน
+  # ถอดได้เมื่อยืนยันยกเลิก BT fallback (พร้อม permission ใน AndroidManifest)
   print_bluetooth_thermal: ^1.2.2
   flutter_blue_plus: ^1.32.12
   permission_handler: ^11.3.1
@@ -74,10 +72,24 @@ dev_dependencies:
   freezed: ^2.5.2
   json_serializable: ^6.8.0
   retrofit_generator: ^8.1.0
-  drift_dev: ^2.18.0
 
 flutter:
   uses-material-design: true
+  generate: true # เปิด gen-l10n (สร้าง AppLocalizations จาก lib/l10n/*.arb)
   assets:
     - assets/images/
     - assets/icons/
+    # ฟอนต์ไทยสำหรับ PDF รายงาน — bundle ในแอปเพื่อให้สร้างรายงานได้ตอน offline
+    # (เดิมใช้ PdfGoogleFonts ดาวน์โหลดจากเน็ตตอนสร้าง → offline พัง)
+    - assets/fonts/Sarabun-Regular.ttf
+    - assets/fonts/Sarabun-Bold.ttf
+  # ฟอนต์ UI ของแอป (Pulse design system) — ใช้ Sarabun เป็น family หลักเพราะรองรับ
+  # ไทย+ละติน และ bundle มาแล้ว (Pulse ต้นฉบับใช้ Plus Jakarta/Inter ซึ่งไม่มี glyph ไทย
+  # จึงคง Sarabun ไว้สำหรับ UI ไทยเป็นหลัก ให้เรนเดอร์ตรงกันทุกแพลตฟอร์ม/ออฟไลน์ได้)
+  fonts:
+    - family: Sarabun
+      fonts:
+        - asset: assets/fonts/Sarabun-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/Sarabun-Bold.ttf
+          weight: 700

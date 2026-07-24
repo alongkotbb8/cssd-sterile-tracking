@@ -22,13 +22,17 @@ export class RunningNumberService {
    * (the retry takes the `update: increment` path and succeeds).
    */
   private async incrementSeq(
+    db: Prisma.TransactionClient | PrismaService,
     setTemplateId: string,
     dateStr: string,
     by: number,
   ): Promise<RunningNumberSequence> {
     for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
       try {
-        return await this.prisma.runningNumberSequence.upsert({
+        // upsert = INSERT ... ON CONFLICT DO UPDATE (statement เดียว atomic) จึง
+        // ปลอดภัยเมื่อรันในทรานแซกชันร่วมกับ package.create (FIX-02 แนวทาง A) —
+        // เลขรันจะ rollback ไปพร้อมกันถ้าทรานแซกชันล้ม (ไม่เกิดเลขกระโดด)
+        return await db.runningNumberSequence.upsert({
           where: { setTemplateId_date: { setTemplateId, date: dateStr } },
           update: { lastSeq: { increment: by } },
           create: { setTemplateId, date: dateStr, lastSeq: by },
@@ -39,40 +43,22 @@ export class RunningNumberService {
         if (!isUniqueConflict) throw e;
       }
     }
-    throw new ConflictException('ออกเลขรันไม่สำเร็จ กรุณาลองใหม่');
+    throw new ConflictException({ message: 'ออกเลขรันไม่สำเร็จ กรุณาลองใหม่', code: 'RUNNING_NUMBER_FAILED' });
   }
 
-  async nextId(setTemplateCode: string, setTemplateId: string, date: Date): Promise<string> {
+  async nextId(
+    setTemplateCode: string,
+    setTemplateId: string,
+    date: Date,
+    db: Prisma.TransactionClient | PrismaService = this.prisma,
+  ): Promise<string> {
     const dateStr = this.toDateStr(date);
-    const row = await this.incrementSeq(setTemplateId, dateStr, 1);
+    const row = await this.incrementSeq(db, setTemplateId, dateStr, 1);
     return this.format(setTemplateCode, dateStr, row.lastSeq);
   }
 
-  /** Reserve a pool of IDs for offline use */
-  async reservePool(
-    setTemplateId: string,
-    setTemplateCode: string,
-    date: Date,
-    count: number,
-    deviceId: string,
-    userId: string,
-  ): Promise<string[]> {
-    const dateStr = this.toDateStr(date);
-    const row = await this.incrementSeq(setTemplateId, dateStr, count);
-
-    const from = row.lastSeq - count + 1;
-    const to = row.lastSeq;
-
-    await this.prisma.numberPoolReservation.create({
-      data: { setTemplateId, date: dateStr, fromSeq: from, toSeq: to, deviceId, userId },
-    });
-
-    const ids: string[] = [];
-    for (let i = from; i <= to; i++) {
-      ids.push(this.format(setTemplateCode, dateStr, i));
-    }
-    return ids;
-  }
+  // หมายเหตุ: เดิมมี reservePool() สำหรับจองเลข offline pool — ตัดออกแล้ว (online-only)
+  // ตาราง NumberPoolReservation ยังคงไว้ใน schema (ไม่ลบ destructive) แต่ไม่มีอะไรเขียนแล้ว
 
   private format(code: string, dateStr: string, seq: number): string {
     return `${code}-${dateStr}-${String(seq).padStart(4, '0')}`;

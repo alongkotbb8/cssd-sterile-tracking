@@ -1,0 +1,177 @@
+name: ci
+
+# Build + test — api / print-gateway / mobile (Flutter)
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  api-gateway:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: prisma generate
+        run: npx prisma generate --schema apps/api/prisma/schema.prisma
+      - name: build (api + gateway + shared)
+        run: npm run -ws --if-present build
+      - name: unit tests (api)
+        run: npm run -w apps/api test
+      - name: unit tests (print-gateway)
+        run: npm run -w apps/print-gateway test
+
+  # Integration tests กับ Postgres จริง (พิสูจน์ migration + flow batch/scan/idempotency)
+  integration:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: cssd
+          POSTGRES_PASSWORD: cssd_dev_pw
+          POSTGRES_DB: cssd_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      # config.ts อ่าน DATABASE_URL แล้วสลับเป็น DB ทดสอบ cssd_inttest (สร้าง/ลบเองใน global-setup)
+      DATABASE_URL: postgresql://cssd:cssd_dev_pw@localhost:5432/cssd_db
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: prisma generate
+        run: npx prisma generate --schema apps/api/prisma/schema.prisma
+      - name: install postgres client (createdb/dropdb ใน global-setup)
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+      - name: integration tests (real Postgres)
+        run: npm run -w apps/api test:integration
+
+  mobile:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - run: flutter pub get
+      - run: flutter analyze
+      - run: flutter test
+
+  # E2E (Playwright) — ยก stack จริง (Postgres + API + web build ชี้ API local) แล้วรัน
+  # smoke + flow + scanner ครบทุก spec ข้าม Desktop Chrome / Mobile Chrome / WebKit (Safari)
+  # ตาม master directive §2D/§3B (ไม่มี test.skip/fixme, ไม่ gate ด้วย flag ที่ CI ไม่ตั้ง)
+  e2e:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: cssd
+          POSTGRES_PASSWORD: cssd_dev_pw
+          POSTGRES_DB: cssd_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://cssd:cssd_dev_pw@localhost:5432/cssd_db
+      JWT_SECRET: e2e-ci-secret-not-for-prod
+      # NODE_ENV=e2e = non-production → seed ใช้รหัส default + CORS เปิด (main.ts/seed.ts
+      # แยกเฉพาะ === 'production') และ throttle guard ยอมรับค่า override ที่ผ่อนปรน
+      # (RELAXED_ENVS = test/e2e/ci เท่านั้น — production ceiling ยังบังคับเหมือนเดิม)
+      NODE_ENV: e2e
+      # E2E ทุก request มาจาก 127.0.0.1 เดียวกัน — per-IP login throttle (10/นาที)
+      # จะปัดตกทั้งชุด จึงยกเพดานเฉพาะ e2e/ci (guard ยังทำงาน; ค่า production ไม่เปลี่ยน)
+      LOGIN_THROTTLE_MAX: "1000"
+      # Browser Print mode (MACOS_BROWSER_PRINT_DIRECTIVE.md) — เปิดเฉพาะ stack ทดสอบ
+      # (production default = ปิดทั้ง backend และ PWA); เพดาน throttle ยกสูงเพราะ
+      # 4 browser projects × 3 รอบใช้ user เดียวกัน (ADMIN001) ยิงพร้อมกัน
+      CSSD_BROWSER_PRINT_ENABLED: "true"
+      BROWSER_PRINT_THROTTLE_MAX: "1000"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - run: npm ci
+      - name: prisma generate
+        run: npx prisma generate --schema apps/api/prisma/schema.prisma
+      - name: migrate + seed
+        run: |
+          npm run -w apps/api prisma:migrate:deploy
+          npm run -w apps/api prisma:seed
+      - name: build + start API (background)
+        run: |
+          npm run -w apps/api build
+          (cd apps/api && node dist/main &)
+          # wait-for-health แบบ fail-fast: ครบ timeout แล้วยังไม่พร้อม → exit 1
+          # (กัน job เดินต่อทั้งที่ API ไม่ขึ้น แล้ว e2e ล้มแบบสับสน)
+          # ต้องยิง /api/v1/health (คืน {status:ok}) — /api/v1 เป็น 404 route จึงเป็น
+          # readiness ที่ผิด (curl -f จะ fail แม้ API พร้อมแล้ว)
+          ok=0
+          for _ in $(seq 1 60); do
+            if curl -fsS -o /dev/null http://localhost:3000/api/v1/health; then ok=1; break; fi
+            sleep 1
+          done
+          [ "$ok" = 1 ] || { echo "::error::API did not become ready within 60s"; exit 1; }
+      - name: build + serve PWA web (→ API local)
+        run: |
+          (cd apps/mobile && flutter build web --release \
+            --dart-define=CSSD_API_URL=http://localhost:3000 \
+            --dart-define=CSSD_BROWSER_PRINT_ENABLED=true)
+          # http-server pinned ใน root lockfile (ไม่มี npx --yes ดาวน์โหลดตอน CI)
+          (./node_modules/.bin/http-server apps/mobile/build/web -p 8080 -s &)
+          ok=0
+          for _ in $(seq 1 30); do
+            if curl -fsS -o /dev/null http://localhost:8080; then ok=1; break; fi
+            sleep 1
+          done
+          [ "$ok" = 1 ] || { echo "::error::static web server did not become ready within 30s"; exit 1; }
+      # §2D — E2E ทุก flow ต้องผ่าน 3 รอบติดกัน (จับ flakiness); bash -e ทำให้
+      # รอบใดตกจะหยุดทันที (ไม่ผ่านทั้ง job). projects ครบตาม playwright.config
+      # (Desktop Chrome + Mobile Chrome + Desktop WebKit + Mobile Safari/WebKit §2D/§4B.1)
+      - name: playwright e2e ×3 (Chrome + Mobile Chrome + WebKit + Mobile Safari)
+        working-directory: e2e
+        run: |
+          npm ci
+          # ติดตั้ง browser engine (ไม่ใช่ npm dep) จาก playwright ที่ pin ใน e2e lockfile
+          npx playwright install --with-deps chromium webkit
+          for round in 1 2 3; do
+            echo "════════════ E2E round $round/3 ════════════"
+            E2E_BASE_URL=http://localhost:8080 npx playwright test \
+              --project=chromium --project=mobile-chrome \
+              --project=webkit --project=mobile-safari
+          done
+      - name: upload playwright report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: e2e/playwright-report
+          retention-days: 7

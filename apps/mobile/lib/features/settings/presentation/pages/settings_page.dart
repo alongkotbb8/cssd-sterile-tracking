@@ -3,7 +3,7 @@ import 'dart:async';
 // (isAndroid, isIOS, ...) throw UnsupportedError ทันที ไม่ใช่แค่คืนค่า false
 import 'dart:io' show Platform;
 
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show kIsWeb, kReleaseMode;
 import 'package:flutter/material.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -12,9 +12,89 @@ import 'package:print_bluetooth_thermal/print_bluetooth_thermal.dart';
 
 import '../../../../core/api/api_client.dart';
 import '../../../../core/auth/auth_controller.dart';
+import '../../../../core/config/feature_flags.dart';
 import '../../../../core/printer/printer_provider.dart';
 import '../../../../core/printer/system_print_adapter.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../l10n/app_localizations.dart';
+
+/// โฮสต์ production ที่อนุญาต (allowlist/pin) — กำหนดตอน build ด้วย
+/// `--dart-define=CSSD_ALLOWED_HOSTS=host-a.example.com,host-b.example.com`
+/// ถ้าไม่กำหนด จะ pin ไว้ที่ host ของ [kDefaultServerUrl] อย่างเดียว
+///
+/// เหตุผล (2.3): release build ไม่ควรให้ผู้ใช้ (หรือผู้ไม่หวังดี) ชี้แอปไป
+/// เซิร์ฟเวอร์ใดก็ได้ — แม้เป็น https ก็ยัง harvest JWT/ข้อมูลผู้ป่วยได้ ถ้าชี้ไป
+/// โดเมนปลอม จึงจำกัดให้ต่อได้เฉพาะโฮสต์ที่อนุมัติไว้เท่านั้น
+Set<String> productionAllowedHosts() {
+  const raw = String.fromEnvironment('CSSD_ALLOWED_HOSTS');
+  final hosts = raw
+      .split(',')
+      .map((h) => h.trim().toLowerCase())
+      .where((h) => h.isNotEmpty)
+      .toSet();
+  if (hosts.isEmpty) {
+    final def = Uri.tryParse(kDefaultServerUrl)?.host.toLowerCase();
+    if (def != null && def.isNotEmpty) hosts.add(def);
+  }
+  return hosts;
+}
+
+/// ตรวจ server URL — คืน `null` ถ้าใช้ได้ หรือข้อความ error (i18n ผ่าน [l10n]) ถ้าไม่ผ่าน
+///
+/// กติกา:
+/// - **release/production = https:// เท่านั้น** (ให้ตรง FIX-06 ฝั่ง Gateway — แม้
+///   localhost/LAN ก็ไม่ยอม http เพื่อกัน JWT/ข้อมูลรั่ว) **และ host ต้องอยู่ใน
+///   allowlist** ([allowedHosts] / [productionAllowedHosts]) — pin กันชี้ไป
+///   เซิร์ฟเวอร์ปลอม (2.3)
+/// - **debug/dev = http:// ได้เฉพาะ localhost/LAN** (ทดสอบในตึก) ; ปลายทาง
+///   สาธารณะต้อง https ; dev ไม่บังคับ allowlist (นักพัฒนาชี้ไปที่ไหนก็ได้)
+///
+/// unit-test ได้โดยโหลด l10n ผ่าน AppLocalizations.delegate.load (ดู server_url_validation_test.dart)
+/// [allowedHosts] override ได้ในเทส ; ถ้าไม่ส่งจะใช้ [productionAllowedHosts]
+String? serverUrlValidationError(
+  String url, {
+  required bool isRelease,
+  required AppLocalizations l10n,
+  Set<String>? allowedHosts,
+}) {
+  final uri = Uri.tryParse(url);
+  if (uri == null || !(uri.isScheme('http') || uri.isScheme('https'))) {
+    return l10n.urlErrFormat;
+  }
+  if (uri.isScheme('https')) {
+    // release: บังคับ pin ไปโฮสต์ที่อนุมัติเท่านั้น (dev ข้ามได้)
+    if (isRelease) {
+      final allow = allowedHosts ?? productionAllowedHosts();
+      if (allow.isNotEmpty && !allow.contains(uri.host.toLowerCase())) {
+        return l10n.urlErrAllowlist(allow.join(', '));
+      }
+    }
+    return null;
+  }
+  // ถึงตรงนี้ = http://
+  if (isRelease) {
+    return l10n.urlErrHttpsOnly;
+  }
+  if (!_isPrivateHost(uri.host)) {
+    return l10n.urlErrExternalHttps;
+  }
+  return null;
+}
+
+/// host ที่ถือว่าเป็นเครือข่ายภายใน — อนุญาต http:// ได้เฉพาะ debug/dev เท่านั้น
+bool _isPrivateHost(String host) {
+  if (host == 'localhost' || host == '127.0.0.1' || host == '10.0.2.2') {
+    return true; // 10.0.2.2 = host loopback ของ Android emulator
+  }
+  final octets = host.split('.').map(int.tryParse).toList();
+  if (octets.length == 4 && octets.every((o) => o != null && o >= 0 && o <= 255)) {
+    final a = octets[0]!, b = octets[1]!;
+    if (a == 10) return true; // 10.0.0.0/8
+    if (a == 192 && b == 168) return true; // 192.168.0.0/16
+    if (a == 172 && b >= 16 && b <= 31) return true; // 172.16.0.0/12
+  }
+  return false;
+}
 
 class SettingsPage extends ConsumerWidget {
   const SettingsPage({super.key});
@@ -24,12 +104,14 @@ class SettingsPage extends ConsumerWidget {
     final serverUrl = ref.watch(serverUrlProvider);
     final printer = ref.watch(printerAdapterProvider);
     final user = ref.watch(authControllerProvider).user;
+    final l10n = AppLocalizations.of(context);
+    final legacyPrint = ref.watch(legacyDirectPrintEnabledProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('ตั้งค่า')),
+      appBar: AppBar(title: Text(l10n.settingsTitle)),
       body: ListView(children: [
         if (user != null) ...[
-          const _SectionHeader('บัญชีผู้ใช้'),
+          _SectionHeader(l10n.settingsAccount),
           ListTile(
             leading: const CircleAvatar(
               backgroundColor: SterelisColors.blue50,
@@ -42,30 +124,41 @@ class SettingsPage extends ConsumerWidget {
           ),
           const Divider(),
         ],
-        const _SectionHeader('เครื่องพิมพ์'),
+        _SectionHeader(l10n.settingsPrinter),
+        // เส้นทางพิมพ์หลักของ Pilot = Print Gateway → XP-420B (สื่อชัด ไม่กำกวม)
         ListTile(
-          leading:
-              const Icon(Icons.print_outlined, color: SterelisColors.blue500),
-          title: const Text('เครื่องพิมพ์ที่ใช้'),
-          subtitle: Text(printer.displayName,
+          leading: const Icon(Icons.cloud_done_outlined,
+              color: SterelisColors.teal500),
+          title: Text(l10n.settingsGatewayPrimaryTitle),
+          subtitle: Text(l10n.settingsGatewayPrimarySubtitle,
               style: const TextStyle(color: SterelisColors.textMuted)),
-          trailing:
-              const Icon(Icons.chevron_right, color: SterelisColors.textFaint),
-          onTap: () => _choosePrinter(context, ref),
         ),
-        const ListTile(
-          leading: Icon(Icons.receipt_long_outlined,
+        ListTile(
+          leading: const Icon(Icons.receipt_long_outlined,
               color: SterelisColors.blue500),
-          title: Text('ขนาดฉลาก'),
-          subtitle: Text('60 × 40 mm · TSPL · 203 DPI',
+          title: Text(l10n.settingsLabelSize),
+          subtitle: const Text('60 × 40 mm · TSPL · 203 DPI',
               style: TextStyle(color: SterelisColors.textMuted)),
         ),
+        // Legacy direct-print (Bluetooth A318BT / System print) — ซ่อนใน Pilot
+        // (flag default = false ใน release) แสดงเฉพาะ dev/opt-in (feature_flags.dart)
+        if (legacyPrint)
+          ListTile(
+            leading:
+                const Icon(Icons.print_outlined, color: SterelisColors.blue500),
+            title: Text(l10n.settingsLegacyPrinterTitle),
+            subtitle: Text(printer.displayName,
+                style: const TextStyle(color: SterelisColors.textMuted)),
+            trailing: const Icon(Icons.chevron_right,
+                color: SterelisColors.textFaint),
+            onTap: () => _choosePrinter(context, ref),
+          ),
         const Divider(),
-        const _SectionHeader('ระบบ'),
+        _SectionHeader(l10n.settingsSystem),
         ListTile(
           leading: const Icon(Icons.cloud_sync_outlined,
               color: SterelisColors.teal500),
-          title: const Text('ที่อยู่ Server API'),
+          title: Text(l10n.settingsServerUrl),
           subtitle: Text(serverUrl,
               style: const TextStyle(
                   color: SterelisColors.textMuted, fontFamily: 'monospace')),
@@ -76,9 +169,19 @@ class SettingsPage extends ConsumerWidget {
         ListTile(
           leading:
               const Icon(Icons.logout_outlined, color: SterelisColors.danger),
-          title: const Text('ออกจากระบบ',
-              style: TextStyle(color: SterelisColors.danger)),
+          title: Text(l10n.actionLogout,
+              style: const TextStyle(color: SterelisColors.danger)),
           onTap: () => _confirmLogout(context, ref),
+        ),
+        ListTile(
+          leading: const Icon(Icons.devices_other_outlined,
+              color: SterelisColors.danger),
+          title: Text(l10n.actionLogoutAll,
+              style: const TextStyle(color: SterelisColors.danger)),
+          subtitle: Text(l10n.actionLogoutAllSubtitle,
+              style: const TextStyle(
+                  color: SterelisColors.textMuted, fontSize: 12)),
+          onTap: () => _confirmLogoutAll(context, ref),
         ),
       ]),
     );
@@ -86,12 +189,13 @@ class SettingsPage extends ConsumerWidget {
 
   Future<void> _editServerUrl(
       BuildContext context, WidgetRef ref, String current) async {
+    final l10n = AppLocalizations.of(context);
     final ctrl = TextEditingController(text: current);
     final result = await showDialog<String>(
       context: context,
       builder: (dctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('ที่อยู่ Server API'),
+        title: Text(l10n.settingsServerUrl),
         content: TextField(
           controller: ctrl,
           keyboardType: TextInputType.url,
@@ -103,23 +207,23 @@ class SettingsPage extends ConsumerWidget {
         actions: [
           TextButton(
               onPressed: () => Navigator.of(dctx).pop(),
-              child: const Text('ยกเลิก')),
+              child: Text(l10n.actionCancel)),
           FilledButton(
             onPressed: () => Navigator.of(dctx).pop(ctrl.text),
-            child: const Text('บันทึก'),
+            child: Text(l10n.actionSave),
           ),
         ],
       ),
     );
     if (result == null) return;
     final url = result.trim();
-    final uri = Uri.tryParse(url);
-    if (uri == null || !(uri.isScheme('http') || uri.isScheme('https'))) {
+    final err =
+        serverUrlValidationError(url, isRelease: kReleaseMode, l10n: l10n);
+    if (err != null) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('รูปแบบ URL ไม่ถูกต้อง (ต้องขึ้นต้นด้วย http:// หรือ https://)'),
-          backgroundColor: SterelisColors.danger,
-        ));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(err), backgroundColor: SterelisColors.danger),
+        );
       }
       return;
     }
@@ -138,21 +242,22 @@ class SettingsPage extends ConsumerWidget {
   }
 
   Future<void> _confirmLogout(BuildContext context, WidgetRef ref) async {
+    final l10n = AppLocalizations.of(context);
     final ok = await showDialog<bool>(
       context: context,
       builder: (dctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('ออกจากระบบ?'),
-        content: const Text('ต้องเข้าสู่ระบบใหม่ในการใช้งานครั้งถัดไป'),
+        title: Text(l10n.logoutConfirmTitle),
+        content: Text(l10n.logoutConfirmBody),
         actions: [
           TextButton(
               onPressed: () => Navigator.of(dctx).pop(false),
-              child: const Text('ยกเลิก')),
+              child: Text(l10n.actionCancel)),
           FilledButton(
             style: FilledButton.styleFrom(
                 backgroundColor: SterelisColors.danger),
             onPressed: () => Navigator.of(dctx).pop(true),
-            child: const Text('ออกจากระบบ'),
+            child: Text(l10n.actionLogout),
           ),
         ],
       ),
@@ -161,8 +266,41 @@ class SettingsPage extends ConsumerWidget {
       await ref.read(authControllerProvider.notifier).logout();
     }
   }
+
+  Future<void> _confirmLogoutAll(BuildContext context, WidgetRef ref) async {
+    final l10n = AppLocalizations.of(context);
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (dctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text(l10n.logoutAllConfirmTitle),
+        content: Text(l10n.logoutAllConfirmBody),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.of(dctx).pop(false),
+              child: Text(l10n.actionCancel)),
+          FilledButton(
+            style: FilledButton.styleFrom(
+                backgroundColor: SterelisColors.danger),
+            onPressed: () => Navigator.of(dctx).pop(true),
+            child: Text(l10n.logoutAllConfirmAction),
+          ),
+        ],
+      ),
+    );
+    if (ok == true) {
+      await ref.read(authControllerProvider.notifier).logoutAllDevices();
+    }
+  }
 }
 
+/// ⚠️ LEGACY — Sheet เลือกเครื่องพิมพ์สำหรับ **direct-print fallback** เท่านั้น
+/// (ทางหลัก = Print Gateway + XP-420B ผ่าน Print Job Queue ไม่ผ่าน sheet นี้)
+///
+/// i18n-allowlist (Gate 1): ข้อความไทยในคลาสนี้จงใจไม่ผ่าน gen-l10n เพราะเป็น UI legacy
+/// ที่ **ซ่อนจากผู้ใช้ทั่วไปใน Pilot** (legacyDirectPrintEnabledProvider = false ใน release
+/// — ดู feature_flags.dart) เข้าถึงได้เฉพาะ dev/opt-in ยังไม่ลบจนกว่า XP-420B/Linux จะผ่าน
+/// Hardware Gate (ตาม PRE_PILOT directive 1.8) — ถ้าจะเปิดให้ผู้ใช้จริงต้อง i18n ก่อน
 /// Sheet เลือกเครื่องพิมพ์: Mock (dev) หรือสแกนหา FlashLabel A318BT ผ่าน Bluetooth
 class _PrinterSheet extends ConsumerStatefulWidget {
   const _PrinterSheet();

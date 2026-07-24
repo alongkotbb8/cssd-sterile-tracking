@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:ui' as ui;
 
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -7,6 +8,7 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../api/api_client.dart';
+import '../../l10n/app_localizations.dart';
 
 /// ต้องเป็น top-level function (ไม่ผูกกับ instance) — ตามข้อกำหนดของ
 /// firebase_messaging สำหรับ handler ที่ทำงานตอนแอปอยู่ background/ถูกปิด
@@ -15,12 +17,17 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   // ไม่ต้องทำอะไรเพิ่ม — ระบบ OS แสดง notification ให้เองจาก payload "notification"
 }
 
-const _kChannel = AndroidNotificationChannel(
-  'cssd_reminders',
-  'แจ้งเตือน CSSD',
-  description: 'แจ้งเตือนใกล้หมดอายุและสรุปประจำวัน',
-  importance: Importance.high,
-);
+const _kChannelId = 'cssd_reminders';
+
+/// ชื่อ/รายละเอียด channel มาจาก i18n ตาม locale ของเครื่อง (สร้างตอน init)
+/// เลือก locale ที่รองรับ (th/en) จาก device locale, fallback th
+Future<AppLocalizations> _channelL10n() {
+  final sys = ui.PlatformDispatcher.instance.locale;
+  final supported = AppLocalizations.supportedLocales
+      .any((l) => l.languageCode == sys.languageCode);
+  return AppLocalizations.delegate
+      .load(supported ? ui.Locale(sys.languageCode) : const ui.Locale('th'));
+}
 
 /// ครอบ Firebase Cloud Messaging ทั้งหมดไว้ที่เดียว — ถ้ายังไม่มีไฟล์ตั้งค่า
 /// Firebase จริง (google-services.json / GoogleService-Info.plist) การ init
@@ -29,6 +36,9 @@ const _kChannel = AndroidNotificationChannel(
 class FcmService {
   static bool _initialized = false;
   static bool isAvailable = false;
+
+  /// channel ที่ localize แล้ว (สร้างใน init) — ใช้ตอนแสดง foreground notification
+  static AndroidNotificationChannel? _channel;
 
   static final _localNotifications = FlutterLocalNotificationsPlugin();
 
@@ -39,7 +49,7 @@ class FcmService {
     try {
       await Firebase.initializeApp();
     } catch (e) {
-      debugPrint('[FcmService] Firebase ยังไม่ได้ตั้งค่า — ปิดการแจ้งเตือน push ($e)');
+      debugPrint('[FcmService] Firebase not configured — push disabled ($e)');
       return;
     }
 
@@ -49,10 +59,17 @@ class FcmService {
         iOS: DarwinInitializationSettings(),
       ),
     );
+    final l10n = await _channelL10n();
+    _channel = AndroidNotificationChannel(
+      _kChannelId,
+      l10n.fcmChannelName,
+      description: l10n.fcmChannelDesc,
+      importance: Importance.high,
+    );
     await _localNotifications
         .resolvePlatformSpecificImplementation<
             AndroidFlutterLocalNotificationsPlugin>()
-        ?.createNotificationChannel(_kChannel);
+        ?.createNotificationChannel(_channel!);
 
     FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
 
@@ -71,8 +88,9 @@ class FcmService {
       notification.title,
       notification.body,
       NotificationDetails(
-        android: AndroidNotificationDetails(_kChannel.id, _kChannel.name,
-            channelDescription: _kChannel.description,
+        android: AndroidNotificationDetails(
+            _kChannelId, _channel?.name ?? 'CSSD',
+            channelDescription: _channel?.description,
             importance: Importance.high),
         iOS: const DarwinNotificationDetails(),
       ),
@@ -103,7 +121,7 @@ Future<void> registerFcmToken(WidgetRef ref) async {
       'deviceId': '$platformLabel-${identityHashCode(token)}',
     });
   } catch (e) {
-    debugPrint('[FcmService] ลงทะเบียน token ไม่สำเร็จ: $e');
+    debugPrint('[FcmService] register token failed: $e');
   }
 }
 
@@ -114,6 +132,6 @@ Future<void> unregisterFcmToken(Ref ref) async {
   try {
     await ref.read(dioProvider).delete('/notifications/fcm-token', data: {'token': token});
   } catch (e) {
-    debugPrint('[FcmService] ยกเลิก token ไม่สำเร็จ: $e');
+    debugPrint('[FcmService] unregister token failed: $e');
   }
 }

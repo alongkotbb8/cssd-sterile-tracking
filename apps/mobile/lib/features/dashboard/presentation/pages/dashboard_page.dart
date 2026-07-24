@@ -8,6 +8,7 @@ import '../../../../core/api/repositories.dart';
 import '../../../../core/auth/auth_controller.dart';
 import '../../../../core/models/models.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../l10n/app_localizations.dart';
 
 const _palette = [
   SterelisColors.blue500,
@@ -26,15 +27,16 @@ class DashboardPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final dash = ref.watch(dashboardProvider);
     final user = ref.watch(authControllerProvider).user;
+    final l10n = AppLocalizations.of(context);
 
     return Scaffold(
       appBar: AppBar(
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('แดชบอร์ด'),
+            Text(l10n.dashTitle),
             if (user != null)
-              Text('สวัสดี ${user.name}',
+              Text(l10n.dashGreeting(user.name),
                   style: const TextStyle(
                       fontSize: 12,
                       color: SterelisColors.textMuted,
@@ -43,7 +45,7 @@ class DashboardPage extends ConsumerWidget {
         ),
         actions: [
           IconButton(
-            tooltip: 'รายงานสรุป / พิมพ์',
+            tooltip: l10n.dashReportTooltip,
             icon: const Icon(Icons.summarize_outlined),
             onPressed: () => context.push('/reports'),
           ),
@@ -54,7 +56,7 @@ class DashboardPage extends ConsumerWidget {
         child: dash.when(
           loading: () => const Center(child: CircularProgressIndicator()),
           error: (e, _) => _ErrorView(
-            message: apiErrorMessage(e),
+            message: apiErrorMessage(l10n, e),
             onRetry: () => ref.invalidate(dashboardProvider),
           ),
           data: (d) => ListView(
@@ -63,17 +65,17 @@ class DashboardPage extends ConsumerWidget {
               _SummaryCards(data: d),
               const SizedBox(height: 8),
               _DonutCard(
-                title: 'คงเหลือปลอดเชื้อ (แยกตามชุด)',
+                title: l10n.dashSterileStockTitle,
                 slices: d.sterileStock,
                 total: d.sterileTotal,
-                centerLabel: 'ห่อพร้อมใช้',
+                centerLabel: l10n.dashSterileStockCenter,
               ),
               const SizedBox(height: 8),
               _DonutCard(
-                title: 'เบิกแยกตามแผนก (30 วัน)',
+                title: l10n.dashIssuedByDeptTitle,
                 slices: d.issuedByDept,
                 total: d.issuedTotal,
-                centerLabel: 'ครั้งที่เบิก',
+                centerLabel: l10n.dashIssuedCenter,
               ),
             ],
           ),
@@ -105,7 +107,7 @@ class _ErrorView extends StatelessWidget {
           child: OutlinedButton.icon(
             onPressed: onRetry,
             icon: const Icon(Icons.refresh),
-            label: const Text('ลองใหม่'),
+            label: Text(AppLocalizations.of(context).commonRetry),
           ),
         ),
       ],
@@ -119,16 +121,18 @@ class _SummaryCards extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Row(children: [
-        _SummaryCard('ใกล้หมดอายุ', data.expiringSoon, SterelisColors.warning,
-            SterelisColors.warningBg, Icons.timer_outlined),
+        _SummaryCard(l10n.dashExpiringSoon, data.expiringSoon,
+            SterelisColors.warning, SterelisColors.warningBg,
+            Icons.timer_outlined),
         const SizedBox(width: 8),
-        _SummaryCard('หมดอายุ', data.expired, SterelisColors.danger,
+        _SummaryCard(l10n.statusExpired, data.expired, SterelisColors.danger,
             SterelisColors.dangerBg, Icons.dangerous_outlined),
         const SizedBox(width: 8),
-        _SummaryCard('รอ Reprocess', data.awaitingReprocess,
+        _SummaryCard(l10n.statusReturned, data.awaitingReprocess,
             SterelisColors.stReturned, SterelisColors.stReturnedBg,
             Icons.autorenew),
       ]),
@@ -204,11 +208,11 @@ class _DonutCard extends StatelessWidget {
                   color: SterelisColors.textStrong)),
           const SizedBox(height: 16),
           if (slices.isEmpty || total == 0)
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 32),
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 32),
               child: Center(
-                child: Text('ยังไม่มีข้อมูล',
-                    style: TextStyle(color: SterelisColors.textFaint)),
+                child: Text(AppLocalizations.of(context).dashNoData,
+                    style: const TextStyle(color: SterelisColors.textFaint)),
               ),
             )
           else

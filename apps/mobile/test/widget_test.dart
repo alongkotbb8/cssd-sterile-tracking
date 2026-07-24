@@ -1,21 +1,26 @@
 import 'package:cssd_mobile/core/models/models.dart';
 import 'package:cssd_mobile/core/widgets/domain_widgets.dart';
+import 'package:cssd_mobile/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'l10n_helper.dart';
+
 void main() {
-  group('packageStatusStyle', () {
-    test('รู้จักทุกสถานะใน state machine', () {
+  group('packageStatusStyle (i18n)', () {
+    test('รู้จักทุกสถานะใน state machine — มีป้ายไทยไม่ตรงกับ enum code', () async {
+      final l10n = await AppLocalizations.delegate.load(const Locale('th'));
       for (final s in [
         'PACKED',
+        'PACKED_OUT',
         'STERILE',
         'ISSUED',
         'RETURNED',
         'EXPIRED',
         'DISCARDED'
       ]) {
-        expect(packageStatusStyle(s).label, isNot(equals(s)),
-            reason: 'สถานะ $s ควรมีป้ายภาษาไทย');
+        expect(packageStatusStyle(l10n, s).label, isNot(equals(s)),
+            reason: 'สถานะ $s ควรมีป้ายแปล');
       }
     });
   });
@@ -40,18 +45,22 @@ void main() {
     });
   });
 
-  testWidgets('StatusBadge แสดงป้ายสถานะปลอดเชื้อ', (tester) async {
-    await tester.pumpWidget(const MaterialApp(
-      home: Scaffold(body: StatusBadge('STERILE')),
-    ));
+  testWidgets('StatusBadge แสดงป้ายสถานะปลอดเชื้อ (locale th)', (tester) async {
+    await tester.pumpWidget(wrapLocalized(const StatusBadge('STERILE')));
+    await tester.pumpAndSettle();
     expect(find.text('ปลอดเชื้อ'), findsOneWidget);
   });
 
+  testWidgets('StatusBadge shows sterile label (locale en)', (tester) async {
+    await tester.pumpWidget(
+        wrapLocalized(const StatusBadge('STERILE'), locale: const Locale('en')));
+    await tester.pumpAndSettle();
+    expect(find.text('Sterile'), findsOneWidget);
+  });
+
   testWidgets('BlockedCard แสดงข้อความห้ามใช้', (tester) async {
-    await tester.pumpWidget(const MaterialApp(
-      home: Scaffold(
-        body: BlockedCard(title: 'ห้ามใช้ — หมดอายุแล้ว', detail: 'ทดสอบ'),
-      ),
+    await tester.pumpWidget(wrapLocalized(
+      const BlockedCard(title: 'ห้ามใช้ — หมดอายุแล้ว', detail: 'ทดสอบ'),
     ));
     expect(find.text('ห้ามใช้ — หมดอายุแล้ว'), findsOneWidget);
   });

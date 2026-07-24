@@ -38,3 +38,9 @@ apps/mobile/*.iml
 .idea/
 .vscode/
 *.iml
+
+# E2E (Playwright) artifacts + local stack
+e2e/playwright-report/
+e2e/test-results/
+e2e/blob-report/
+.e2e-stack.pids

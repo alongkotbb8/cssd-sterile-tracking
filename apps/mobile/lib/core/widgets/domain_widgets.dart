@@ -3,6 +3,7 @@ import 'package:qr_flutter/qr_flutter.dart';
 
 import '../models/models.dart';
 import '../theme/app_theme.dart';
+import '../../l10n/app_localizations.dart';
 
 /// การ์ด QR code ของห่อ — เก็บเฉพาะ package_id ตามกฎโดเมน (ห้ามยัดข้อมูลอื่นลง QR)
 class PackageQrCard extends StatelessWidget {
@@ -20,10 +21,10 @@ class PackageQrCard extends StatelessWidget {
         border: Border.all(color: SterelisColors.border),
       ),
       child: Column(children: [
-        const Align(
+        Align(
           alignment: Alignment.centerLeft,
-          child: Text('QR สำหรับสแกน',
-              style: TextStyle(
+          child: Text(AppLocalizations.of(context).dmQrForScan,
+              style: const TextStyle(
                   fontWeight: FontWeight.w700,
                   fontSize: 14,
                   color: SterelisColors.textStrong)),
@@ -63,51 +64,52 @@ class PackageQrCard extends StatelessWidget {
   }
 }
 
-/// สี/ป้ายของสถานะห่อ — ผูกกับ state machine ใน design system
-({Color fg, Color bg, String label}) packageStatusStyle(String status) {
+/// สี/ป้ายของสถานะห่อ — ผูกกับ state machine ใน design system (label = i18n)
+({Color fg, Color bg, String label}) packageStatusStyle(
+    AppLocalizations l10n, String status) {
   switch (status) {
     case 'PACKED':
       return (
         fg: SterelisColors.stPacked,
         bg: SterelisColors.stPackedBg,
-        label: 'แพ็กแล้ว'
+        label: l10n.statusPacked
       );
     case 'PACKED_OUT':
       // ส่งออกโดยยังไม่ฆ่าเชื้อ — โทนม่วง แยกจาก ISSUED (น้ำเงิน) ให้เห็นชัด
       return (
         fg: const Color(0xFF8B5CF6),
         bg: const Color(0xFFF3EEFE),
-        label: 'ส่งออก (ยังไม่ฆ่าเชื้อ)'
+        label: l10n.statusPackedOut
       );
     case 'STERILE':
       return (
         fg: SterelisColors.stSterile,
         bg: SterelisColors.stSterileBg,
-        label: 'ปลอดเชื้อ'
+        label: l10n.statusSterile
       );
     case 'ISSUED':
       return (
         fg: SterelisColors.stIssued,
         bg: SterelisColors.stIssuedBg,
-        label: 'เบิกออก'
+        label: l10n.statusIssued
       );
     case 'RETURNED':
       return (
         fg: SterelisColors.stReturned,
         bg: SterelisColors.stReturnedBg,
-        label: 'รอ Reprocess'
+        label: l10n.statusReturned
       );
     case 'EXPIRED':
       return (
         fg: SterelisColors.stExpired,
         bg: SterelisColors.stExpiredBg,
-        label: 'หมดอายุ'
+        label: l10n.statusExpired
       );
     case 'DISCARDED':
       return (
         fg: SterelisColors.stDiscarded,
         bg: SterelisColors.stDiscardedBg,
-        label: 'ทิ้ง/ชำรุด'
+        label: l10n.statusDiscarded
       );
     default:
       return (
@@ -124,7 +126,7 @@ class StatusBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final s = packageStatusStyle(status);
+    final s = packageStatusStyle(AppLocalizations.of(context), status);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 4),
       decoration: BoxDecoration(
@@ -140,9 +142,14 @@ class StatusBadge extends StatelessWidget {
             decoration: BoxDecoration(color: s.fg, shape: BoxShape.circle),
           ),
           const SizedBox(width: 6),
-          Text(s.label,
-              style: TextStyle(
-                  color: s.fg, fontSize: 12, fontWeight: FontWeight.w600)),
+          // Flexible+ellipsis — จอแคบ/text scale ใหญ่ ป้ายต้องหดได้ ไม่ล้นการ์ด
+          Flexible(
+            child: Text(s.label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                    color: s.fg, fontSize: 12, fontWeight: FontWeight.w600)),
+          ),
         ],
       ),
     );
@@ -163,7 +170,9 @@ class WrapBadge extends StatelessWidget {
         borderRadius: BorderRadius.circular(999),
       ),
       child: Text(
-        isSeal ? 'ห่อซีล · 180 วัน' : 'ห่อผ้า · 7 วัน',
+        isSeal
+            ? AppLocalizations.of(context).dmWrapSeal
+            : AppLocalizations.of(context).dmWrapCloth,
         style: TextStyle(
           color: isSeal ? SterelisColors.wrapSeal : SterelisColors.wrapCloth,
           fontSize: 12,
@@ -234,8 +243,8 @@ class ExpiryRing extends StatelessWidget {
                 ),
               ),
               if (!expired)
-                const Text('วัน',
-                    style: TextStyle(
+                Text(AppLocalizations.of(context).dmDaysShort,
+                    style: const TextStyle(
                         fontSize: 8,
                         color: SterelisColors.textFaint,
                         fontWeight: FontWeight.w600,

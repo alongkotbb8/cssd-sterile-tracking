@@ -1,0 +1,9 @@
+# Flutter gen-l10n config — สร้าง AppLocalizations จากไฟล์ ARB
+# ภาษาหลัก = ไทย (template) ; en เป็น fallback/รองรับอนาคต
+# output ลงไดเรกทอรีจริง (synthetic-package: false) เพื่อ import ตรงได้
+arb-dir: lib/l10n
+output-dir: lib/l10n
+template-arb-file: app_th.arb
+output-localization-file: app_localizations.dart
+output-class: AppLocalizations
+nullable-getter: false
