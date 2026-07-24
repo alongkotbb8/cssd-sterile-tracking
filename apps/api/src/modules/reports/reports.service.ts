@@ -22,7 +22,15 @@ export class ReportsService {
   /** FR-6: Dashboard data */
   async dashboard() {
     const now = new Date();
-    const [sterileByTemplate, issuedByDept, expiringSoon, expired, awaitingReprocess, packedOut] =
+    const [
+      sterileByTemplate,
+      issuedByDept,
+      expiringSoon,
+      expired,
+      awaitingReprocess,
+      packedOut,
+      recentMovementRows,
+    ] =
       await Promise.all([
         // Stock by set template
         this.prisma.package.groupBy({
@@ -56,6 +64,15 @@ export class ReportsService {
         this.prisma.package.count({ where: { status: PackageStatus.RETURNED } }),
         // ส่งออกโดยยังไม่ฆ่าเชื้อ ที่ยังไม่คืน
         this.prisma.package.count({ where: { status: PackageStatus.PACKED_OUT } }),
+        // การเคลื่อนไหวล่าสุด 8 รายการ (ทุกชนิด) — "ชุดอะไรไปอยู่ที่ไหน"
+        this.prisma.movement.findMany({
+          orderBy: { createdAt: 'desc' },
+          take: 8,
+          include: {
+            package: { include: { setTemplate: true } },
+            department: true,
+          },
+        }),
       ]);
 
     // Enrich template names
@@ -80,6 +97,15 @@ export class ReportsService {
         count: r._count.id,
       })),
       summary: { expiringSoon, expired, awaitingReprocess, packedOut },
+      recentMovements: recentMovementRows.map((m) => ({
+        packageId: m.packageId,
+        setName: m.package?.setTemplate?.name ?? m.packageId,
+        type: m.type,
+        departmentName: m.department?.name ?? null,
+        receiverName: m.receiverName ?? null,
+        at: m.createdAt.toISOString(),
+        packageStatus: m.package?.status ?? null,
+      })),
     };
   }
 

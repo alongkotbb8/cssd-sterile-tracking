@@ -32,20 +32,22 @@ LabelData browserPrintLabelData(BrowserPrintLabel label) => LabelData(
       expiryDate: label.isSterilized ? label.expiryDate : null,
     );
 
-/// เปิด sheet พิมพ์ผ่านเบราว์เซอร์ (BROWSER_DIALOG) สำหรับห่อเดียว
+/// เปิด sheet พิมพ์ผ่านเบราว์เซอร์ (BROWSER_DIALOG) — รองรับ 1..N ห่อ
 /// [createdFrom] = CREATE_PACKAGE | PACKAGE_DETAIL | PRINT_JOBS (บันทึกที่ backend)
 ///
 /// Flow (MACOS_BROWSER_PRINT_DIRECTIVE.md §10):
-/// สร้างคำขอที่ backend → แสดง preview จาก label payload → ผู้ใช้กดพิมพ์ →
-/// บันทึก dialog-opened **ให้สำเร็จก่อน** → เปิด print dialog → ผู้ใช้เลือกผลเอง
-/// (ยืนยัน/ไม่ได้พิมพ์/ตรวจสอบภายหลัง) — **ไม่มี** auto-open, auto-confirm,
-/// auto-retry ใด ๆ และไม่แตะ printedAt/สถานะ PRINTED เด็ดขาด
+/// สร้างคำขอ **แยก 1 ต่อ 1 ห่อ** ที่ backend (traceability/reprint ครบต่อห่อ) →
+/// แสดง preview จาก label payload → ผู้ใช้กดพิมพ์ → บันทึก dialog-opened ของทุกห่อ
+/// **ให้สำเร็จก่อน** → เปิด print dialog ครั้งเดียว (PDF รวมทุกห่อ×สำเนา) → ผู้ใช้เลือก
+/// ผลเอง (ยืนยัน/ไม่ได้พิมพ์/ตรวจสอบภายหลัง) มีผลกับทุกห่อในชุด — **ไม่มี** auto-open,
+/// auto-confirm, auto-retry ใด ๆ และไม่แตะ printedAt/สถานะ PRINTED เด็ดขาด
 Future<void> showBrowserPrintSheet(
   BuildContext context,
   WidgetRef ref, {
-  required PackageModel pkg,
+  required List<PackageModel> pkgs,
   required String createdFrom,
 }) async {
+  if (pkgs.isEmpty) return;
   await showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
@@ -53,7 +55,7 @@ Future<void> showBrowserPrintSheet(
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
     ),
-    builder: (_) => _BrowserPrintSheet(pkg: pkg, createdFrom: createdFrom),
+    builder: (_) => _BrowserPrintSheet(pkgs: pkgs, createdFrom: createdFrom),
   );
 }
 
@@ -72,8 +74,8 @@ enum _Phase {
 }
 
 class _BrowserPrintSheet extends ConsumerStatefulWidget {
-  const _BrowserPrintSheet({required this.pkg, required this.createdFrom});
-  final PackageModel pkg;
+  const _BrowserPrintSheet({required this.pkgs, required this.createdFrom});
+  final List<PackageModel> pkgs;
   final String createdFrom;
 
   @override
@@ -87,22 +89,29 @@ class _BrowserPrintSheetState extends ConsumerState<_BrowserPrintSheet> {
   bool _needReason = false; // ต้องกรอกเหตุผล reprint ก่อนสร้างคำขอ
   BrowserPrintPrior? _prior; // ข้อมูลการพิมพ์ครั้งก่อน (จาก error body/response)
   Object? _createError; // error ล่าสุดตอนสร้างคำขอ (แสดง + ปุ่มลองใหม่)
-  BrowserPrintRequest? _request; // คำขอที่สร้างสำเร็จ (มี label payload)
-  Uint8List? _png; // bitmap preview จาก label payload
+  // คำขอ + preview แยกต่อห่อ (index ตรงกับ widget.pkgs) — สร้างครบทุกห่อจึงไป preview
+  final List<BrowserPrintRequest> _requests = [];
+  final List<Uint8List?> _pngs = [];
   bool _working = false; // กำลังเรียก dialog-opened/confirm/cancel
 
-  // Idempotency-Key **คงเดิมต่อ 1 operation** ตลอดอายุ sheet — กดลองใหม่แล้ว
+  int get _n => widget.pkgs.length;
+
+  // Idempotency-Key **คงเดิมต่อ (operation × ห่อ)** ตลอดอายุ sheet — กดลองใหม่แล้ว
   // backend replay ของเดิม ไม่สร้างคำขอ/transition ซ้ำ (กัน label ซ้ำ)
-  late final String _createKey = newIdempotencyKey();
-  late final String _dialogOpenedKey = newIdempotencyKey();
-  late final String _confirmKey = newIdempotencyKey();
-  late final String _cancelKey = newIdempotencyKey();
+  late final List<String> _createKeys =
+      List.generate(_n, (_) => newIdempotencyKey());
+  late final List<String> _dialogOpenedKeys =
+      List.generate(_n, (_) => newIdempotencyKey());
+  late final List<String> _confirmKeys =
+      List.generate(_n, (_) => newIdempotencyKey());
+  late final List<String> _cancelKeys =
+      List.generate(_n, (_) => newIdempotencyKey());
 
   @override
   void initState() {
     super.initState();
-    if (widget.pkg.printedAt != null) {
-      // เคยพิมพ์แล้ว (gateway ACK) → ต้องเตือน + บังคับเหตุผลก่อนสร้างคำขอ (§9)
+    if (widget.pkgs.any((p) => p.printedAt != null)) {
+      // มีอย่างน้อยหนึ่งห่อเคยพิมพ์แล้ว (gateway ACK) → เตือน + บังคับเหตุผลก่อน (§9)
       _needReason = true;
     } else {
       // ยังไม่เคยพิมพ์ → สร้างคำขอทันทีที่เปิด sheet (backend ตัดสิน reprint ซ้ำ
@@ -132,27 +141,40 @@ class _BrowserPrintSheetState extends ConsumerState<_BrowserPrintSheet> {
       _createError = null;
     });
     try {
-      final req = await ref.read(browserPrintRepositoryProvider).create(
-            widget.pkg.id,
-            copies: _copies,
-            createdFrom: widget.createdFrom,
-            reprintReason: reason.isEmpty ? null : reason,
-            idempotencyKey: _createKey, // คงเดิมเมื่อ retry — กันคำขอซ้ำ
-          );
-      // preview สร้างจาก label payload ของ backend เท่านั้น (ไม่ใช่ pkg ฝั่ง client)
-      final label = req.label;
-      final png = label == null
-          ? null
-          : await ref.read(renderLabelPngProvider)(
-              browserPrintLabelData(label),
-              widthMm: kLabelWidthMm,
-              heightMm: kLabelHeightMm,
-            );
+      // สร้างคำขอแยกต่อห่อ (idempotency key คงที่ต่อ index — retry แล้ว replay ของเดิม
+      // ไม่สร้างซ้ำ). สร้างใหม่ทั้งชุดทุกครั้งได้อย่างปลอดภัยเพราะ backend replay
+      final reqs = <BrowserPrintRequest>[];
+      final pngs = <Uint8List?>[];
+      final repo = ref.read(browserPrintRepositoryProvider);
+      final renderPng = ref.read(renderLabelPngProvider);
+      for (var i = 0; i < _n; i++) {
+        final req = await repo.create(
+          widget.pkgs[i].id,
+          copies: _copies,
+          createdFrom: widget.createdFrom,
+          reprintReason: reason.isEmpty ? null : reason,
+          idempotencyKey: _createKeys[i],
+        );
+        // preview สร้างจาก label payload ของ backend เท่านั้น (ไม่ใช่ pkg ฝั่ง client)
+        final label = req.label;
+        pngs.add(label == null
+            ? null
+            : await renderPng(
+                browserPrintLabelData(label),
+                widthMm: kLabelWidthMm,
+                heightMm: kLabelHeightMm,
+              ));
+        reqs.add(req);
+      }
       if (!mounted) return;
       setState(() {
-        _request = req;
-        _prior = req.priorPrints ?? _prior;
-        _png = png;
+        _requests
+          ..clear()
+          ..addAll(reqs);
+        _pngs
+          ..clear()
+          ..addAll(pngs);
+        _prior = reqs.first.priorPrints ?? _prior;
         _phase = _Phase.preview;
       });
     } on DioException catch (e) {
@@ -187,15 +209,17 @@ class _BrowserPrintSheetState extends ConsumerState<_BrowserPrintSheet> {
   /// ปุ่ม "พิมพ์ผ่านเครื่องนี้" — บันทึก DIALOG_OPENED ที่ backend **ให้สำเร็จก่อน**
   /// จึงเปิด print dialog (ผลลัพธ์ของ dialog ถูกเพิกเฉยทั้งหมด — ไม่ใช่หลักฐานพิมพ์)
   Future<void> _openPrintDialog() async {
-    final req = _request;
-    final png = _png;
-    if (req == null || png == null || _working) return;
+    if (_requests.isEmpty || _working) return;
     final l10n = AppLocalizations.of(context);
     setState(() => _working = true);
     try {
-      await ref
-          .read(browserPrintRepositoryProvider)
-          .dialogOpened(req.id, idempotencyKey: _dialogOpenedKey);
+      // บันทึก dialog-opened ของ **ทุกห่อ** ให้สำเร็จก่อน จึงเปิด print dialog
+      // (ลำดับ §10 ข้อ 3→4). idempotent ต่อ index — retry แล้ว replay ของเดิม
+      for (var i = 0; i < _requests.length; i++) {
+        await ref
+            .read(browserPrintRepositoryProvider)
+            .dialogOpened(_requests[i].id, idempotencyKey: _dialogOpenedKeys[i]);
+      }
     } catch (e) {
       // dialog-opened ไม่สำเร็จ → **ห้าม** เปิด print dialog (ลำดับ §10 ข้อ 3→4)
       if (!mounted) return;
@@ -207,12 +231,15 @@ class _BrowserPrintSheetState extends ConsumerState<_BrowserPrintSheet> {
       return;
     }
 
-    // สร้าง PDF ขนาด label จริง (N หน้า = N สำเนา) แล้วเปิด system print dialog
-    // ผ่าน seam — ผลลัพธ์ (return/พัง/ timeout) ไม่มีความหมายเชิงสถานะ จึงเพิกเฉย
+    // สร้าง PDF ขนาด label จริง รวมทุกห่อ (แต่ละห่อ × สำเนา) แล้วเปิด system print
+    // dialog ครั้งเดียว ผ่าน seam — ผลลัพธ์ (return/พัง/timeout) ไม่มีความหมายเชิงสถานะ
     try {
-      final bytes = await _buildPdf(png, req.copies);
+      final bytes = await _buildPdf();
+      final name = _n == 1
+          ? 'cssd-label-${_requests.first.packageId}.pdf'
+          : 'cssd-labels-$_n.pdf';
       await ref
-          .read(printPdfProvider)(bytes, 'cssd-label-${req.packageId}.pdf')
+          .read(printPdfProvider)(bytes, name)
           .timeout(const Duration(seconds: 10));
     } catch (_) {
       // เพิกเฉยโดยตั้งใจ: การพัง/ค้างของ print dialog ไม่ใช่ผลการพิมพ์ —
@@ -225,47 +252,56 @@ class _BrowserPrintSheetState extends ConsumerState<_BrowserPrintSheet> {
     });
   }
 
-  Future<Uint8List> _buildPdf(Uint8List png, int copies) async {
+  /// PDF รวม: ต่อ 1 ห่อ = (สำเนา) หน้า, เรียงตามลำดับห่อ — 1 หน้า = 1 label ขนาดจริง
+  Future<Uint8List> _buildPdf() async {
     final doc = pw.Document();
-    final image = pw.MemoryImage(png);
-    for (var i = 0; i < copies; i++) {
-      doc.addPage(pw.Page(
-        pageFormat: const PdfPageFormat(
-          kLabelWidthMm * PdfPageFormat.mm,
-          kLabelHeightMm * PdfPageFormat.mm,
-        ),
-        margin: pw.EdgeInsets.zero,
-        build: (_) => pw.Image(image, fit: pw.BoxFit.fill),
-      ));
+    for (var i = 0; i < _requests.length; i++) {
+      final png = _pngs[i];
+      if (png == null) continue; // ไม่มี label payload (ไม่ควรเกิด) — ข้าม
+      final image = pw.MemoryImage(png);
+      final copies = _requests[i].copies;
+      for (var c = 0; c < copies; c++) {
+        doc.addPage(pw.Page(
+          pageFormat: const PdfPageFormat(
+            kLabelWidthMm * PdfPageFormat.mm,
+            kLabelHeightMm * PdfPageFormat.mm,
+          ),
+          margin: pw.EdgeInsets.zero,
+          build: (_) => pw.Image(image, fit: pw.BoxFit.fill),
+        ));
+      }
     }
     return doc.save();
   }
 
   Future<void> _confirm() => _finish(
-        (repo, id) => repo.confirm(id, idempotencyKey: _confirmKey),
+        (repo, id, i) => repo.confirm(id, idempotencyKey: _confirmKeys[i]),
         (l10n) => l10n.bpConfirmedSnack,
         SterelisColors.success,
       );
 
   Future<void> _cancelNotPrinted() => _finish(
-        (repo, id) => repo.cancel(id, idempotencyKey: _cancelKey),
+        (repo, id, i) => repo.cancel(id, idempotencyKey: _cancelKeys[i]),
         (l10n) => l10n.bpCancelledSnack,
         SterelisColors.textMuted,
       );
 
+  /// ยืนยัน/ยกเลิก **ทุกห่อในชุด** (idempotent ต่อ index — retry แล้ว replay ของเดิม)
   Future<void> _finish(
-    Future<BrowserPrintRequest> Function(BrowserPrintRepository, String) call,
+    Future<BrowserPrintRequest> Function(BrowserPrintRepository, String, int) call,
     String Function(AppLocalizations) message,
     Color color,
   ) async {
-    final req = _request;
-    if (req == null || _working) return;
+    if (_requests.isEmpty || _working) return;
     final l10n = AppLocalizations.of(context);
     final messenger = ScaffoldMessenger.of(context);
     final navigator = Navigator.of(context);
     setState(() => _working = true);
     try {
-      await call(ref.read(browserPrintRepositoryProvider), req.id);
+      final repo = ref.read(browserPrintRepositoryProvider);
+      for (var i = 0; i < _requests.length; i++) {
+        await call(repo, _requests[i].id, i);
+      }
       if (!mounted) return;
       navigator.pop();
       messenger.showSnackBar(
@@ -306,7 +342,7 @@ class _BrowserPrintSheetState extends ConsumerState<_BrowserPrintSheet> {
                   fontWeight: FontWeight.w800,
                   color: SterelisColors.textStrong)),
           const SizedBox(height: 4),
-          Text(widget.pkg.id,
+          Text(_n == 1 ? widget.pkgs.first.id : l10n.bpPackagesCount(_n),
               style: const TextStyle(
                   fontFamily: 'monospace',
                   fontSize: 13,
@@ -371,70 +407,20 @@ class _BrowserPrintSheetState extends ConsumerState<_BrowserPrintSheet> {
       ];
 
   List<Widget> _buildPreview(AppLocalizations l10n) {
-    final req = _request!;
-    final label = req.label;
-    final fmt = DateFormat('dd/MM/yyyy');
+    final anyReprint = _requests.any((r) => r.isReprint);
     return [
-      // §10: เลขห่อ + ชื่อชุด + สถานะห่อ + จำนวนสำเนา + ตัวอย่าง label
-      if (label != null) ...[
-        Row(children: [
-          Expanded(
-            child: Text(label.templateName,
-                style: const TextStyle(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 15,
-                    color: SterelisColors.textStrong)),
-          ),
-          StatusBadge(label.status),
-        ]),
-        const SizedBox(height: 10),
-      ],
       Text(l10n.bpPreviewTitle,
           style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
       const SizedBox(height: 8),
-      if (_png != null)
-        Center(
-          child: Container(
-            constraints: const BoxConstraints(maxWidth: 300),
-            decoration: BoxDecoration(
-              color: SterelisColors.white,
-              border: Border.all(color: SterelisColors.borderStrong),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: AspectRatio(
-              aspectRatio: kLabelWidthMm / kLabelHeightMm,
-              child: Image.memory(_png!, fit: BoxFit.contain),
-            ),
-          ),
-        ),
+      // §10: ตัวอย่าง label ต่อ 1 ห่อ (เลขห่อ + ชื่อชุด + สถานะ + วันที่/แถบเตือน)
+      for (var i = 0; i < _requests.length; i++) ...[
+        if (i > 0) const SizedBox(height: 12),
+        _previewCard(l10n, _requests[i], _pngs[i]),
+      ],
       const SizedBox(height: 8),
-      if (label != null)
-        label.isSterilized &&
-                label.sterilizeDate != null &&
-                label.expiryDate != null
-            ? Text(
-                l10n.bpDatesLine(fmt.format(label.sterilizeDate!),
-                    fmt.format(label.expiryDate!)),
-                style: const TextStyle(
-                    fontSize: 13, color: SterelisColors.textMuted))
-            : Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                decoration: BoxDecoration(
-                  color: SterelisColors.textStrong,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Text(l10n.bpUnsterileNotice,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700)),
-              ),
-      const SizedBox(height: 6),
-      Text(l10n.bpCopiesLine(req.copies),
+      Text(l10n.bpCopiesLine(_copies),
           style: const TextStyle(fontSize: 13, color: SterelisColors.textMuted)),
-      if (req.isReprint) ...[
+      if (anyReprint) ...[
         const SizedBox(height: 10),
         _reprintWarningBox(l10n),
       ],
@@ -456,6 +442,72 @@ class _BrowserPrintSheetState extends ConsumerState<_BrowserPrintSheet> {
         style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
       ),
     ];
+  }
+
+  /// การ์ดตัวอย่าง label ของ 1 ห่อ — เนื้อหาเหมือนเดิม (ชื่อชุด + สถานะ + ภาพ +
+  /// วันที่/แถบ "ยังไม่ผ่านการฆ่าเชื้อ") ทำให้ N==1 หน้าตาเท่าเดิม
+  Widget _previewCard(AppLocalizations l10n, BrowserPrintRequest req, Uint8List? png) {
+    final label = req.label;
+    final fmt = DateFormat('dd/MM/yyyy');
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (label != null) ...[
+          Row(children: [
+            Expanded(
+              child: Text('${label.templateName} · ${req.packageId}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 14,
+                      color: SterelisColors.textStrong)),
+            ),
+            StatusBadge(label.status),
+          ]),
+          const SizedBox(height: 8),
+        ],
+        if (png != null)
+          Center(
+            child: Container(
+              constraints: const BoxConstraints(maxWidth: 300),
+              decoration: BoxDecoration(
+                color: SterelisColors.white,
+                border: Border.all(color: SterelisColors.borderStrong),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: AspectRatio(
+                aspectRatio: kLabelWidthMm / kLabelHeightMm,
+                child: Image.memory(png, fit: BoxFit.contain),
+              ),
+            ),
+          ),
+        const SizedBox(height: 8),
+        if (label != null)
+          label.isSterilized &&
+                  label.sterilizeDate != null &&
+                  label.expiryDate != null
+              ? Text(
+                  l10n.bpDatesLine(fmt.format(label.sterilizeDate!),
+                      fmt.format(label.expiryDate!)),
+                  style: const TextStyle(
+                      fontSize: 13, color: SterelisColors.textMuted))
+              : Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: SterelisColors.textStrong,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(l10n.bpUnsterileNotice,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700)),
+                ),
+      ],
+    );
   }
 
   List<Widget> _buildResult(AppLocalizations l10n) => [
@@ -526,9 +578,14 @@ class _BrowserPrintSheetState extends ConsumerState<_BrowserPrintSheet> {
     final fmt = DateFormat('dd/MM/yyyy HH:mm');
     final priorAt = prior?.lastAt != null
         ? fmt.format(prior!.lastAt!)
-        : widget.pkg.printedAt != null
-            ? fmt.format(widget.pkg.printedAt!)
-            : null;
+        : () {
+            // fallback: ห่อแรกในชุดที่เคยพิมพ์ (มี printedAt) — ใช้แสดงเวลาพิมพ์ครั้งก่อน
+            final printed = widget.pkgs
+                .map((p) => p.printedAt)
+                .whereType<DateTime>()
+                .toList();
+            return printed.isEmpty ? null : fmt.format(printed.first);
+          }();
     final priorStatus = prior?.lastStatus == null
         ? null
         : BrowserPrintStatusStyle.of(l10n, prior!.lastStatus!).label;

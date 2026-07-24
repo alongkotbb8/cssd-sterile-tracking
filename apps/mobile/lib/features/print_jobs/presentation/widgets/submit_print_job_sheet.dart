@@ -4,9 +4,11 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../core/api/api_client.dart';
 import '../../../../core/api/repositories.dart';
+import '../../../../core/config/feature_flags.dart';
 import '../../../../core/models/models.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../l10n/app_localizations.dart';
+import '../../../browser_print/presentation/widgets/browser_print_sheet.dart';
 
 /// สร้างงานพิมพ์ผ่าน Print Job Queue (แทนการพิมพ์ตรง) — เลือก gateway + เหตุผล
 /// พิมพ์ซ้ำ (ถ้าเคยพิมพ์แล้ว) → สร้าง PrintJob 1 งานต่อ 1 ห่อ แล้วพาไปดูสถานะ
@@ -220,6 +222,22 @@ class _SubmitPrintJobSheetState extends ConsumerState<_SubmitPrintJobSheet> {
                     : l10n.pjCreateButtonCount(widget.pkgs.length)),
             style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
           ),
+          // Browser print (BROWSER_DIALOG) — ทางเลือกพิมพ์ผ่าน macOS print dialog บนเครื่อง
+          // นี้โดยตรง (ไม่ต้องมี Print Gateway). รองรับหลายห่อ (พิมพ์รวม print dialog เดียว)
+          // เฉพาะเมื่อเปิด feature flag
+          if (ref.watch(browserPrintEnabledProvider) && !_submitting) ...[
+            const SizedBox(height: 10),
+            OutlinedButton.icon(
+              onPressed: () {
+                Navigator.of(context).pop();
+                showBrowserPrintSheet(context, ref,
+                    pkgs: widget.pkgs, createdFrom: 'PACKAGE_DETAIL');
+              },
+              icon: const Icon(Icons.open_in_browser),
+              label: Text(l10n.bpPrintViaThisDevice),
+              style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(52)),
+            ),
+          ],
         ],
       ),
     );

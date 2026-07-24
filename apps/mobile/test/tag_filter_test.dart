@@ -35,22 +35,23 @@ void main() {
 
   group('PackageQuery (family cache key)', () {
     test('record ที่ค่าเท่ากัน = เท่ากัน (cache ทำงานถูก)', () {
-      const PackageQuery a = (status: 'STERILE', tagId: 't1');
-      const PackageQuery b = (status: 'STERILE', tagId: 't1');
+      const PackageQuery a = (status: 'STERILE', tagId: 't1', search: null);
+      const PackageQuery b = (status: 'STERILE', tagId: 't1', search: null);
       expect(a, b);
       expect(a.hashCode, b.hashCode);
     });
 
-    test('status หรือ tagId ต่างกัน = คนละคีย์', () {
-      const PackageQuery base = (status: 'STERILE', tagId: 't1');
-      expect(base == (status: 'PACKED', tagId: 't1'), isFalse);
-      expect(base == (status: 'STERILE', tagId: 't2'), isFalse);
-      expect(base == (status: 'STERILE', tagId: null), isFalse);
+    test('status/tagId/search ต่างกัน = คนละคีย์', () {
+      const PackageQuery base = (status: 'STERILE', tagId: 't1', search: null);
+      expect(base == (status: 'PACKED', tagId: 't1', search: null), isFalse);
+      expect(base == (status: 'STERILE', tagId: 't2', search: null), isFalse);
+      expect(base == (status: 'STERILE', tagId: null, search: null), isFalse);
+      expect(base == (status: 'STERILE', tagId: 't1', search: 'x'), isFalse);
     });
 
-    test('null ทั้งคู่ = กรองทั้งหมด', () {
-      const PackageQuery all = (status: null, tagId: null);
-      expect(all == (status: null, tagId: null), isTrue);
+    test('null ทั้งหมด = กรองทั้งหมด', () {
+      const PackageQuery all = (status: null, tagId: null, search: null);
+      expect(all == (status: null, tagId: null, search: null), isTrue);
     });
   });
 }

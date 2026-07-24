@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show FontLoader, rootBundle;
 import 'package:intl/intl.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
@@ -25,6 +26,31 @@ String wrapTypeLabelText(String wrapType) =>
 class LabelRenderer {
   /// 203 DPI ≈ 8 dots/mm
   static const int dotsPerMm = 8;
+
+  /// ฟอนต์ที่ฝังมากับแอป (assets/fonts/Sarabun-*.ttf) — **ต้องระบุชัดเจน**
+  /// เพราะ [TextPainter] ที่วาดลง [Canvas] นอก widget tree ไม่สืบทอด fontFamily
+  /// จาก ThemeData; ถ้าไม่ระบุ เอนจินจะใช้ฟอนต์ดีฟอลต์ (บนเว็บ/CanvasKit = Roboto)
+  /// ซึ่ง **ไม่มี glyph ภาษาไทย** → ตัวอักษรไทยกลายเป็นกล่องว่าง (tofu)
+  static const String _fontFamily = 'Sarabun';
+
+  /// โหลด glyph ของ Sarabun เข้าเอนจิน **ครั้งเดียว** ก่อน rasterize —
+  /// กันเคส cold-start บนเว็บที่ยังไม่เคยวาดข้อความ Sarabun (ฟอนต์ยังไม่ถูก
+  /// ดาวน์โหลด) แล้ว [Canvas]→[toImage] ไปหยิบฟอนต์ fallback ที่ไม่มีสระ/
+  /// พยัญชนะไทย → label เป็นกล่องว่าง. ทำให้ renderer เป็น self-contained
+  /// (ไม่พึ่งว่า theme ต้องเคยวาดข้อความ Sarabun มาก่อน) และทดสอบ headless ได้
+  static Future<void>? _fontReady;
+  static Future<void> _ensureFont() {
+    return _fontReady ??= () async {
+      final loader = FontLoader(_fontFamily);
+      for (final asset in const [
+        'assets/fonts/Sarabun-Regular.ttf',
+        'assets/fonts/Sarabun-Bold.ttf',
+      ]) {
+        loader.addFont(rootBundle.load(asset));
+      }
+      await loader.load();
+    }();
+  }
 
   /// คืน bytes ของคำสั่ง TSPL ทั้งชุด (header + BITMAP data + PRINT)
   static Future<List<int>> buildTsplBitmap(
@@ -73,6 +99,7 @@ class LabelRenderer {
 
   static Future<ui.Image> _renderImage(
       LabelData d, int widthDots, int heightDots) async {
+    await _ensureFont(); // มี glyph ไทยแน่นอนก่อนวาด (กัน tofu บนเว็บ)
     final recorder = ui.PictureRecorder();
     final canvas = Canvas(recorder);
 
@@ -95,6 +122,7 @@ class LabelRenderer {
           text: text,
           style: TextStyle(
             color: Colors.black,
+            fontFamily: _fontFamily,
             fontSize: fontSize,
             fontWeight: weight,
             height: 1.0,
@@ -150,6 +178,7 @@ class LabelRenderer {
           text: 'ยังไม่ผ่านการฆ่าเชื้อ',
           style: TextStyle(
             color: Colors.white,
+            fontFamily: _fontFamily,
             fontSize: 26,
             fontWeight: FontWeight.w800,
             height: 1.0,

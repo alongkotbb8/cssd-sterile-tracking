@@ -3,8 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
+import 'dart:async';
+
 import '../../../../core/api/api_client.dart';
 import '../../../../core/api/repositories.dart';
+import '../../../../core/auth/auth_controller.dart';
 import '../../../../core/models/models.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/domain_widgets.dart';
@@ -14,6 +17,8 @@ import '../widgets/create_package_sheet.dart';
 
 final _statusFilterProvider = StateProvider<String?>((ref) => null);
 final _tagFilterProvider = StateProvider<String?>((ref) => null); // 2.7 กรองตาม tag
+// คำค้นที่ debounce แล้ว — ป้อนเข้า PackageQuery.search (ค้นที่ server: เลขห่อ /
+// ชื่อชุด / อุปกรณ์ในชุด / คลังปัจจุบัน) แทนการกรองฝั่ง client อย่างเดียว
 final _searchProvider = StateProvider<String>((ref) => '');
 
 // โหมดเลือกหลายห่อเพื่อพิมพ์ label พร้อมกัน
@@ -27,7 +32,12 @@ class PackagesPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final filter = ref.watch(_statusFilterProvider);
     final tagFilter = ref.watch(_tagFilterProvider);
-    final query = (status: filter, tagId: tagFilter);
+    final search = ref.watch(_searchProvider).trim();
+    final query = (
+      status: filter,
+      tagId: tagFilter,
+      search: search.isEmpty ? null : search,
+    );
     final packages = ref.watch(packagesProvider(query));
     final selectMode = ref.watch(_selectModeProvider);
     final selectedIds = ref.watch(_selectedIdsProvider);
@@ -69,7 +79,7 @@ class PackagesPage extends ConsumerWidget {
               foregroundColor: Colors.white,
             ),
       bottomNavigationBar:
-          selectMode ? _PrintSelectedBar(query: query) : null,
+          selectMode ? _SelectionBar(query: query) : null,
       body: Column(children: [
         const _SearchBar(),
         const _StatusFilterBar(),
@@ -104,9 +114,18 @@ class PackagesPage extends ConsumerWidget {
 }
 
 /// แถบล่างตอนอยู่โหมดเลือก — ปุ่มพิมพ์ label ของห่อที่เลือกทั้งหมด
-class _PrintSelectedBar extends ConsumerWidget {
-  const _PrintSelectedBar({required this.query});
+/// + ปุ่มลบถาวร (แสดงเฉพาะตัวกรอง PACKED และผู้ใช้ SUPERVISOR/ADMIN)
+class _SelectionBar extends ConsumerWidget {
+  const _SelectionBar({required this.query});
   final PackageQuery query;
+
+  /// ลบได้เฉพาะตัวกรองสถานะ = PACKED (ห่อที่ยังไม่มีประวัติ) และสิทธิ์สูงพอ
+  /// (backend บังคับ RBAC + เงื่อนไข PACKED/ไม่มีประวัติซ้ำ — UI แค่ซ่อนปุ่ม)
+  bool _canDelete(WidgetRef ref) {
+    if (query.status != 'PACKED') return false;
+    final role = ref.watch(authControllerProvider).user?.role;
+    return role == 'SUPERVISOR' || role == 'ADMIN';
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -114,41 +133,134 @@ class _PrintSelectedBar extends ConsumerWidget {
     final packages = ref.watch(packagesProvider(query)).value ?? const [];
     final count = selectedIds.length;
     final l10n = AppLocalizations.of(context);
+    final canDelete = _canDelete(ref);
+
+    List<PackageModel> selectedPackages() =>
+        packages.where((p) => selectedIds.contains(p.id)).toList();
 
     return SafeArea(
       child: Padding(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-        child: FilledButton.icon(
-          onPressed: count == 0
-              ? null
-              : () async {
-                  final selected = packages
-                      .where((p) => selectedIds.contains(p.id))
-                      .toList();
-                  await submitPrintJobs(context, ref, selected);
-                  ref.read(_selectModeProvider.notifier).state = false;
-                  ref.read(_selectedIdsProvider.notifier).state = {};
-                },
-          icon: const Icon(Icons.print_outlined),
-          label: Text(count == 0
-              ? l10n.pkgSelectToPrintHint
-              : l10n.pkgPrintSelected(count)),
-          style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(50)),
-        ),
+        child: Row(children: [
+          if (canDelete) ...[
+            OutlinedButton.icon(
+              onPressed: count == 0
+                  ? null
+                  : () => _confirmDelete(context, ref, selectedIds.toList()),
+              icon: const Icon(Icons.delete_outline),
+              label: Text(l10n.pkgDeleteSelected),
+              style: OutlinedButton.styleFrom(
+                minimumSize: const Size(0, 50),
+                foregroundColor: SterelisColors.danger,
+                side: const BorderSide(color: SterelisColors.danger),
+              ),
+            ),
+            const SizedBox(width: 10),
+          ],
+          Expanded(
+            child: FilledButton.icon(
+              onPressed: count == 0
+                  ? null
+                  : () async {
+                      final selected = selectedPackages();
+                      await submitPrintJobs(context, ref, selected);
+                      ref.read(_selectModeProvider.notifier).state = false;
+                      ref.read(_selectedIdsProvider.notifier).state = {};
+                    },
+              icon: const Icon(Icons.print_outlined),
+              label: Text(count == 0
+                  ? l10n.pkgSelectToPrintHint
+                  : l10n.pkgPrintSelected(count)),
+              style:
+                  FilledButton.styleFrom(minimumSize: const Size.fromHeight(50)),
+            ),
+          ),
+        ]),
       ),
     );
   }
+
+  /// ยืนยันก่อนลบถาวร — ผู้ใช้ต้องกด "ลบถาวร" จึงจะเรียก repo.bulkDelete
+  Future<void> _confirmDelete(
+      BuildContext context, WidgetRef ref, List<String> ids) async {
+    final l10n = AppLocalizations.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(l10n.pkgDeleteConfirmTitle(ids.length)),
+        content: Text(l10n.pkgDeleteConfirmBody),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text(l10n.pkgDeleteConfirmCancel),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            style: FilledButton.styleFrom(
+                backgroundColor: SterelisColors.danger),
+            child: Text(l10n.pkgDeleteConfirmAction),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+
+    try {
+      final results =
+          await ref.read(packageRepositoryProvider).bulkDelete(ids);
+      final okCount = results.where((r) => r.success).length;
+      final failCount = results.length - okCount;
+      // เคลียร์การเลือก + ออกจากโหมดเลือก (bulkDelete invalidate list/dashboard แล้ว)
+      ref.read(_selectModeProvider.notifier).state = false;
+      ref.read(_selectedIdsProvider.notifier).state = {};
+      messenger.showSnackBar(SnackBar(
+        content: Text(failCount == 0
+            ? l10n.pkgDeleteDone(okCount)
+            : '${l10n.pkgDeleteDone(okCount)}${l10n.pkgDeleteFailedSuffix(failCount)}'),
+        backgroundColor:
+            failCount == 0 ? SterelisColors.success : SterelisColors.warning,
+      ));
+    } catch (e) {
+      messenger.showSnackBar(SnackBar(
+        content: Text(apiErrorMessage(l10n, e)),
+        backgroundColor: SterelisColors.danger,
+      ));
+    }
+  }
 }
 
-class _SearchBar extends ConsumerWidget {
+/// ช่องค้นหา — debounce ~350ms ก่อนป้อนเข้า _searchProvider (ยิง GET /packages?search=)
+/// กันยิง server ทุกตัวอักษรระหว่างพิมพ์
+class _SearchBar extends ConsumerStatefulWidget {
   const _SearchBar();
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_SearchBar> createState() => _SearchBarState();
+}
+
+class _SearchBarState extends ConsumerState<_SearchBar> {
+  Timer? _debounce;
+
+  @override
+  void dispose() {
+    _debounce?.cancel();
+    super.dispose();
+  }
+
+  void _onChanged(String v) {
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 350), () {
+      ref.read(_searchProvider.notifier).state = v;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
       child: TextField(
-        onChanged: (v) => ref.read(_searchProvider.notifier).state = v,
+        onChanged: _onChanged,
         decoration: InputDecoration(
           hintText: AppLocalizations.of(context).pkgSearchHint,
           hintStyle: const TextStyle(color: SterelisColors.textFaint),
@@ -309,16 +421,10 @@ class _PackageList extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final q = ref.watch(_searchProvider).trim().toLowerCase();
     final selectMode = ref.watch(_selectModeProvider);
     final selectedIds = ref.watch(_selectedIdsProvider);
-    final list = q.isEmpty
-        ? packages
-        : packages
-            .where((p) =>
-                p.id.toLowerCase().contains(q) ||
-                p.templateName.toLowerCase().contains(q))
-            .toList();
+    // ค้นหาทำที่ server (PackageQuery.search) แล้ว — ที่นี่แสดงผลลัพธ์ตรง ๆ
+    final list = packages;
 
     if (list.isEmpty) {
       return ListView(children: [

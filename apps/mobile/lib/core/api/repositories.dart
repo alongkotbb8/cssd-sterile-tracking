@@ -124,9 +124,10 @@ class ReportRepository {
 
 /// ---------- Packages ----------
 
-/// คีย์ query รายการห่อ — กรองด้วย status และ/หรือ tag พร้อมกันได้
+/// คีย์ query รายการห่อ — กรองด้วย status และ/หรือ tag และ/หรือ search พร้อมกันได้
 /// (record มี value-equality → family cache ทำงานถูกต้องเมื่อค่าเท่ากัน)
-typedef PackageQuery = ({String? status, String? tagId});
+/// [search] = ค้นหาที่ server (เลขห่อ / ชื่อชุด / อุปกรณ์ในชุด / คลังปัจจุบัน)
+typedef PackageQuery = ({String? status, String? tagId, String? search});
 
 /// status = null → ทั้งหมด, มิฉะนั้นส่ง status ไปกรองที่ server (เรียง FEFO จาก server)
 /// 'EXPIRED' เป็นค่าคำนวณ ไม่ใช่สถานะใน DB — ดึงของในคลังแล้วกรอง isExpired ฝั่งนี้
@@ -135,11 +136,13 @@ final packagesProvider =
     FutureProvider.autoDispose.family<List<PackageModel>, PackageQuery>((ref, q) async {
   final status = q.status;
   final isExpiredFilter = status == 'EXPIRED';
+  final search = q.search?.trim();
   final res = await ref.watch(dioProvider).get<List<dynamic>>(
     '/packages',
     queryParameters: {
       if (status != null) 'status': isExpiredFilter ? 'STERILE' : status,
       if (q.tagId != null) 'tagId': q.tagId,
+      if (search != null && search.isNotEmpty) 'search': search,
     },
   );
   final list = res.data!
@@ -197,6 +200,27 @@ class PackageRepository {
     );
     _ref.invalidate(packageDetailProvider(id));
     _ref.invalidate(packagesProvider);
+  }
+
+  /// ลบห่อถาวร (SUPERVISOR/ADMIN) — เฉพาะห่อสถานะ PACKED ที่ยังไม่มีประวัติ
+  /// backend บังคับเงื่อนไขซ้ำ (การซ่อนปุ่มฝั่ง UI ไม่ใช่การป้องกันหลัก) แล้วคืน
+  /// ผลรายห่อ (mirror scan) — ห่อที่มีประวัติจะ fail ด้วย errorCode PKG_HAS_HISTORY
+  /// [idempotencyKey] คงเดิมต่อ 1 operation แล้วใช้ซ้ำเมื่อกดลองใหม่ (กันลบซ้ำ)
+  Future<List<BulkDeleteResult>> bulkDelete(
+    List<String> packageIds, {
+    String? idempotencyKey,
+  }) async {
+    final res = await _ref.read(dioProvider).post<List<dynamic>>(
+      '/packages/bulk-delete',
+      data: {'packageIds': packageIds},
+      options: Options(
+          headers: {'Idempotency-Key': idempotencyKey ?? newIdempotencyKey()}),
+    );
+    _ref.invalidate(packagesProvider);
+    _ref.invalidate(dashboardProvider);
+    return res.data!
+        .map((e) => BulkDeleteResult.fromJson(e as Map<String, dynamic>))
+        .toList();
   }
 }
 

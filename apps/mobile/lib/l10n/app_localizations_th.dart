@@ -171,6 +171,10 @@ class AppLocalizationsTh extends AppLocalizations {
   String get srvPkgWrongStatus => 'สถานะห่อไม่ถูกต้องสำหรับการดำเนินการนี้';
 
   @override
+  String get srvPkgHasHistory =>
+      'ลบไม่ได้ ห่อนี้มีประวัติการใช้งานแล้ว (ใช้การทิ้ง/DISCARD แทน)';
+
+  @override
   String get srvPkgAlreadyInThisBatch => 'ห่อนี้อยู่ในรอบนี้แล้ว';
 
   @override
@@ -356,6 +360,27 @@ class AppLocalizationsTh extends AppLocalizations {
 
   @override
   String get dashNoData => 'ยังไม่มีข้อมูล';
+
+  @override
+  String get dashSearchHint => 'ค้นหา: ชื่อชุด / เลขห่อ / คลัง / อุปกรณ์ในชุด';
+
+  @override
+  String get dashRecentMovementsTitle => 'ชุดอะไรไปอยู่ที่ไหน (ล่าสุด)';
+
+  @override
+  String get dashNoMovements => 'ยังไม่มีการเคลื่อนไหว';
+
+  @override
+  String get dashMoveIn => 'เข้าคลัง';
+
+  @override
+  String get dashMoveOut => 'เบิกออก';
+
+  @override
+  String get dashMoveReturn => 'ส่งคืน';
+
+  @override
+  String get dashSearchNoResults => 'ไม่พบห่อที่ตรงกับคำค้นนี้';
 
   @override
   String get cpCreatedOne => 'สร้างห่อสำเร็จ';
@@ -620,6 +645,34 @@ class AppLocalizationsTh extends AppLocalizations {
   @override
   String pkgLocationAt(String location) {
     return 'อยู่ที่ $location';
+  }
+
+  @override
+  String get pkgDeleteSelected => 'ลบ';
+
+  @override
+  String pkgDeleteConfirmTitle(int count) {
+    return 'ลบ $count รายการถาวร?';
+  }
+
+  @override
+  String get pkgDeleteConfirmBody =>
+      'ลบเฉพาะห่อที่แพ็กแล้วและยังไม่มีประวัติ — การลบถาวรย้อนกลับไม่ได้';
+
+  @override
+  String get pkgDeleteConfirmCancel => 'ยกเลิก';
+
+  @override
+  String get pkgDeleteConfirmAction => 'ลบถาวร';
+
+  @override
+  String pkgDeleteDone(int count) {
+    return 'ลบ $count รายการ';
+  }
+
+  @override
+  String pkgDeleteFailedSuffix(int count) {
+    return ' · ลบไม่ได้ $count รายการ (มีประวัติ)';
   }
 
   @override
@@ -1338,7 +1391,12 @@ class AppLocalizationsTh extends AppLocalizations {
 
   @override
   String bpCopiesLine(int count) {
-    return 'จำนวนสำเนา: $count';
+    return 'จำนวนสำเนา: $count (ต่อห่อ)';
+  }
+
+  @override
+  String bpPackagesCount(int count) {
+    return '$count ห่อ';
   }
 
   @override

@@ -398,6 +398,12 @@ abstract class AppLocalizations {
   /// **'สถานะห่อไม่ถูกต้องสำหรับการดำเนินการนี้'**
   String get srvPkgWrongStatus;
 
+  /// No description provided for @srvPkgHasHistory.
+  ///
+  /// In th, this message translates to:
+  /// **'ลบไม่ได้ ห่อนี้มีประวัติการใช้งานแล้ว (ใช้การทิ้ง/DISCARD แทน)'**
+  String get srvPkgHasHistory;
+
   /// No description provided for @srvPkgAlreadyInThisBatch.
   ///
   /// In th, this message translates to:
@@ -751,6 +757,48 @@ abstract class AppLocalizations {
   /// In th, this message translates to:
   /// **'ยังไม่มีข้อมูล'**
   String get dashNoData;
+
+  /// No description provided for @dashSearchHint.
+  ///
+  /// In th, this message translates to:
+  /// **'ค้นหา: ชื่อชุด / เลขห่อ / คลัง / อุปกรณ์ในชุด'**
+  String get dashSearchHint;
+
+  /// No description provided for @dashRecentMovementsTitle.
+  ///
+  /// In th, this message translates to:
+  /// **'ชุดอะไรไปอยู่ที่ไหน (ล่าสุด)'**
+  String get dashRecentMovementsTitle;
+
+  /// No description provided for @dashNoMovements.
+  ///
+  /// In th, this message translates to:
+  /// **'ยังไม่มีการเคลื่อนไหว'**
+  String get dashNoMovements;
+
+  /// No description provided for @dashMoveIn.
+  ///
+  /// In th, this message translates to:
+  /// **'เข้าคลัง'**
+  String get dashMoveIn;
+
+  /// No description provided for @dashMoveOut.
+  ///
+  /// In th, this message translates to:
+  /// **'เบิกออก'**
+  String get dashMoveOut;
+
+  /// No description provided for @dashMoveReturn.
+  ///
+  /// In th, this message translates to:
+  /// **'ส่งคืน'**
+  String get dashMoveReturn;
+
+  /// No description provided for @dashSearchNoResults.
+  ///
+  /// In th, this message translates to:
+  /// **'ไม่พบห่อที่ตรงกับคำค้นนี้'**
+  String get dashSearchNoResults;
 
   /// No description provided for @cpCreatedOne.
   ///
@@ -1201,6 +1249,48 @@ abstract class AppLocalizations {
   /// In th, this message translates to:
   /// **'อยู่ที่ {location}'**
   String pkgLocationAt(String location);
+
+  /// No description provided for @pkgDeleteSelected.
+  ///
+  /// In th, this message translates to:
+  /// **'ลบ'**
+  String get pkgDeleteSelected;
+
+  /// No description provided for @pkgDeleteConfirmTitle.
+  ///
+  /// In th, this message translates to:
+  /// **'ลบ {count} รายการถาวร?'**
+  String pkgDeleteConfirmTitle(int count);
+
+  /// No description provided for @pkgDeleteConfirmBody.
+  ///
+  /// In th, this message translates to:
+  /// **'ลบเฉพาะห่อที่แพ็กแล้วและยังไม่มีประวัติ — การลบถาวรย้อนกลับไม่ได้'**
+  String get pkgDeleteConfirmBody;
+
+  /// No description provided for @pkgDeleteConfirmCancel.
+  ///
+  /// In th, this message translates to:
+  /// **'ยกเลิก'**
+  String get pkgDeleteConfirmCancel;
+
+  /// No description provided for @pkgDeleteConfirmAction.
+  ///
+  /// In th, this message translates to:
+  /// **'ลบถาวร'**
+  String get pkgDeleteConfirmAction;
+
+  /// No description provided for @pkgDeleteDone.
+  ///
+  /// In th, this message translates to:
+  /// **'ลบ {count} รายการ'**
+  String pkgDeleteDone(int count);
+
+  /// No description provided for @pkgDeleteFailedSuffix.
+  ///
+  /// In th, this message translates to:
+  /// **' · ลบไม่ได้ {count} รายการ (มีประวัติ)'**
+  String pkgDeleteFailedSuffix(int count);
 
   /// No description provided for @commonConfirm.
   ///
@@ -2447,8 +2537,14 @@ abstract class AppLocalizations {
   /// No description provided for @bpCopiesLine.
   ///
   /// In th, this message translates to:
-  /// **'จำนวนสำเนา: {count}'**
+  /// **'จำนวนสำเนา: {count} (ต่อห่อ)'**
   String bpCopiesLine(int count);
+
+  /// No description provided for @bpPackagesCount.
+  ///
+  /// In th, this message translates to:
+  /// **'{count} ห่อ'**
+  String bpPackagesCount(int count);
 
   /// No description provided for @bpReprintWarning.
   ///

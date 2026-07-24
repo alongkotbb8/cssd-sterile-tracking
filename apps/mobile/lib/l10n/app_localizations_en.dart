@@ -173,6 +173,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'The package status does not allow this action';
 
   @override
+  String get srvPkgHasHistory =>
+      'Cannot delete — this package already has usage history (use DISCARD instead)';
+
+  @override
   String get srvPkgAlreadyInThisBatch =>
       'This package is already in this batch';
 
@@ -364,6 +368,28 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get dashNoData => 'No data yet';
+
+  @override
+  String get dashSearchHint =>
+      'Search: set name / package no. / location / items';
+
+  @override
+  String get dashRecentMovementsTitle => 'Where did each set go (latest)';
+
+  @override
+  String get dashNoMovements => 'No movements yet';
+
+  @override
+  String get dashMoveIn => 'In';
+
+  @override
+  String get dashMoveOut => 'Out';
+
+  @override
+  String get dashMoveReturn => 'Return';
+
+  @override
+  String get dashSearchNoResults => 'No packages match this search';
 
   @override
   String get cpCreatedOne => 'Package created';
@@ -627,6 +653,34 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String pkgLocationAt(String location) {
     return 'At $location';
+  }
+
+  @override
+  String get pkgDeleteSelected => 'Delete';
+
+  @override
+  String pkgDeleteConfirmTitle(int count) {
+    return 'Permanently delete $count item(s)?';
+  }
+
+  @override
+  String get pkgDeleteConfirmBody =>
+      'Only packed packages with no history are deleted — permanent deletion cannot be undone';
+
+  @override
+  String get pkgDeleteConfirmCancel => 'Cancel';
+
+  @override
+  String get pkgDeleteConfirmAction => 'Delete permanently';
+
+  @override
+  String pkgDeleteDone(int count) {
+    return 'Deleted $count item(s)';
+  }
+
+  @override
+  String pkgDeleteFailedSuffix(int count) {
+    return ' · $count could not be deleted (has history)';
   }
 
   @override
@@ -1353,7 +1407,12 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String bpCopiesLine(int count) {
-    return 'Copies: $count';
+    return 'Copies: $count (per package)';
+  }
+
+  @override
+  String bpPackagesCount(int count) {
+    return '$count packages';
   }
 
   @override
