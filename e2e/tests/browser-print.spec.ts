@@ -1,6 +1,6 @@
 import { test, expect, APIRequestContext, Page } from '@playwright/test';
 import crypto from 'node:crypto';
-import { enableFlutterSemantics, byLabel, login, openTab } from './helpers';
+import { byLabel, login, openTab } from './helpers';
 
 /**
  * Browser Print (BROWSER_DIALOG) E2E — MACOS_BROWSER_PRINT_DIRECTIVE.md §14 (E2E ≥9 ข้อ)
@@ -108,90 +108,94 @@ async function bpList(
   };
 }
 
-/** เปิดหน้ารายละเอียดห่อจากรายการ (แท็บ "รายการ" → แตะการ์ดของ id นั้น) */
-async function openPackageDetail(page: Page, packageId: string) {
+/**
+ * สร้างห่อผ่าน UI จริง (flow เดียวกับ flow.spec — พิสูจน์แล้วว่าเสถียรทุก browser)
+ * แล้วเปิด browser-print sheet จาก "ปุ่มพิมพ์ผ่านเครื่องนี้" ใน dialog สร้างสำเร็จ
+ * — ไม่พึ่งการเลื่อนหา card ในรายการ (Flutter canvas ไม่สร้าง semantics ให้ item นอกจอ)
+ * คืนค่า BrowserPrintRequest ที่ backend สร้าง (ดักจาก network response ของ PWA เอง)
+ */
+async function createPackageThenOpenBrowserSheet(page: Page) {
+  await login(page, 'ADMIN001', 'Admin@1234');
   await openTab(page, 'รายการ');
-  const card = byLabel(page, packageId).first();
-  await expect(card).toBeVisible({ timeout: 20_000 });
-  await card.click();
+  await byLabel(page, 'สร้างห่อใหม่').first().click();
+  await expect(byLabel(page, 'ชุดถอนฟัน').first()).toBeVisible({ timeout: 10_000 });
+  await byLabel(page, 'ชุดถอนฟัน').first().click();
+  await byLabel(page, 'บันทึก').last().click();
+
+  // dialog สร้างสำเร็จ → ปุ่ม "พิมพ์ผ่านเครื่องนี้" (แสดงเฉพาะเมื่อ flag เปิด + 1 ห่อ)
+  const btn = byLabel(page, 'พิมพ์ผ่านเครื่องนี้').first();
+  await expect(btn).toBeVisible({ timeout: 20_000 });
+
+  // ดัก POST /browser-print-requests (sheet auto-create ตอนเปิด สำหรับห่อใหม่)
+  const createResp = page.waitForResponse(
+    (r) =>
+      /\/browser-print-requests$/.test(new URL(r.url()).pathname) &&
+      r.request().method() === 'POST',
+    { timeout: 20_000 },
+  );
+  await btn.click();
+  const bpReq = await (await createResp).json();
+  return bpReq as {
+    id: string;
+    packageId: string;
+    status: string;
+    isReprint: boolean;
+  };
 }
 
 test.describe('Browser Print — UI (Mac/PWA print dialog flow)', () => {
-  test('§14.1 login → เปิดห่อ → เปิด sheet → preview + request ถูกสร้าง (CREATED)', async ({
+  // flow ผ่าน UI จริงหลายขั้น (login + สร้างห่อ + เปิด sheet + พิมพ์ + reload) บน Flutter
+  // canvas — ใช้เวลามากกว่า default 30s โดยเฉพาะ WebKit จึงตั้ง timeout ให้พอ
+  test.describe.configure({ timeout: 120_000 });
+
+  test('§14.1 login → สร้างห่อ → เปิด sheet → preview + request ถูกสร้าง (CREATED)', async ({
     page,
-    request,
   }) => {
-    const admin = await apiLogin(request, 'ADMIN001', 'Admin@1234');
-    const pkg = await createPackage(request, admin);
+    const bpReq = await createPackageThenOpenBrowserSheet(page);
 
-    await login(page, 'ADMIN001', 'Admin@1234');
-    await openPackageDetail(page, pkg);
+    // auto-create สำเร็จ = ห่อใหม่ (ไม่ใช่ reprint) สถานะเริ่มต้น CREATED
+    expect(bpReq.status).toBe('CREATED');
+    expect(bpReq.isReprint).toBe(false);
 
-    // ปุ่มเข้าโหมดพิมพ์ผ่านเครื่องนี้ (แสดงเฉพาะเมื่อ flag เปิด)
-    await byLabel(page, 'พิมพ์ผ่านเครื่องนี้').first().click();
-
-    // sheet สร้าง request อัตโนมัติ (ห่อใหม่ ไม่ใช่ reprint) แล้วแสดงตัวอย่าง label
-    await expect
-      .poll(
-        async () => {
-          const list = await bpList(request, admin, pkg);
-          return list.items.length === 1 && list.items[0].status === 'CREATED';
-        },
-        { timeout: 20_000 },
-      )
-      .toBeTruthy();
-
-    // preview UI แสดงคำเตือนว่า browser ยืนยันผล hardware ไม่ได้
-    await expect(
-      byLabel(page, 'ไม่สามารถตรวจสอบกระดาษ').first(),
-    ).toBeVisible({ timeout: 15_000 });
+    // preview UI แสดงคำเตือนว่า browser ยืนยันผล hardware ไม่ได้ (§10)
+    await expect(byLabel(page, 'ไม่สามารถตรวจสอบกระดาษ').first()).toBeVisible({
+      timeout: 15_000,
+    });
   });
 
-  test('§14.2+5 กดพิมพ์ → DIALOG_OPENED ก่อนเปิด dialog; refresh แล้วไม่เปิด dialog ซ้ำ/ไม่สร้าง request ใหม่', async ({
+  test('§14.2+5 กดพิมพ์ → DIALOG_OPENED ก่อนเปิด dialog; refresh แล้วไม่สร้าง request ใหม่/ไม่เปิด dialog ซ้ำ', async ({
     page,
     request,
   }) => {
     const admin = await apiLogin(request, 'ADMIN001', 'Admin@1234');
-    const pkg = await createPackage(request, admin);
+    const bpReq = await createPackageThenOpenBrowserSheet(page);
 
-    await login(page, 'ADMIN001', 'Admin@1234');
-    await openPackageDetail(page, pkg);
-    await byLabel(page, 'พิมพ์ผ่านเครื่องนี้').first().click();
-
-    // รอ request ถูกสร้างก่อน (sheet auto-create)
-    await expect
-      .poll(async () => (await bpList(request, admin, pkg)).items.length, {
-        timeout: 20_000,
-      })
-      .toBe(1);
-
-    // กดปุ่มพิมพ์ใน sheet (ตัวสุดท้าย = ปุ่ม action ใน sheet)
+    // กดปุ่มพิมพ์ใน sheet → PWA บันทึก dialog-opened "ก่อน" เรียก print เสมอ
+    // (headless print() เป็น no-op — พิสูจน์ลำดับด้วย state ที่ backend บันทึก)
+    const openedResp = page.waitForResponse(
+      (r) => /\/dialog-opened$/.test(new URL(r.url()).pathname) && r.request().method() === 'POST',
+      { timeout: 20_000 },
+    );
     await byLabel(page, 'พิมพ์ผ่านเครื่องนี้').last().click();
+    const opened = await (await openedResp).json();
+    expect(opened.status).toBe('DIALOG_OPENED');
 
-    // backend ต้องบันทึก DIALOG_OPENED (PWA บันทึกก่อนเรียก print เสมอ —
-    // headless print() เป็น no-op จึงพิสูจน์ลำดับด้วย state ที่ backend เห็น)
-    await expect
-      .poll(
-        async () => {
-          const list = await bpList(request, admin, pkg);
-          return list.items[0]?.status;
-        },
-        { timeout: 20_000 },
-      )
-      .toBe('DIALOG_OPENED');
-
-    const before = await bpList(request, admin, pkg);
+    const before = await bpList(request, admin, bpReq.packageId);
+    expect(before.items.length).toBe(1);
     const openedAt = before.items[0].dialogOpenedAt;
 
-    // refresh — ห้าม auto-open dialog / ห้าม re-use request เดิม / ห้ามสร้างใหม่เอง
+    // refresh — ห้าม auto-open dialog / re-use request เดิม / สร้างใหม่เอง
     await page.reload();
-    await enableFlutterSemantics(page);
     await page.waitForTimeout(3000);
 
-    const after = await bpList(request, admin, pkg);
-    expect(after.items.length).toBe(1);
-    expect(after.items[0].status).toBe('DIALOG_OPENED');
+    const after = await bpList(request, admin, bpReq.packageId);
+    expect(after.items.length).toBe(1); // ไม่มี request ใหม่ถูกสร้างจาก refresh
+    expect(after.items[0].status).toBe('DIALOG_OPENED'); // สถานะไม่เปลี่ยนเอง
     expect(after.items[0].dialogOpenedAt).toBe(openedAt);
+    // sheet ไม่เปิดเอง (คำเตือน preview ไม่โผล่หลัง refresh)
+    await expect(byLabel(page, 'ไม่สามารถตรวจสอบกระดาษ')).toHaveCount(0, {
+      timeout: 10_000,
+    });
   });
 });
 
