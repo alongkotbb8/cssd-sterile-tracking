@@ -20,11 +20,11 @@ cd e2e
 npm install
 npm run install:browsers                              # ติดตั้ง Chromium + WebKit
 
-E2E_BASE_URL=http://localhost:8080 npm test           # smoke (default) ทุก project
-E2E_BASE_URL=http://localhost:8080 E2E_FLOW=1 npm test # smoke + full flow
+E2E_BASE_URL=http://localhost:8080 npm test            # smoke เท่านั้น (ไม่ต้องมี stack ครบ)
+E2E_BASE_URL=http://localhost:8080 npm run test:e2e    # ทุก spec (ต้องมี stack จาก e2e-stack.sh)
 E2E_BASE_URL=http://localhost:8080 npm run test:webkit # เฉพาะ Safari/WebKit
 E2E_BASE_URL=http://localhost:8080 npm run test:headed
-npm run report                                        # เปิดรายงานล่าสุด
+npm run report                                         # เปิดรายงานล่าสุด
 ```
 
 > PWA ต้องรันผ่าน `localhost`/https (secure context) — localhost ใช้ได้
@@ -41,16 +41,21 @@ camera driver/lifecycle ของอุปกรณ์จริง)
 - PWA โหลด + Flutter bootstrap (ไม่มี console error ร้ายแรง)
 - PWA manifest ถูกต้อง (installable) + service worker ลงทะเบียน
 
-**flow** (`E2E_FLOW=1` เท่านั้น — ยัง **ต้อง validate selector กับ build จริง**):
-- login (ADMIN001) เข้าสู่ระบบ → เห็น shell หลัก
-- สร้างห่อ → สร้างงานพิมพ์ → เห็นสถานะในคิว
-- (fixme) สแกน manual entry → reprocess ห่อที่ส่งคืน
+**spec เต็ม (รันใน CI ทุกครั้ง — ไม่มี flag gate, ไม่มี test.skip/fixme):**
+- `flow.spec` — login (ADMIN001) → shell หลัก, สร้างห่อผ่าน UI
+- `auth.spec` — login ผิด, lockout (LOCK001), logout, reload คง session
+- `scanner.spec` — camera error UI (headless), manual entry, charset validation
+- `lifecycle.spec` — API+PG จริง: running number, batch pass/fail+recall, expired
+  fail-closed, scan out/return/reprocess, tags, RBAC, idempotency, browser ห้าม ACK
+- `browser-print.spec` — โหมด BROWSER_DIALOG (MACOS_BROWSER_PRINT_DIRECTIVE.md §14):
+  UI เปิด sheet + preview + DIALOG_OPENED ก่อน print + refresh ไม่เปิดซ้ำ; API state
+  machine (CREATED→DIALOG_OPENED→USER_CONFIRMED/CANCELLED), idempotency, reprint
+  reason บังคับ, history แยก original/reprint, **ไม่แตะ Gateway job / Package.printedAt**
 
 > Flutter web วาดด้วย canvas — E2E ต้องเปิด semantics ก่อน (ดู `tests/helpers.ts`)
-> flow ยัง gate ไว้เพราะยังไม่ได้ verify selector กับ build จริง (ไม่มี browser/stack
-> ในสภาพแวดล้อมพัฒนา) — CI จึงรันเฉพาะ smoke
 
 ## CI
 
 `.github/workflows/ci.yml` job `e2e`: ยก Postgres service + API (node) + build/serve web
-(`--dart-define=CSSD_API_URL=http://localhost:3000`) แล้วรัน **smoke** (flow gate ไว้)
+(`--dart-define=CSSD_API_URL=http://localhost:3000 --dart-define=CSSD_BROWSER_PRINT_ENABLED=true`)
+แล้วรัน **ทุก spec × 3 รอบติด × 4 projects** (chromium, mobile-chrome, webkit, mobile-safari)

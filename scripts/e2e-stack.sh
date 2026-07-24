@@ -18,6 +18,9 @@ export JWT_SECRET="${JWT_SECRET:-e2e-local-secret-not-for-prod}"
 export NODE_ENV=e2e
 # E2E ทุก request มาจาก IP เดียว — ยกเพดาน per-IP login throttle เฉพาะ e2e/ci (RELAXED_ENVS)
 export LOGIN_THROTTLE_MAX="${LOGIN_THROTTLE_MAX:-1000}"
+# Browser Print mode — เปิดเฉพาะ stack ทดสอบ (production default = ปิด)
+export CSSD_BROWSER_PRINT_ENABLED="${CSSD_BROWSER_PRINT_ENABLED:-true}"
+export BROWSER_PRINT_THROTTLE_MAX="${BROWSER_PRINT_THROTTLE_MAX:-1000}"
 
 dc() { if docker compose version >/dev/null 2>&1; then docker compose "$@"; else docker-compose "$@"; fi; }
 
@@ -50,7 +53,9 @@ up() {
   [ "$ok" = 1 ] || { echo "ERROR: API ไม่พร้อมภายใน 30s (ดู /tmp/cssd-e2e-api.log)" >&2; exit 1; }
 
   echo "== 4/5 build PWA web (ชี้ API → $API_URL) =="
-  ( cd apps/mobile && flutter build web --release --dart-define=CSSD_API_URL="$API_URL" )
+  ( cd apps/mobile && flutter build web --release \
+      --dart-define=CSSD_API_URL="$API_URL" \
+      --dart-define=CSSD_BROWSER_PRINT_ENABLED=true )
 
   echo "== 5/5 serve web ที่ :$WEB_PORT (background) =="
   # http-server pinned ใน root lockfile (npm ci ติดตั้งให้แล้ว — ไม่ดาวน์โหลดตอนรัน)
@@ -67,7 +72,7 @@ up() {
   echo "✓ stack พร้อม:"
   echo "    API : $API_URL/api/v1"
   echo "    Web : http://localhost:$WEB_PORT"
-  echo "    รัน : cd e2e && E2E_BASE_URL=http://localhost:$WEB_PORT E2E_FLOW=1 npm test"
+  echo "    รัน : cd e2e && E2E_BASE_URL=http://localhost:$WEB_PORT npm run test:e2e"
   echo "    หยุด: bash scripts/e2e-stack.sh down"
 }
 

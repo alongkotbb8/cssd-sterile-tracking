@@ -105,6 +105,11 @@ jobs:
       # E2E ทุก request มาจาก 127.0.0.1 เดียวกัน — per-IP login throttle (10/นาที)
       # จะปัดตกทั้งชุด จึงยกเพดานเฉพาะ e2e/ci (guard ยังทำงาน; ค่า production ไม่เปลี่ยน)
       LOGIN_THROTTLE_MAX: "1000"
+      # Browser Print mode (MACOS_BROWSER_PRINT_DIRECTIVE.md) — เปิดเฉพาะ stack ทดสอบ
+      # (production default = ปิดทั้ง backend และ PWA); เพดาน throttle ยกสูงเพราะ
+      # 4 browser projects × 3 รอบใช้ user เดียวกัน (ADMIN001) ยิงพร้อมกัน
+      CSSD_BROWSER_PRINT_ENABLED: "true"
+      BROWSER_PRINT_THROTTLE_MAX: "1000"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -137,7 +142,9 @@ jobs:
           [ "$ok" = 1 ] || { echo "::error::API did not become ready within 60s"; exit 1; }
       - name: build + serve PWA web (→ API local)
         run: |
-          (cd apps/mobile && flutter build web --release --dart-define=CSSD_API_URL=http://localhost:3000)
+          (cd apps/mobile && flutter build web --release \
+            --dart-define=CSSD_API_URL=http://localhost:3000 \
+            --dart-define=CSSD_BROWSER_PRINT_ENABLED=true)
           # http-server pinned ใน root lockfile (ไม่มี npx --yes ดาวน์โหลดตอน CI)
           (./node_modules/.bin/http-server apps/mobile/build/web -p 8080 -s &)
           ok=0
