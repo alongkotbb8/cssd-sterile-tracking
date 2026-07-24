@@ -147,6 +147,27 @@ class AppLocalizationsTh extends AppLocalizations {
       'คำขอนี้ถูกส่งซ้ำ — โหลดใหม่แล้วลองอีกครั้ง';
 
   @override
+  String get srvBrowserPrintDisabled => 'โหมดพิมพ์ผ่านเบราว์เซอร์ถูกปิดใช้งาน';
+
+  @override
+  String get srvBrowserPrintNotFound => 'ไม่พบคำขอพิมพ์ผ่านเบราว์เซอร์นี้';
+
+  @override
+  String get srvBrowserPrintForbidden => 'ไม่มีสิทธิ์เข้าถึงคำขอพิมพ์นี้';
+
+  @override
+  String get srvBrowserPrintState =>
+      'สถานะคำขอพิมพ์ไม่ถูกต้องสำหรับการดำเนินการนี้';
+
+  @override
+  String get srvBrowserPrintReprintReasonRequired =>
+      'ห่อนี้เคยสั่งพิมพ์แล้ว ต้องระบุเหตุผลการพิมพ์ซ้ำ';
+
+  @override
+  String get srvBrowserPrintRateLimited =>
+      'สั่งพิมพ์บ่อยเกินไป กรุณารอสักครู่แล้วลองใหม่';
+
+  @override
   String get srvPkgWrongStatus => 'สถานะห่อไม่ถูกต้องสำหรับการดำเนินการนี้';
 
   @override
@@ -1288,4 +1309,139 @@ class AppLocalizationsTh extends AppLocalizations {
 
   @override
   String get pjAutoHint => 'ส่งแบบอัตโนมัติ — เครื่องพิมพ์ที่ว่างจะรับงานเอง';
+
+  @override
+  String get bpSheetTitle => 'พิมพ์ผ่านเบราว์เซอร์';
+
+  @override
+  String get bpPrintViaThisDevice => 'พิมพ์ผ่านเครื่องนี้';
+
+  @override
+  String get bpCreateRequest => 'สร้างคำขอพิมพ์';
+
+  @override
+  String get bpCreating => 'กำลังสร้างคำขอพิมพ์...';
+
+  @override
+  String get bpPreviewTitle => 'ตัวอย่าง Label';
+
+  @override
+  String get bpUnsterileNotice => 'ยังไม่ผ่านการฆ่าเชื้อ — Label ไม่แสดงวันที่';
+
+  @override
+  String bpDatesLine(String sterilize, String expiry) {
+    return 'นึ่ง $sterilize · หมดอายุ $expiry';
+  }
+
+  @override
+  String get bpCopies => 'จำนวนสำเนา';
+
+  @override
+  String bpCopiesLine(int count) {
+    return 'จำนวนสำเนา: $count';
+  }
+
+  @override
+  String get bpReprintWarning =>
+      'ห่อนี้เคยสั่งพิมพ์แล้ว — ต้องระบุเหตุผลการพิมพ์ซ้ำ';
+
+  @override
+  String bpReprintLast(String at, String name, String status) {
+    return 'ล่าสุด: $at · โดย $name · $status';
+  }
+
+  @override
+  String get bpReprintReasonLabel => 'เหตุผลการพิมพ์ซ้ำ (บังคับ)';
+
+  @override
+  String get bpReprintReasonHint => 'เช่น label เดิมชำรุด/หลุด';
+
+  @override
+  String get bpReprintReasonRequired => 'ต้องระบุเหตุผลการพิมพ์ซ้ำ';
+
+  @override
+  String get bpSettingsTitle => 'ตรวจการตั้งค่าในหน้าต่างพิมพ์ก่อนกด Print';
+
+  @override
+  String get bpSettingsPrinter => 'Printer: Xprinter XP-420B';
+
+  @override
+  String bpSettingsPaper(int w, int h) {
+    return 'Paper size: $w × $h มม.';
+  }
+
+  @override
+  String get bpSettingsScale => 'Scale: 100%';
+
+  @override
+  String get bpSettingsMargins => 'Margins: None';
+
+  @override
+  String get bpSettingsHeaders => 'Headers and footers: ปิด';
+
+  @override
+  String get bpCannotVerifyWarning =>
+      'ระบบ Browser ไม่สามารถตรวจสอบกระดาษที่ออกจากเครื่องได้ กรุณาตรวจ Label ก่อนยืนยัน';
+
+  @override
+  String get bpResultQuestion => 'ผลการพิมพ์เป็นอย่างไร?';
+
+  @override
+  String get bpResultPrinted => 'กระดาษออกถูกต้อง';
+
+  @override
+  String get bpResultNotPrinted => 'ไม่ได้พิมพ์ / ยกเลิก';
+
+  @override
+  String get bpResultLater => 'ตรวจสอบภายหลัง';
+
+  @override
+  String get bpConfirmedSnack => 'บันทึกแล้ว: ผู้ใช้ยืนยันว่ากระดาษออกแล้ว';
+
+  @override
+  String get bpCancelledSnack => 'บันทึกแล้ว: ไม่ได้พิมพ์/ยกเลิก';
+
+  @override
+  String get bpStatusCreated => 'สร้างคำขอแล้ว';
+
+  @override
+  String get bpStatusDialogOpened => 'เปิดหน้าต่างพิมพ์แล้ว ยังไม่ยืนยันผล';
+
+  @override
+  String get bpStatusUserConfirmed => 'ผู้ใช้ยืนยันว่ากระดาษออกแล้ว';
+
+  @override
+  String get bpStatusCancelled => 'ผู้ใช้แจ้งว่าไม่ได้พิมพ์หรือยกเลิก';
+
+  @override
+  String get bpHistoryTitle => 'ประวัติพิมพ์ผ่านเบราว์เซอร์';
+
+  @override
+  String get bpHistoryNone => 'ยังไม่มีคำขอพิมพ์ผ่านเบราว์เซอร์';
+
+  @override
+  String bpHistoryBy(String name) {
+    return 'ผู้สั่ง: $name';
+  }
+
+  @override
+  String bpHistoryMeta(String mode, int copies, String version) {
+    return 'โหมด $mode · สำเนา $copies · เทมเพลต v$version';
+  }
+
+  @override
+  String bpHistoryReason(String reason) {
+    return 'เหตุผลพิมพ์ซ้ำ: $reason';
+  }
+
+  @override
+  String bpHistoryRequestId(String id) {
+    return 'คำขอ $id';
+  }
+
+  @override
+  String get bpSegGateway => 'Gateway';
+
+  @override
+  String get bpSegBrowser => 'เบราว์เซอร์';
 }

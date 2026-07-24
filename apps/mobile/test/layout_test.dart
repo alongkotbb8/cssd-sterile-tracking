@@ -9,7 +9,12 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:cssd_mobile/core/api/api_client.dart';
+import 'package:cssd_mobile/core/config/feature_flags.dart';
+import 'package:cssd_mobile/core/models/models.dart';
+import 'package:cssd_mobile/core/printer/printer_adapter.dart';
 import 'package:cssd_mobile/features/auth/presentation/pages/login_page.dart';
+import 'package:cssd_mobile/features/browser_print/presentation/widgets/browser_print_sheet.dart';
+import 'package:cssd_mobile/features/browser_print/print_pdf_seam.dart';
 import 'package:cssd_mobile/features/packages/presentation/pages/package_detail_page.dart';
 import 'package:cssd_mobile/features/packages/presentation/pages/packages_page.dart';
 import 'package:cssd_mobile/features/packages/presentation/widgets/create_package_sheet.dart';
@@ -45,6 +50,52 @@ Map<String, dynamic> _pkg(String id, String status,
       'reprintCount': 0,
       'tags': const [],
     };
+
+/// แถว BrowserPrintRequest fixture (BROWSER_DIALOG) — ใช้กับ layout test
+/// ของ sheet/การ์ดประวัติเมื่อเปิด flag
+Map<String, dynamic> _bpRow({required String status, bool withLabel = false}) => {
+      'id': 'bpr-$status',
+      'packageId': _kPkgId,
+      'requestedByUserId': 'u1',
+      'requestedByName': 'สมหญิง ใจดี',
+      'requestedAt': '2026-07-24T01:00:00.000Z',
+      'mode': 'BROWSER_DIALOG',
+      'templateVersion': '1',
+      'copies': 2,
+      'isReprint': status == 'USER_CONFIRMED',
+      'reprintReason': status == 'USER_CONFIRMED' ? 'label เดิมชำรุด' : null,
+      'status': status,
+      'dialogOpenedAt': status == 'CREATED' ? null : '2026-07-24T01:01:00.000Z',
+      'userConfirmedAt':
+          status == 'USER_CONFIRMED' ? '2026-07-24T01:02:00.000Z' : null,
+      'cancelledAt': null,
+      'createdFrom': 'PACKAGE_DETAIL',
+      'createdAt': '2026-07-24T01:00:00.000Z',
+      'updatedAt': '2026-07-24T01:00:00.000Z',
+      if (withLabel)
+        'label': {
+          'packageId': _kPkgId,
+          'templateName': 'ชุดทำคลอด',
+          'wrapType': 'SEAL',
+          'status': 'STERILE',
+          'sterilizeDate': '2026-07-01T00:00:00.000Z',
+          'expiryDate': '2026-12-28T00:00:00.000Z',
+          'isSterilized': true,
+        },
+      if (withLabel)
+        'priorPrints': {
+          'count': 0,
+          'lastAt': null,
+          'lastByName': null,
+          'lastStatus': null,
+          'lastSource': null,
+        },
+    };
+
+/// PNG 1×1 ใส — ให้ render seam ปลอมคืนค่า (กัน layout test ค้างรอ engine render)
+final Uint8List _tinyPng = base64Decode(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==',
+);
 
 /// Adapter ปลอม — ตอบ fixture JSON ตาม path (ไม่ยิงเน็ตจริง)
 class _FixtureAdapter implements HttpClientAdapter {
@@ -112,6 +163,23 @@ class _FixtureAdapter implements HttpClientAdapter {
       ]);
     }
     if (p == '/print-jobs/gateways/list') return _json(const []);
+    if (p == '/browser-print-requests' && o.method == 'POST') {
+      return _json(_bpRow(status: 'CREATED', withLabel: true));
+    }
+    if (p.startsWith('/browser-print-requests/') && o.method == 'POST') {
+      return _json(_bpRow(status: 'DIALOG_OPENED'));
+    }
+    if (p == '/browser-print-requests') {
+      return _json({
+        'items': [
+          _bpRow(status: 'USER_CONFIRMED'),
+          _bpRow(status: 'DIALOG_OPENED'),
+        ],
+        'total': 2,
+        'page': 1,
+        'pageSize': 20,
+      });
+    }
     if (p.startsWith('/batches')) return _json(const []);
     if (p == '/reports/dashboard') return _json(const {});
     // path อื่น: ตอบ 200 ว่าง — layout test สนใจการเรนเดอร์ ไม่ใช่ข้อมูลครบ
@@ -158,6 +226,7 @@ void main() {
     required Size size,
     required double scale,
     required Locale locale,
+    List<Override> overrides = const [],
   }) async {
     tester.view.physicalSize = size;
     tester.view.devicePixelRatio = 1.0;
@@ -165,6 +234,7 @@ void main() {
 
     final container = ProviderContainer(overrides: [
       sharedPreferencesProvider.overrideWithValue(prefs),
+      ...overrides,
     ]);
     addTearDown(container.dispose);
     // สลับ HTTP adapter ของ dio จริงเป็นตัว fixture (โค้ด provider เดิมทั้งหมด)
@@ -204,13 +274,37 @@ void main() {
         );
       });
 
+  /// host สำหรับเปิด BrowserPrintSheet (BROWSER_DIALOG — flag เปิดใน override)
+  Widget bpSheetHost() => Consumer(builder: (context, ref, _) {
+        final pkg = PackageModel.fromJson(_pkg(_kPkgId, 'STERILE',
+            sterilize: '2026-07-01', expiry: '2026-12-28'));
+        return Scaffold(
+          body: Center(
+            child: ElevatedButton(
+              onPressed: () => showBrowserPrintSheet(context, ref,
+                  pkg: pkg, createdFrom: 'PACKAGE_DETAIL'),
+              child: const Text('open'),
+            ),
+          ),
+        );
+      });
+
+  /// overrides สำหรับเคส browser print: เปิด flag + render seam คืน PNG จิ๋ว
+  /// (ไม่พึ่ง engine render จริงใน test — สนใจ layout ไม่ใช่ pixel)
+  List<Override> bpOverrides() => [
+        browserPrintEnabledProvider.overrideWithValue(true),
+        renderLabelPngProvider.overrideWithValue(
+            (LabelData data, {int widthMm = 60, int heightMm = 40}) async =>
+                _tinyPng),
+      ];
+
   for (final entry in _sizes.entries) {
     for (final scale in _scales) {
       for (final locale in _locales) {
         final label = '${entry.key} · scale $scale · ${locale.languageCode}';
 
-        Future<void> expectNoOverflow(
-            WidgetTester tester, Widget page) async {
+        Future<void> expectNoOverflow(WidgetTester tester, Widget page,
+            {List<Override> overrides = const []}) async {
           // ดัก FlutterError เองเพื่อให้ได้ diagnostics เต็ม (รวมบรรทัด "The
           // relevant error-causing widget was" ชี้ไฟล์:บรรทัดของ Row/Column ที่ล้น)
           final captured = <FlutterErrorDetails>[];
@@ -218,7 +312,11 @@ void main() {
           FlutterError.onError = captured.add;
           try {
             await pumpAt(tester,
-                page: page, size: entry.value, scale: scale, locale: locale);
+                page: page,
+                size: entry.value,
+                scale: scale,
+                locale: locale,
+                overrides: overrides);
           } finally {
             FlutterError.onError = prev;
           }
@@ -275,6 +373,40 @@ void main() {
           tester.takeException();
           for (final d in captured) {
             debugPrint('── OVERFLOW(sheet) @ $label ──\n$d');
+          }
+          expect(captured, isEmpty,
+              reason: 'layout overflow/exception ที่ $label');
+        });
+
+        // §14.13 — browser print (BROWSER_DIALOG, flag เปิด): หน้า detail มีปุ่ม
+        // + การ์ดประวัติ และตัว sheet (preview + คำแนะนำ + คำเตือน) ต้องไม่ล้น
+        testWidgets('รายละเอียดห่อ (browser print) ไม่ overflow @ $label',
+            (tester) async {
+          await expectNoOverflow(tester, const PackageDetailPage(id: _kPkgId),
+              overrides: bpOverrides());
+        });
+
+        testWidgets('BrowserPrintSheet ไม่ overflow @ $label', (tester) async {
+          await pumpAt(tester,
+              page: bpSheetHost(),
+              size: entry.value,
+              scale: scale,
+              locale: locale,
+              overrides: bpOverrides());
+          final captured = <FlutterErrorDetails>[];
+          final prev = FlutterError.onError;
+          FlutterError.onError = captured.add;
+          try {
+            await tester.tap(find.text('open'));
+            for (var i = 0; i < 8; i++) {
+              await tester.pump(const Duration(milliseconds: 120));
+            }
+          } finally {
+            FlutterError.onError = prev;
+          }
+          tester.takeException();
+          for (final d in captured) {
+            debugPrint('── OVERFLOW(bp-sheet) @ $label ──\n$d');
           }
           expect(captured, isEmpty,
               reason: 'layout overflow/exception ที่ $label');

@@ -427,3 +427,92 @@ class PrintJobRepository {
     return PrintJob.fromJson(res.data!);
   }
 }
+
+/// ---------- Browser Print (BROWSER_DIALOG — MACOS_BROWSER_PRINT_DIRECTIVE.md) ----------
+
+/// รายการคำขอพิมพ์ผ่านเบราว์เซอร์ (ของตัวเอง; SUPERVISOR/ADMIN เห็นทั้งหมด —
+/// backend บังคับ) — key = packageId (null = ทั้งหมดของฉัน) เรียงล่าสุดก่อนจาก server
+final browserPrintRequestsProvider = FutureProvider.autoDispose
+    .family<List<BrowserPrintRequest>, String?>((ref, packageId) async {
+  final res = await ref.watch(dioProvider).get<Map<String, dynamic>>(
+    '/browser-print-requests',
+    queryParameters: {if (packageId != null) 'packageId': packageId},
+  );
+  return ((res.data!['items'] as List?) ?? const [])
+      .map((e) => BrowserPrintRequest.fromJson(e as Map<String, dynamic>))
+      .toList();
+});
+
+final browserPrintRepositoryProvider =
+    Provider<BrowserPrintRepository>((ref) => BrowserPrintRepository(ref));
+
+class BrowserPrintRepository {
+  BrowserPrintRepository(this._ref);
+  final Ref _ref;
+
+  /// สร้างคำขอพิมพ์ผ่านเบราว์เซอร์ — backend ตัดสิน isReprint เอง (ประวัติ
+  /// browser DIALOG_OPENED/USER_CONFIRMED หรือ package.printedAt จาก gateway)
+  /// ถ้าเป็น reprint แล้วไม่ส่ง [reprintReason] backend ตอบ 400
+  /// BROWSER_PRINT_REPRINT_REASON_REQUIRED พร้อมข้อมูล prior
+  /// [idempotencyKey] — ผู้เรียก **ต้องคงเดิม** ต่อ 1 operation แล้วใช้ซ้ำตอน retry
+  /// (กันสร้างคำขอซ้ำเมื่อ response แรกหาย) ถ้าไม่ส่งจะ gen ใหม่
+  Future<BrowserPrintRequest> create(
+    String packageId, {
+    int copies = 1,
+    required String createdFrom,
+    String? reprintReason,
+    String? idempotencyKey,
+  }) async {
+    final res = await _ref.read(dioProvider).post<Map<String, dynamic>>(
+      '/browser-print-requests',
+      data: {
+        'packageId': packageId,
+        'copies': copies,
+        'createdFrom': createdFrom,
+        if (reprintReason != null && reprintReason.isNotEmpty)
+          'reprintReason': reprintReason,
+      },
+      options: Options(
+          headers: {'Idempotency-Key': idempotencyKey ?? newIdempotencyKey()}),
+    );
+    _ref.invalidate(browserPrintRequestsProvider);
+    return BrowserPrintRequest.fromJson(res.data!);
+  }
+
+  /// บันทึกว่า "กำลังเปิดหน้าต่างพิมพ์" (CREATED → DIALOG_OPENED) — **ต้องสำเร็จ
+  /// ก่อน** จึงค่อยเปิด print dialog จริง (directive §10 flow ข้อ 3→4)
+  Future<BrowserPrintRequest> dialogOpened(String id,
+          {String? idempotencyKey}) =>
+      _transition(id, 'dialog-opened', idempotencyKey);
+
+  /// ผู้ใช้ยืนยันเองว่ากระดาษออกถูกต้อง (DIALOG_OPENED → USER_CONFIRMED) —
+  /// เป็น user-confirmed เท่านั้น ไม่ใช่หลักฐาน hardware
+  Future<BrowserPrintRequest> confirm(String id, {String? idempotencyKey}) =>
+      _transition(id, 'confirm', idempotencyKey);
+
+  /// ผู้ใช้แจ้งว่าไม่ได้พิมพ์/ยกเลิก (CREATED|DIALOG_OPENED → CANCELLED)
+  Future<BrowserPrintRequest> cancel(String id, {String? idempotencyKey}) =>
+      _transition(id, 'cancel', idempotencyKey);
+
+  Future<BrowserPrintRequest> _transition(
+      String id, String action, String? idempotencyKey) async {
+    final res = await _ref.read(dioProvider).post<Map<String, dynamic>>(
+      '/browser-print-requests/${Uri.encodeComponent(id)}/$action',
+      options: Options(
+          headers: {'Idempotency-Key': idempotencyKey ?? newIdempotencyKey()}),
+    );
+    _ref.invalidate(browserPrintRequestsProvider);
+    return BrowserPrintRequest.fromJson(res.data!);
+  }
+
+  /// รายการคำขอ (เท่าที่มีสิทธิ์เห็น) — กรองตาม [packageId] ได้
+  Future<List<BrowserPrintRequest>> list({String? packageId}) async {
+    final res = await _ref.read(dioProvider).get<Map<String, dynamic>>(
+      '/browser-print-requests',
+      queryParameters: {if (packageId != null) 'packageId': packageId},
+    );
+    return ((res.data!['items'] as List?) ?? const [])
+        .map((e) => BrowserPrintRequest.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+}

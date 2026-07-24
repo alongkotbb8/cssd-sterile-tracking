@@ -29,3 +29,24 @@ final bool kLegacyDirectPrintEnabled =
 /// (feature-flag test ยืนยันว่า Pilot production build ไม่โชว์ตัวเลือกเครื่องพิมพ์ legacy)
 final legacyDirectPrintEnabledProvider =
     Provider<bool>((ref) => kLegacyDirectPrintEnabled);
+
+/// **Browser print (`BROWSER_DIALOG`)** — MACOS_BROWSER_PRINT_DIRECTIVE.md §4
+///
+/// เปิด UI พิมพ์ผ่าน macOS system print dialog (Mac ที่เสียบ XP-420B และเปิด PWA
+/// เครื่องเดียวกัน) — default **ปิด** เสมอ (production ห้ามเปิดโดยไม่ตั้งใจ);
+/// เปิดตอน build ด้วย `--dart-define=CSSD_BROWSER_PRINT_ENABLED=true`
+/// backend ตรวจ flag ฝั่งตัวเองซ้ำทุก endpoint — การซ่อนปุ่มนี้ไม่ใช่การป้องกันหลัก
+const bool kBrowserPrintEnabled =
+    bool.fromEnvironment('CSSD_BROWSER_PRINT_ENABLED', defaultValue: false);
+
+/// provider ครอบ [kBrowserPrintEnabled] เพื่อ override ได้ในเทส
+/// (flag ปิด = ไม่มีปุ่ม/ประวัติ browser print ปรากฏใน UI เลย)
+final browserPrintEnabledProvider = Provider<bool>((ref) => kBrowserPrintEnabled);
+
+/// ขนาด label จริง (มม.) — MACOS_BROWSER_PRINT_DIRECTIVE.md §11: เริ่มต้น 60×40
+/// และปรับได้ผ่าน configuration (dart-define) ใช้ทั้ง preview bitmap และ
+/// ขนาดหน้ากระดาษ PDF ตอนเปิด print dialog (1 หน้า = 1 label ขนาดจริง)
+const int kLabelWidthMm =
+    int.fromEnvironment('CSSD_LABEL_WIDTH_MM', defaultValue: 60);
+const int kLabelHeightMm =
+    int.fromEnvironment('CSSD_LABEL_HEIGHT_MM', defaultValue: 40);

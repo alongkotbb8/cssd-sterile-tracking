@@ -4,10 +4,13 @@ import 'package:intl/intl.dart';
 
 import '../../../../core/api/api_client.dart';
 import '../../../../core/api/repositories.dart';
+import '../../../../core/config/feature_flags.dart';
 import '../../../../core/models/models.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/domain_widgets.dart';
 import '../../../../l10n/app_localizations.dart';
+import '../../../browser_print/presentation/widgets/browser_print_history_card.dart';
+import '../../../browser_print/presentation/widgets/browser_print_sheet.dart';
 import '../../../print_jobs/presentation/widgets/submit_print_job_sheet.dart';
 
 class PackageDetailPage extends ConsumerWidget {
@@ -18,12 +21,25 @@ class PackageDetailPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final detail = ref.watch(packageDetailProvider(id));
     final l10n = AppLocalizations.of(context);
+    // Browser print (BROWSER_DIALOG) — ปุ่ม/ประวัติแสดงเฉพาะเมื่อเปิด feature flag
+    // (backend ตรวจ flag ซ้ำทุก endpoint — การซ่อน UI ไม่ใช่การป้องกันหลัก)
+    final browserPrint = ref.watch(browserPrintEnabledProvider);
 
     return Scaffold(
       appBar: AppBar(
         title: Text(id,
             style: const TextStyle(fontFamily: 'monospace', fontSize: 15)),
         actions: [
+          if (browserPrint)
+            detail.maybeWhen(
+              data: (pkg) => IconButton(
+                tooltip: l10n.bpPrintViaThisDevice,
+                icon: const Icon(Icons.open_in_browser),
+                onPressed: () => showBrowserPrintSheet(context, ref,
+                    pkg: pkg, createdFrom: 'PACKAGE_DETAIL'),
+              ),
+              orElse: () => const SizedBox.shrink(),
+            ),
           detail.maybeWhen(
             data: (pkg) => IconButton(
               tooltip: l10n.pdReprintTooltip,
@@ -74,6 +90,10 @@ class PackageDetailPage extends ConsumerWidget {
               const SizedBox(height: 12),
               _TagsCard(pkg: pkg),
               const SizedBox(height: 12),
+              if (browserPrint) ...[
+                BrowserPrintHistoryCard(packageId: pkg.id),
+                const SizedBox(height: 12),
+              ],
               _HistoryCard(movements: pkg.movements),
             ],
           ),

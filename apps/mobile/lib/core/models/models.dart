@@ -503,6 +503,149 @@ class PrintJob {
   bool get isSimulated => status == 'SIMULATED';
 }
 
+/// ---------- Browser Print (BROWSER_DIALOG — MACOS_BROWSER_PRINT_DIRECTIVE.md) ----------
+///
+/// คำขอพิมพ์ผ่าน macOS system print dialog — แยก semantics จาก PrintJob เด็ดขาด
+/// สถานะจำกัด: CREATED → DIALOG_OPENED → USER_CONFIRMED | CANCELLED
+/// (USER_CONFIRMED = **ผู้ใช้ยืนยันเอง** ไม่ใช่ hardware-confirmed — ห้ามใช้
+/// PRINTED/SENT/ACK_UNKNOWN กับโหมดนี้ และไม่แตะ printedAt/reprintCount)
+
+/// ข้อมูล label ที่ **backend เป็นผู้ชี้ขาด** (authoritative) แนบมากับ response
+/// ตอนสร้างคำขอ — วันที่มาจาก DB เท่านั้น (null เมื่อยังไม่ผ่านการฆ่าเชื้อ)
+/// client ห้ามคำนวณวันนึ่ง/วันหมดอายุเองเด็ดขาด
+class BrowserPrintLabel {
+  final String packageId;
+  final String templateName;
+  final String wrapType; // SEAL | CLOTH
+  final String status;
+  final DateTime? sterilizeDate;
+  final DateTime? expiryDate;
+  final bool isSterilized;
+
+  const BrowserPrintLabel({
+    required this.packageId,
+    required this.templateName,
+    required this.wrapType,
+    required this.status,
+    this.sterilizeDate,
+    this.expiryDate,
+    this.isSterilized = false,
+  });
+
+  factory BrowserPrintLabel.fromJson(Map<String, dynamic> j) =>
+      BrowserPrintLabel(
+        packageId: j['packageId'] as String,
+        templateName: (j['templateName'] ?? '') as String,
+        wrapType: (j['wrapType'] ?? 'SEAL') as String,
+        status: (j['status'] ?? '') as String,
+        sterilizeDate: _date(j['sterilizeDate']),
+        expiryDate: _date(j['expiryDate']),
+        isSterilized: (j['isSterilized'] ?? false) as bool,
+      );
+}
+
+/// สรุปประวัติการพิมพ์ก่อนหน้า (นับรวมทั้ง browser และ gateway) — ใช้แสดง
+/// คำเตือน reprint (backend คำนวณ; แนบมากับ create response และ error 400
+/// BROWSER_PRINT_REPRINT_REASON_REQUIRED)
+class BrowserPrintPrior {
+  final int count;
+  final DateTime? lastAt;
+  final String? lastByName;
+  final String? lastStatus;
+  final String? lastSource; // BROWSER | GATEWAY | null
+
+  const BrowserPrintPrior({
+    required this.count,
+    this.lastAt,
+    this.lastByName,
+    this.lastStatus,
+    this.lastSource,
+  });
+
+  factory BrowserPrintPrior.fromJson(Map<String, dynamic> j) =>
+      BrowserPrintPrior(
+        count: (j['count'] ?? 0) as int,
+        lastAt: _date(j['lastAt']),
+        lastByName: j['lastByName'] as String?,
+        lastStatus: j['lastStatus'] as String?,
+        lastSource: j['lastSource'] as String?,
+      );
+}
+
+class BrowserPrintRequest {
+  final String id;
+  final String packageId;
+  final String requestedByUserId;
+  final String requestedByName;
+  final DateTime? requestedAt;
+  final String mode; // BROWSER_DIALOG เท่านั้น
+  final String templateVersion;
+  final int copies;
+  final bool isReprint;
+  final String? reprintReason;
+  final String status; // CREATED | DIALOG_OPENED | USER_CONFIRMED | CANCELLED
+  final DateTime? dialogOpenedAt;
+  final DateTime? userConfirmedAt;
+  final DateTime? cancelledAt;
+  final String createdFrom; // CREATE_PACKAGE | PACKAGE_DETAIL | PRINT_JOBS
+  final DateTime? createdAt;
+  final DateTime? updatedAt;
+
+  /// แนบมาเฉพาะ create response (endpoint อื่นเป็น null)
+  final BrowserPrintLabel? label;
+  final BrowserPrintPrior? priorPrints;
+
+  const BrowserPrintRequest({
+    required this.id,
+    required this.packageId,
+    required this.requestedByUserId,
+    required this.requestedByName,
+    required this.mode,
+    required this.templateVersion,
+    required this.copies,
+    required this.isReprint,
+    required this.status,
+    required this.createdFrom,
+    this.requestedAt,
+    this.reprintReason,
+    this.dialogOpenedAt,
+    this.userConfirmedAt,
+    this.cancelledAt,
+    this.createdAt,
+    this.updatedAt,
+    this.label,
+    this.priorPrints,
+  });
+
+  factory BrowserPrintRequest.fromJson(Map<String, dynamic> j) =>
+      BrowserPrintRequest(
+        id: j['id'] as String,
+        packageId: j['packageId'] as String,
+        requestedByUserId: (j['requestedByUserId'] ?? '') as String,
+        requestedByName: (j['requestedByName'] ?? '') as String,
+        requestedAt: _date(j['requestedAt']),
+        mode: (j['mode'] ?? 'BROWSER_DIALOG') as String,
+        templateVersion: (j['templateVersion'] ?? '1') as String,
+        copies: (j['copies'] ?? 1) as int,
+        isReprint: (j['isReprint'] ?? false) as bool,
+        reprintReason: j['reprintReason'] as String?,
+        status: (j['status'] ?? 'CREATED') as String,
+        dialogOpenedAt: _date(j['dialogOpenedAt']),
+        userConfirmedAt: _date(j['userConfirmedAt']),
+        cancelledAt: _date(j['cancelledAt']),
+        createdFrom: (j['createdFrom'] ?? '') as String,
+        createdAt: _date(j['createdAt']),
+        updatedAt: _date(j['updatedAt']),
+        label: j['label'] is Map<String, dynamic>
+            ? BrowserPrintLabel.fromJson(j['label'] as Map<String, dynamic>)
+            : null,
+        priorPrints: j['priorPrints'] is Map<String, dynamic>
+            ? BrowserPrintPrior.fromJson(
+                j['priorPrints'] as Map<String, dynamic>)
+            : null,
+      );
+}
+
 /// Gateway (เครื่องพิมพ์) ที่ลงทะเบียนไว้ — ใช้เลือกปลายทางตอนสร้าง PrintJob
 /// มาจาก GET /print-jobs/gateways/list (SUPERVISOR/ADMIN)
 class PrinterGateway {

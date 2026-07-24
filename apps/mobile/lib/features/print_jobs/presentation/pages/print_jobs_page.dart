@@ -6,24 +6,31 @@ import 'package:intl/intl.dart';
 import '../../../../core/api/api_client.dart';
 import '../../../../core/api/repositories.dart';
 import '../../../../core/auth/auth_controller.dart';
+import '../../../../core/config/feature_flags.dart';
 import '../../../../core/models/models.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../l10n/app_localizations.dart';
+import '../../../browser_print/presentation/widgets/browser_print_history_card.dart';
 import '../print_job_status_style.dart';
 
 /// รายการงานพิมพ์ — CSSD เห็นของตัวเอง, SUPERVISOR/ADMIN เห็นทั้งหมด (backend filter)
 /// งานที่ต้องดูแล (ACK_UNKNOWN/DEAD_LETTER) ถูกเน้นและดันขึ้นบน
-class PrintJobsPage extends ConsumerWidget {
+/// เมื่อเปิด flag browser print มี segment สลับดูคำขอพิมพ์ผ่านเบราว์เซอร์ (ของฉัน)
+class PrintJobsPage extends ConsumerStatefulWidget {
   const PrintJobsPage({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final async = ref.watch(printJobsProvider(null));
-    final role = ref.watch(authControllerProvider).user?.role;
+  ConsumerState<PrintJobsPage> createState() => _PrintJobsPageState();
+}
+
+class _PrintJobsPageState extends ConsumerState<PrintJobsPage> {
+  bool _showBrowser = false;
+
+  @override
+  Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final scope = (role == 'SUPERVISOR' || role == 'ADMIN')
-        ? l10n.pjScopeAll
-        : l10n.pjScopeMine;
+    final browserPrint = ref.watch(browserPrintEnabledProvider);
+    final showBrowser = browserPrint && _showBrowser;
 
     return Scaffold(
       appBar: AppBar(
@@ -31,11 +38,99 @@ class PrintJobsPage extends ConsumerWidget {
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
-            onPressed: () => ref.invalidate(printJobsProvider),
+            onPressed: () {
+              ref.invalidate(printJobsProvider);
+              if (browserPrint) ref.invalidate(browserPrintRequestsProvider);
+            },
           ),
         ],
       ),
-      body: async.when(
+      body: Column(children: [
+        if (browserPrint)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+            child: SegmentedButton<bool>(
+              segments: [
+                ButtonSegment(value: false, label: Text(l10n.bpSegGateway)),
+                ButtonSegment(value: true, label: Text(l10n.bpSegBrowser)),
+              ],
+              selected: {_showBrowser},
+              onSelectionChanged: (s) =>
+                  setState(() => _showBrowser = s.first),
+            ),
+          ),
+        Expanded(
+            child: showBrowser ? _browserBody(l10n) : _gatewayBody(l10n)),
+      ]),
+    );
+  }
+
+  /// รายการคำขอ browser print (ของฉัน — backend บังคับ scope ให้เอง)
+  Widget _browserBody(AppLocalizations l10n) {
+    final async = ref.watch(browserPrintRequestsProvider(null));
+    return async.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (e, _) => Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Text(apiErrorMessage(l10n, e),
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: SterelisColors.danger)),
+        ),
+      ),
+      data: (items) {
+        if (items.isEmpty) {
+          return Center(
+            child: Text(l10n.bpHistoryNone,
+                style: const TextStyle(color: SterelisColors.textMuted)),
+          );
+        }
+        return RefreshIndicator(
+          onRefresh: () async => ref.invalidate(browserPrintRequestsProvider),
+          child: ListView(
+            padding: const EdgeInsets.all(16),
+            children: [
+              for (final r in items)
+                Card(
+                  margin: const EdgeInsets.only(bottom: 10),
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    side: const BorderSide(color: SterelisColors.border),
+                  ),
+                  color: SterelisColors.white,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 4),
+                    child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const SizedBox(height: 8),
+                          Text(r.packageId,
+                              style: const TextStyle(
+                                  fontFamily: 'monospace',
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 14,
+                                  color: SterelisColors.textStrong)),
+                          BrowserPrintHistoryRow(request: r),
+                        ]),
+                  ),
+                ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _gatewayBody(AppLocalizations l10n) {
+    final async = ref.watch(printJobsProvider(null));
+    final role = ref.watch(authControllerProvider).user?.role;
+    final scope = (role == 'SUPERVISOR' || role == 'ADMIN')
+        ? l10n.pjScopeAll
+        : l10n.pjScopeMine;
+
+    return async.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(
           child: Padding(
@@ -95,8 +190,7 @@ class PrintJobsPage extends ConsumerWidget {
             ),
           );
         },
-      ),
-    );
+      );
   }
 
   int _attentionRank(PrintJob j) {

@@ -356,6 +356,42 @@ abstract class AppLocalizations {
   /// **'คำขอนี้ถูกส่งซ้ำ — โหลดใหม่แล้วลองอีกครั้ง'**
   String get srvIdempotencyConflict;
 
+  /// No description provided for @srvBrowserPrintDisabled.
+  ///
+  /// In th, this message translates to:
+  /// **'โหมดพิมพ์ผ่านเบราว์เซอร์ถูกปิดใช้งาน'**
+  String get srvBrowserPrintDisabled;
+
+  /// No description provided for @srvBrowserPrintNotFound.
+  ///
+  /// In th, this message translates to:
+  /// **'ไม่พบคำขอพิมพ์ผ่านเบราว์เซอร์นี้'**
+  String get srvBrowserPrintNotFound;
+
+  /// No description provided for @srvBrowserPrintForbidden.
+  ///
+  /// In th, this message translates to:
+  /// **'ไม่มีสิทธิ์เข้าถึงคำขอพิมพ์นี้'**
+  String get srvBrowserPrintForbidden;
+
+  /// No description provided for @srvBrowserPrintState.
+  ///
+  /// In th, this message translates to:
+  /// **'สถานะคำขอพิมพ์ไม่ถูกต้องสำหรับการดำเนินการนี้'**
+  String get srvBrowserPrintState;
+
+  /// No description provided for @srvBrowserPrintReprintReasonRequired.
+  ///
+  /// In th, this message translates to:
+  /// **'ห่อนี้เคยสั่งพิมพ์แล้ว ต้องระบุเหตุผลการพิมพ์ซ้ำ'**
+  String get srvBrowserPrintReprintReasonRequired;
+
+  /// No description provided for @srvBrowserPrintRateLimited.
+  ///
+  /// In th, this message translates to:
+  /// **'สั่งพิมพ์บ่อยเกินไป กรุณารอสักครู่แล้วลองใหม่'**
+  String get srvBrowserPrintRateLimited;
+
   /// No description provided for @srvPkgWrongStatus.
   ///
   /// In th, this message translates to:
@@ -2359,6 +2395,240 @@ abstract class AppLocalizations {
   /// In th, this message translates to:
   /// **'ส่งแบบอัตโนมัติ — เครื่องพิมพ์ที่ว่างจะรับงานเอง'**
   String get pjAutoHint;
+
+  /// No description provided for @bpSheetTitle.
+  ///
+  /// In th, this message translates to:
+  /// **'พิมพ์ผ่านเบราว์เซอร์'**
+  String get bpSheetTitle;
+
+  /// No description provided for @bpPrintViaThisDevice.
+  ///
+  /// In th, this message translates to:
+  /// **'พิมพ์ผ่านเครื่องนี้'**
+  String get bpPrintViaThisDevice;
+
+  /// No description provided for @bpCreateRequest.
+  ///
+  /// In th, this message translates to:
+  /// **'สร้างคำขอพิมพ์'**
+  String get bpCreateRequest;
+
+  /// No description provided for @bpCreating.
+  ///
+  /// In th, this message translates to:
+  /// **'กำลังสร้างคำขอพิมพ์...'**
+  String get bpCreating;
+
+  /// No description provided for @bpPreviewTitle.
+  ///
+  /// In th, this message translates to:
+  /// **'ตัวอย่าง Label'**
+  String get bpPreviewTitle;
+
+  /// No description provided for @bpUnsterileNotice.
+  ///
+  /// In th, this message translates to:
+  /// **'ยังไม่ผ่านการฆ่าเชื้อ — Label ไม่แสดงวันที่'**
+  String get bpUnsterileNotice;
+
+  /// No description provided for @bpDatesLine.
+  ///
+  /// In th, this message translates to:
+  /// **'นึ่ง {sterilize} · หมดอายุ {expiry}'**
+  String bpDatesLine(String sterilize, String expiry);
+
+  /// No description provided for @bpCopies.
+  ///
+  /// In th, this message translates to:
+  /// **'จำนวนสำเนา'**
+  String get bpCopies;
+
+  /// No description provided for @bpCopiesLine.
+  ///
+  /// In th, this message translates to:
+  /// **'จำนวนสำเนา: {count}'**
+  String bpCopiesLine(int count);
+
+  /// No description provided for @bpReprintWarning.
+  ///
+  /// In th, this message translates to:
+  /// **'ห่อนี้เคยสั่งพิมพ์แล้ว — ต้องระบุเหตุผลการพิมพ์ซ้ำ'**
+  String get bpReprintWarning;
+
+  /// No description provided for @bpReprintLast.
+  ///
+  /// In th, this message translates to:
+  /// **'ล่าสุด: {at} · โดย {name} · {status}'**
+  String bpReprintLast(String at, String name, String status);
+
+  /// No description provided for @bpReprintReasonLabel.
+  ///
+  /// In th, this message translates to:
+  /// **'เหตุผลการพิมพ์ซ้ำ (บังคับ)'**
+  String get bpReprintReasonLabel;
+
+  /// No description provided for @bpReprintReasonHint.
+  ///
+  /// In th, this message translates to:
+  /// **'เช่น label เดิมชำรุด/หลุด'**
+  String get bpReprintReasonHint;
+
+  /// No description provided for @bpReprintReasonRequired.
+  ///
+  /// In th, this message translates to:
+  /// **'ต้องระบุเหตุผลการพิมพ์ซ้ำ'**
+  String get bpReprintReasonRequired;
+
+  /// No description provided for @bpSettingsTitle.
+  ///
+  /// In th, this message translates to:
+  /// **'ตรวจการตั้งค่าในหน้าต่างพิมพ์ก่อนกด Print'**
+  String get bpSettingsTitle;
+
+  /// No description provided for @bpSettingsPrinter.
+  ///
+  /// In th, this message translates to:
+  /// **'Printer: Xprinter XP-420B'**
+  String get bpSettingsPrinter;
+
+  /// No description provided for @bpSettingsPaper.
+  ///
+  /// In th, this message translates to:
+  /// **'Paper size: {w} × {h} มม.'**
+  String bpSettingsPaper(int w, int h);
+
+  /// No description provided for @bpSettingsScale.
+  ///
+  /// In th, this message translates to:
+  /// **'Scale: 100%'**
+  String get bpSettingsScale;
+
+  /// No description provided for @bpSettingsMargins.
+  ///
+  /// In th, this message translates to:
+  /// **'Margins: None'**
+  String get bpSettingsMargins;
+
+  /// No description provided for @bpSettingsHeaders.
+  ///
+  /// In th, this message translates to:
+  /// **'Headers and footers: ปิด'**
+  String get bpSettingsHeaders;
+
+  /// No description provided for @bpCannotVerifyWarning.
+  ///
+  /// In th, this message translates to:
+  /// **'ระบบ Browser ไม่สามารถตรวจสอบกระดาษที่ออกจากเครื่องได้ กรุณาตรวจ Label ก่อนยืนยัน'**
+  String get bpCannotVerifyWarning;
+
+  /// No description provided for @bpResultQuestion.
+  ///
+  /// In th, this message translates to:
+  /// **'ผลการพิมพ์เป็นอย่างไร?'**
+  String get bpResultQuestion;
+
+  /// No description provided for @bpResultPrinted.
+  ///
+  /// In th, this message translates to:
+  /// **'กระดาษออกถูกต้อง'**
+  String get bpResultPrinted;
+
+  /// No description provided for @bpResultNotPrinted.
+  ///
+  /// In th, this message translates to:
+  /// **'ไม่ได้พิมพ์ / ยกเลิก'**
+  String get bpResultNotPrinted;
+
+  /// No description provided for @bpResultLater.
+  ///
+  /// In th, this message translates to:
+  /// **'ตรวจสอบภายหลัง'**
+  String get bpResultLater;
+
+  /// No description provided for @bpConfirmedSnack.
+  ///
+  /// In th, this message translates to:
+  /// **'บันทึกแล้ว: ผู้ใช้ยืนยันว่ากระดาษออกแล้ว'**
+  String get bpConfirmedSnack;
+
+  /// No description provided for @bpCancelledSnack.
+  ///
+  /// In th, this message translates to:
+  /// **'บันทึกแล้ว: ไม่ได้พิมพ์/ยกเลิก'**
+  String get bpCancelledSnack;
+
+  /// No description provided for @bpStatusCreated.
+  ///
+  /// In th, this message translates to:
+  /// **'สร้างคำขอแล้ว'**
+  String get bpStatusCreated;
+
+  /// No description provided for @bpStatusDialogOpened.
+  ///
+  /// In th, this message translates to:
+  /// **'เปิดหน้าต่างพิมพ์แล้ว ยังไม่ยืนยันผล'**
+  String get bpStatusDialogOpened;
+
+  /// No description provided for @bpStatusUserConfirmed.
+  ///
+  /// In th, this message translates to:
+  /// **'ผู้ใช้ยืนยันว่ากระดาษออกแล้ว'**
+  String get bpStatusUserConfirmed;
+
+  /// No description provided for @bpStatusCancelled.
+  ///
+  /// In th, this message translates to:
+  /// **'ผู้ใช้แจ้งว่าไม่ได้พิมพ์หรือยกเลิก'**
+  String get bpStatusCancelled;
+
+  /// No description provided for @bpHistoryTitle.
+  ///
+  /// In th, this message translates to:
+  /// **'ประวัติพิมพ์ผ่านเบราว์เซอร์'**
+  String get bpHistoryTitle;
+
+  /// No description provided for @bpHistoryNone.
+  ///
+  /// In th, this message translates to:
+  /// **'ยังไม่มีคำขอพิมพ์ผ่านเบราว์เซอร์'**
+  String get bpHistoryNone;
+
+  /// No description provided for @bpHistoryBy.
+  ///
+  /// In th, this message translates to:
+  /// **'ผู้สั่ง: {name}'**
+  String bpHistoryBy(String name);
+
+  /// No description provided for @bpHistoryMeta.
+  ///
+  /// In th, this message translates to:
+  /// **'โหมด {mode} · สำเนา {copies} · เทมเพลต v{version}'**
+  String bpHistoryMeta(String mode, int copies, String version);
+
+  /// No description provided for @bpHistoryReason.
+  ///
+  /// In th, this message translates to:
+  /// **'เหตุผลพิมพ์ซ้ำ: {reason}'**
+  String bpHistoryReason(String reason);
+
+  /// No description provided for @bpHistoryRequestId.
+  ///
+  /// In th, this message translates to:
+  /// **'คำขอ {id}'**
+  String bpHistoryRequestId(String id);
+
+  /// No description provided for @bpSegGateway.
+  ///
+  /// In th, this message translates to:
+  /// **'Gateway'**
+  String get bpSegGateway;
+
+  /// No description provided for @bpSegBrowser.
+  ///
+  /// In th, this message translates to:
+  /// **'เบราว์เซอร์'**
+  String get bpSegBrowser;
 }
 
 class _AppLocalizationsDelegate

@@ -202,6 +202,18 @@ String? serverErrorFromCode(AppLocalizations l10n, String? code) {
       return l10n.srvGatewayConfig;
     case 'PRINTER_NOT_FOUND':
       return l10n.srvPrinterNotFound;
+    case 'BROWSER_PRINT_DISABLED':
+      return l10n.srvBrowserPrintDisabled;
+    case 'BROWSER_PRINT_NOT_FOUND':
+      return l10n.srvBrowserPrintNotFound;
+    case 'BROWSER_PRINT_FORBIDDEN':
+      return l10n.srvBrowserPrintForbidden;
+    case 'BROWSER_PRINT_STATE':
+      return l10n.srvBrowserPrintState;
+    case 'BROWSER_PRINT_REPRINT_REASON_REQUIRED':
+      return l10n.srvBrowserPrintReprintReasonRequired;
+    case 'BROWSER_PRINT_RATE_LIMITED':
+      return l10n.srvBrowserPrintRateLimited;
     default:
       return null;
   }

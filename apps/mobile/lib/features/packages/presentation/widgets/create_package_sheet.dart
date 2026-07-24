@@ -6,12 +6,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/api/api_client.dart';
 import '../../../../core/api/repositories.dart';
 import '../../../../core/auth/auth_controller.dart';
+import '../../../../core/config/feature_flags.dart';
 import '../../../../core/models/models.dart';
 import '../../../../core/printer/label_renderer.dart';
 import '../../../../core/printer/printer_adapter.dart';
 import '../../../../core/printer/printer_provider.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../l10n/app_localizations.dart';
+import '../../../browser_print/presentation/widgets/browser_print_sheet.dart';
 import '../../../print_jobs/presentation/widgets/submit_print_job_sheet.dart';
 
 /// เปิด sheet สร้างห่อ (สร้างได้ทีละหลายห่อ) — เมื่อสำเร็จแสดง dialog สรุป + ปุ่มพิมพ์ทั้งหมด
@@ -28,7 +30,11 @@ Future<void> showCreatePackageSheet(BuildContext context, WidgetRef ref) async {
   if (created == null || created.isEmpty || !context.mounted) return;
 
   final l10n = AppLocalizations.of(context);
-  final shouldPrint = await showDialog<bool>(
+  // ปุ่ม "พิมพ์ผ่านเครื่องนี้" (BROWSER_DIALOG) แสดงเฉพาะ flag เปิด + สร้าง 1 ห่อ
+  // (browser print สั่งได้ทีละคำขอต่อห่อ — หลายห่อใช้ Print Gateway ตามเดิม)
+  final browserPrint =
+      ref.read(browserPrintEnabledProvider) && created.length == 1;
+  final action = await showDialog<_PostCreateAction>(
     context: context,
     builder: (dctx) => AlertDialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
@@ -80,11 +86,18 @@ Future<void> showCreatePackageSheet(BuildContext context, WidgetRef ref) async {
       ),
       actions: [
         TextButton(
-          onPressed: () => Navigator.of(dctx).pop(false),
+          onPressed: () => Navigator.of(dctx).pop(null),
           child: Text(l10n.commonClose),
         ),
+        if (browserPrint)
+          OutlinedButton.icon(
+            onPressed: () =>
+                Navigator.of(dctx).pop(_PostCreateAction.browser),
+            icon: const Icon(Icons.open_in_browser, size: 18),
+            label: Text(l10n.bpPrintViaThisDevice),
+          ),
         FilledButton.icon(
-          onPressed: () => Navigator.of(dctx).pop(true),
+          onPressed: () => Navigator.of(dctx).pop(_PostCreateAction.gateway),
           icon: const Icon(Icons.print_outlined, size: 18),
           label: Text(created.length == 1
               ? l10n.pjPrintLabel
@@ -94,12 +107,24 @@ Future<void> showCreatePackageSheet(BuildContext context, WidgetRef ref) async {
     ),
   );
 
-  if (shouldPrint == true && context.mounted) {
-    // ใช้ Print Job Queue เป็นทางหลัก (สร้างงานผ่าน backend → Gateway พิมพ์/ACK)
-    // ไม่พิมพ์ตรงจาก client อีกต่อไป — printedAt/reprintCount อัปเดตจาก Gateway ACK เท่านั้น
-    await submitPrintJobs(context, ref, created);
+  if (!context.mounted) return;
+  switch (action) {
+    case _PostCreateAction.gateway:
+      // ใช้ Print Job Queue เป็นทางหลัก (สร้างงานผ่าน backend → Gateway พิมพ์/ACK)
+      // ไม่พิมพ์ตรงจาก client อีกต่อไป — printedAt/reprintCount อัปเดตจาก Gateway ACK เท่านั้น
+      await submitPrintJobs(context, ref, created);
+    case _PostCreateAction.browser:
+      // โหมด BROWSER_DIALOG (หลัง flag) — สร้าง BrowserPrintRequest แยกจาก
+      // PrintJob เด็ดขาด ผู้ใช้ยืนยันผลเอง ไม่แตะ printedAt
+      await showBrowserPrintSheet(context, ref,
+          pkg: created.first, createdFrom: 'CREATE_PACKAGE');
+    case null:
+      break;
   }
 }
+
+/// ทางเลือกหลังสร้างห่อสำเร็จ — พิมพ์ผ่าน Gateway (หลัก) หรือผ่านเบราว์เซอร์ (flag)
+enum _PostCreateAction { gateway, browser }
 
 // ─────────────────────────────────────────────────────────────────────────
 // ⚠️ Legacy direct-print (Bluetooth/System) — **ไม่ได้ผูกกับปุ่มพิมพ์ใน UI แล้ว**

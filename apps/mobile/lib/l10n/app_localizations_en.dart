@@ -147,6 +147,28 @@ class AppLocalizationsEn extends AppLocalizations {
       'This request was sent twice — reload and try again';
 
   @override
+  String get srvBrowserPrintDisabled => 'Browser printing mode is disabled';
+
+  @override
+  String get srvBrowserPrintNotFound => 'Browser print request not found';
+
+  @override
+  String get srvBrowserPrintForbidden =>
+      'You do not have access to this print request';
+
+  @override
+  String get srvBrowserPrintState =>
+      'The print request state does not allow this action';
+
+  @override
+  String get srvBrowserPrintReprintReasonRequired =>
+      'This package was already printed — a reprint reason is required';
+
+  @override
+  String get srvBrowserPrintRateLimited =>
+      'Too many print requests — please wait and try again';
+
+  @override
   String get srvPkgWrongStatus =>
       'The package status does not allow this action';
 
@@ -1301,4 +1323,142 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get pjAutoHint =>
       'Sent automatically — a free printer will claim the job';
+
+  @override
+  String get bpSheetTitle => 'Print via browser';
+
+  @override
+  String get bpPrintViaThisDevice => 'Print via this device';
+
+  @override
+  String get bpCreateRequest => 'Create print request';
+
+  @override
+  String get bpCreating => 'Creating print request...';
+
+  @override
+  String get bpPreviewTitle => 'Label preview';
+
+  @override
+  String get bpUnsterileNotice =>
+      'Not sterilized — no dates shown on the label';
+
+  @override
+  String bpDatesLine(String sterilize, String expiry) {
+    return 'Sterilized $sterilize · expires $expiry';
+  }
+
+  @override
+  String get bpCopies => 'Copies';
+
+  @override
+  String bpCopiesLine(int count) {
+    return 'Copies: $count';
+  }
+
+  @override
+  String get bpReprintWarning =>
+      'This package was already printed — a reprint reason is required';
+
+  @override
+  String bpReprintLast(String at, String name, String status) {
+    return 'Last: $at · by $name · $status';
+  }
+
+  @override
+  String get bpReprintReasonLabel => 'Reprint reason (required)';
+
+  @override
+  String get bpReprintReasonHint => 'e.g. previous label damaged/fell off';
+
+  @override
+  String get bpReprintReasonRequired => 'A reprint reason is required';
+
+  @override
+  String get bpSettingsTitle =>
+      'Check the print dialog settings before pressing Print';
+
+  @override
+  String get bpSettingsPrinter => 'Printer: Xprinter XP-420B';
+
+  @override
+  String bpSettingsPaper(int w, int h) {
+    return 'Paper size: $w × $h mm';
+  }
+
+  @override
+  String get bpSettingsScale => 'Scale: 100%';
+
+  @override
+  String get bpSettingsMargins => 'Margins: none';
+
+  @override
+  String get bpSettingsHeaders => 'Headers and footers: off';
+
+  @override
+  String get bpCannotVerifyWarning =>
+      'The browser cannot verify that a label actually came out of the printer — check the physical label before confirming';
+
+  @override
+  String get bpResultQuestion => 'What was the print result?';
+
+  @override
+  String get bpResultPrinted => 'Label came out correctly';
+
+  @override
+  String get bpResultNotPrinted => 'Not printed / cancel';
+
+  @override
+  String get bpResultLater => 'Check later';
+
+  @override
+  String get bpConfirmedSnack => 'Saved: user confirmed the label came out';
+
+  @override
+  String get bpCancelledSnack => 'Saved: not printed / cancelled';
+
+  @override
+  String get bpStatusCreated => 'Request created';
+
+  @override
+  String get bpStatusDialogOpened =>
+      'Print dialog opened — result not confirmed yet';
+
+  @override
+  String get bpStatusUserConfirmed => 'User confirmed the label came out';
+
+  @override
+  String get bpStatusCancelled => 'User reported not printed or cancelled';
+
+  @override
+  String get bpHistoryTitle => 'Browser print history';
+
+  @override
+  String get bpHistoryNone => 'No browser print requests yet';
+
+  @override
+  String bpHistoryBy(String name) {
+    return 'By: $name';
+  }
+
+  @override
+  String bpHistoryMeta(String mode, int copies, String version) {
+    return 'Mode $mode · copies $copies · template v$version';
+  }
+
+  @override
+  String bpHistoryReason(String reason) {
+    return 'Reprint reason: $reason';
+  }
+
+  @override
+  String bpHistoryRequestId(String id) {
+    return 'Request $id';
+  }
+
+  @override
+  String get bpSegGateway => 'Gateway';
+
+  @override
+  String get bpSegBrowser => 'Browser';
 }
