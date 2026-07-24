@@ -68,8 +68,11 @@ final dioProvider = Provider<Dio>((ref) {
   final baseUrl = ref.watch(serverUrlProvider);
   final dio = Dio(BaseOptions(
     baseUrl: '$baseUrl/api/v1',
-    connectTimeout: const Duration(seconds: 20),
-    receiveTimeout: const Duration(seconds: 20),
+    // เผื่อ cold-start ของ Render free tier (ตื่นได้ถึง ~50-60 วิ) — คำขอแรก
+    // หลัง server หลับต้องรอ TTFB นาน ถ้าตั้งสั้นไป (เดิม 20 วิ) จะ timeout
+    // ตั้งแต่ยังไม่ทันตื่น โดยเฉพาะ POST /auth/login ที่ไม่ retry บน receiveTimeout
+    connectTimeout: const Duration(seconds: 30),
+    receiveTimeout: const Duration(seconds: 60),
   ));
 
   dio.interceptors.add(InterceptorsWrapper(
@@ -105,9 +108,15 @@ final dioProvider = Provider<Dio>((ref) {
         // - GET: retry ได้เสมอ (idempotent)
         // - POST/PATCH/DELETE: retry เฉพาะ connectTimeout/connectionError
         //   (ยังไม่เชื่อมต่อ ไม่มีทางที่ server ได้รับข้อมูลไปประมวลผลแล้ว)
+        // 502/503/504/522 = edge/proxy ตอบก่อน server ตื่น (Render/Cloudflare
+        // gateway timeout) — server ยังไม่ได้ประมวลผล จึง retry ได้ปลอดภัยทุก
+        // method (mutation ทุกตัวมี Idempotency-Key อยู่แล้ว กันซ้ำอีกชั้น)
+        final sc = currentError.response?.statusCode;
+        final wakingStatus = sc == 502 || sc == 503 || sc == 504 || sc == 522;
         final canRetry = currentError.type ==
                 DioExceptionType.connectionTimeout ||
             currentError.type == DioExceptionType.connectionError ||
+            wakingStatus ||
             (currentError.type == DioExceptionType.receiveTimeout &&
                 currentError.requestOptions.method.toUpperCase() == 'GET');
         if (!canRetry) break;
