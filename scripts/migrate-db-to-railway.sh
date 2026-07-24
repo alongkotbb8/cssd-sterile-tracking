@@ -30,11 +30,12 @@ pg_restore --no-owner --no-privileges --clean --if-exists --no-comments \
   --dbname="$NEW" "$DUMP"
 
 echo "==> ตรวจนับตารางหลัก ..."
+# ชื่อตารางจริงเป็น snake_case (Prisma @@map) — ไม่ใช่ชื่อ model
 psql "$NEW" -c 'SELECT
-  (SELECT count(*) FROM "User")        AS users,
-  (SELECT count(*) FROM "Package")     AS packages,
-  (SELECT count(*) FROM "Movement")    AS movements,
-  (SELECT count(*) FROM "_prisma_migrations") AS migrations;' || \
+  (SELECT count(*) FROM users)        AS users,
+  (SELECT count(*) FROM packages)     AS packages,
+  (SELECT count(*) FROM movements)    AS movements,
+  (SELECT count(*) FROM _prisma_migrations) AS migrations;' || \
   echo "(ข้ามการนับ — ตรวจเองภายหลังได้)"
 
 echo "✅ ย้ายข้อมูลเสร็จ"
